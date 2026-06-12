@@ -24,3 +24,7 @@ yarn-error.log*
 *.csv
 *.zip
 temp_zip/
+
+# Environment Variables
+.env
+.env.*

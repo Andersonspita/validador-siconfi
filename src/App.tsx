@@ -1,19 +1,61 @@
 import { useState, useEffect } from 'react';
-import { Moon, Sun, ShieldCheck } from 'lucide-react';
+import { Moon, Sun, ShieldCheck, LogOut, Loader2 } from 'lucide-react';
 import Dropzone from './components/Dropzone';
 import ReportDashboard from './components/ReportDashboard';
+import Login from './components/Login';
+import { auth } from './firebase';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 
 function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [files, setFiles] = useState<File[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
     document.body.className = `theme-${theme}`;
   }, [theme]);
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoadingAuth(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setFiles([]);
+  };
+
+  if (loadingAuth) {
+    return (
+      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Loader2 size={48} className="spin" style={{ color: 'var(--primary)' }} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="app-container">
+        <header className="glass-header">
+          <div className="header-content" style={{ justifyContent: 'center' }}>
+            <div className="logo-container">
+              <ShieldCheck className="logo-icon" size={32} />
+              <h1>Validador <span>Siconfi</span></h1>
+            </div>
+          </div>
+        </header>
+        <Login />
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -26,6 +68,9 @@ function App() {
           <div className="header-actions">
             <button onClick={toggleTheme} className="icon-btn" aria-label="Toggle Theme">
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+            </button>
+            <button onClick={handleLogout} className="icon-btn logout-btn" aria-label="Sair" title="Sair">
+              <LogOut size={20} />
             </button>
           </div>
         </div>
