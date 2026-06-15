@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { parseFiles } from '../core/parsers';
 import { runValidations } from '../core/validatorEngine';
-import { ValidationResult } from '../core/types';
+import { ValidationResult, RuleDefinition } from '../core/types';
 import Papa from 'papaparse';
 import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download } from 'lucide-react';
 import './ReportDashboard.css';
 
 interface ReportDashboardProps {
   files: File[];
+  rulesMap: Map<string, RuleDefinition>;
   onReset: () => void;
 }
 
-export default function ReportDashboard({ files, onReset }: ReportDashboardProps) {
+export default function ReportDashboard({ files, rulesMap, onReset }: ReportDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<ValidationResult[]>([]);
   const [filter, setFilter] = useState<'all' | 'error' | 'warning' | 'capag'>('all');
@@ -20,7 +21,7 @@ export default function ReportDashboard({ files, onReset }: ReportDashboardProps
     const process = async () => {
       try {
         const parsedData = await parseFiles(files);
-        const validationResults = runValidations(parsedData);
+        const validationResults = runValidations(parsedData, rulesMap);
         setResults(validationResults);
       } catch (err) {
         console.error("Error processing files:", err);

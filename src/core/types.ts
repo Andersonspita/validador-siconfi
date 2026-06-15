@@ -7,6 +7,15 @@ export interface DetailedItem {
   valor?: number;
 }
 
+export interface RuleDefinition {
+  ruleId: string;
+  description: string;
+  dimension: 'D1' | 'D2' | 'D3' | 'D4';
+  impactsCapag: boolean;
+  aplicavel?: string;
+  finalidade?: string;
+}
+
 export interface ValidationResult {
   ruleId: string;
   dimension: 'D1' | 'D2' | 'D3' | 'D4';
@@ -18,9 +27,13 @@ export interface ValidationResult {
   message: string;
 }
 
+export interface XLSReport {
+  [sheetName: string]: any[][];
+}
+
 export interface ParsedData {
   msc?: MSCAccount[];
-  rreo?: any; // Simplified for now
+  rreo?: any; // XML ou XLSReport
   rgf?: any;
   dca?: any;
 }

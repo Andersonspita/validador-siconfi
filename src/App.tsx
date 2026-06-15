@@ -6,6 +6,8 @@ import Login from './components/Login';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { loadRulesMetadata } from './core/rulesMetadata';
+import { RuleDefinition } from './core/types';
 
 function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -13,10 +15,15 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [rulesMap, setRulesMap] = useState<Map<string, RuleDefinition> | null>(null);
 
   useEffect(() => {
     document.body.className = `theme-${theme}`;
   }, [theme]);
+
+  useEffect(() => {
+    loadRulesMetadata().then(map => setRulesMap(map));
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -35,7 +42,7 @@ function App() {
     setFiles([]);
   };
 
-  if (loadingAuth) {
+  if (loadingAuth || !rulesMap) {
     return (
       <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Loader2 size={48} className="spin" style={{ color: 'var(--primary)' }} />
@@ -90,7 +97,7 @@ function App() {
         {files.length === 0 ? (
           <Dropzone onFilesDropped={setFiles} />
         ) : (
-          <ReportDashboard files={files} onReset={() => setFiles([])} />
+          <ReportDashboard files={files} rulesMap={rulesMap} onReset={() => setFiles([])} />
         )}
       </main>
       

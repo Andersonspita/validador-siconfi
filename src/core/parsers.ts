@@ -1,7 +1,8 @@
 import Papa from 'papaparse';
 import JSZip from 'jszip';
 import { XMLParser } from 'fast-xml-parser';
-import { ParsedData, MSCAccount } from './types';
+import * as XLSX from 'xlsx';
+import { ParsedData, MSCAccount, XLSReport } from './types';
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -49,6 +50,19 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
       if (file.name.toLowerCase().includes('rreo')) result.rreo = parsedXml;
       else if (file.name.toLowerCase().includes('rgf')) result.rgf = parsedXml;
       else if (file.name.toLowerCase().includes('dca')) result.dca = parsedXml;
+    } else if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      
+      const parsedXls: XLSReport = {};
+      workbook.SheetNames.forEach(sheetName => {
+        const worksheet = workbook.Sheets[sheetName];
+        parsedXls[sheetName] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      });
+
+      if (file.name.toLowerCase().includes('rreo')) result.rreo = parsedXls;
+      else if (file.name.toLowerCase().includes('rgf')) result.rgf = parsedXls;
+      else if (file.name.toLowerCase().includes('dca')) result.dca = parsedXls;
     }
   }
 

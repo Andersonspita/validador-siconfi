@@ -1,22 +1,38 @@
-import { ParsedData, ValidationResult, MSCAccount } from './types';
+import { ParsedData, ValidationResult, MSCAccount, RuleDefinition } from './types';
+import { getRCLFromRREO, getRCLFromRGF, getReceitasArrecadadasRREO_Anexo1 } from './xmlExtractors';
 
-export const runValidations = (data: ParsedData): ValidationResult[] => {
+export const runValidations = (data: ParsedData, rulesMap: Map<string, RuleDefinition>): ValidationResult[] => {
   const results: ValidationResult[] = [];
 
   if (data.msc) {
-    results.push(...validateD1_MSC(data.msc));
+    results.push(...validateD1_MSC(data.msc, rulesMap));
+    results.push(...validateMSC_CAPAG(data.msc, rulesMap));
   }
 
-  // Se tivermos MSC e outros arquivos, podemos cruzar (D4) ou checar D2/D3
+  // Se tivermos MSC e outros arquivos, podemos cruzar (D4)
+  if (data.msc && data.rreo) {
+    results.push(...validateD4_Cruzamentos(data, rulesMap));
+  }
+
+  // Checar RREO vs RGF (D3)
   if (data.rreo && data.rgf) {
-    results.push(...validateD3_Fiscal(data.rreo, data.rgf));
+    results.push(...validateD3_Fiscal(data.rreo, data.rgf, rulesMap));
   }
 
-  return results;
+  // Populate dynamic metadata
+  return results.map(res => {
+    const ruleDef = rulesMap.get(res.ruleId);
+    if (ruleDef) {
+      res.description = ruleDef.description;
+      res.impactsCapag = ruleDef.impactsCapag;
+      res.dimension = ruleDef.dimension;
+    }
+    return res;
+  });
 };
 
 // --- D1 Rules (Gestão da Informação) ---
-function validateD1_MSC(msc: MSCAccount[]): ValidationResult[] {
+function validateD1_MSC(msc: MSCAccount[], rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
   const results: ValidationResult[] = [];
 
   // D1_00017: Valores negativos
@@ -127,21 +143,101 @@ function validateD1_MSC(msc: MSCAccount[]): ValidationResult[] {
 }
 
 // --- D3 Rules (Fiscal) ---
-function validateD3_Fiscal(rreo: any, rgf: any): ValidationResult[] {
+function validateD3_Fiscal(rreo: any, rgf: any, rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
   const results: ValidationResult[] = [];
   
-  // Exemplo de regra D3_00005: Igualdade da RCL
-  // (Na vida real, navegaríamos no XML para achar o valor)
-  // Aqui é mockado para demonstrar o Alerta CAPAG
+  // D3_00005: Igualdade da RCL entre RREO e RGF
   if (rreo && rgf) {
-    // Simulando uma discrepância CAPAG
+    const rclRREO = getRCLFromRREO(rreo);
+    const rclRGF = getRCLFromRGF(rgf);
+
+    if (Math.abs(rclRREO - rclRGF) > 0.01) {
+      results.push({
+        ruleId: 'D3_00005',
+        dimension: 'D3',
+        description: '', // populated dynamically
+        severity: 'error',
+        impactsCapag: true,
+        message: `Divergência na Receita Corrente Líquida (RCL). RREO: R$ ${rclRREO.toFixed(2)} | RGF: R$ ${rclRGF.toFixed(2)}.`,
+      });
+    }
+  }
+
+  return results;
+}
+
+// --- D4 Rules (Cruzamentos Diversos) ---
+function validateD4_Cruzamentos(data: ParsedData, rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+  const results: ValidationResult[] = [];
+
+  // D4_00020: Igualdade nas receitas arrecadadas na MSC de dezembro e no Anexo 01 do RREO 6ºB
+  if (data.msc && data.rreo) {
+    let receitasMSC = 0;
+    
+    data.msc.forEach(acc => {
+      // Receitas arrecadadas (Classe 6, tipicamente 6212 ou contas de receita com natureza credora)
+      if (acc.CONTA.startsWith('6212') && acc.Tipo_valor === 'period_change') {
+        receitasMSC += acc.Valor;
+      }
+    });
+
+    const receitasRREO = getReceitasArrecadadasRREO_Anexo1(data.rreo);
+
+    // Como é PoC, o valor da MSC provavelmente não vai bater com o mock do RREO
+    if (Math.abs(receitasMSC - receitasRREO) > 0.01) {
+      results.push({
+        ruleId: 'D4_00020',
+        dimension: 'D4',
+        description: '', // populated dynamically
+        severity: 'error',
+        impactsCapag: true,
+        message: `Receitas Arrecadadas divergentes. MSC: R$ ${receitasMSC.toFixed(2)} | RREO: R$ ${receitasRREO.toFixed(2)}.`,
+      });
+    }
+  }
+
+  return results;
+}
+
+// --- MSC CAPAG Rules ---
+function validateMSC_CAPAG(msc: MSCAccount[], rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+  const results: ValidationResult[] = [];
+
+  // D3_00021: Somatório do passivo circulante e passivo não circulante (financeiros) >= Restos a Pagar (Executivo + RPPS)
+  // Lógica Aproximada (PCASP): 
+  // Passivo Financeiro = Contas Classe 2 (21 e 22) com atributo F (Superávit Financeiro).
+  // Restos a Pagar = Contas 2131 (RPNP) e 2121/2122 (RPP) ou saldo das contas de controle.
+  
+  let passivoFinanceiro = 0;
+  let restosAPagar = 0;
+
+  msc.forEach(acc => {
+    // Na MSC, o saldo final de contas do passivo tem natureza credora (C)
+    if (acc.Tipo_valor === 'ending_balance') {
+      const valor = acc.Natureza_valor === 'C' ? acc.Valor : -acc.Valor;
+      
+      // Simplificação do Passivo Financeiro (geralmente detalhado por fonte com atributo F)
+      // Aqui vamos apenas usar as contas 21 e 22 de forma abrangente para o mock.
+      if (acc.CONTA.startsWith('21') || acc.CONTA.startsWith('22')) {
+        passivoFinanceiro += valor;
+      }
+
+      // Restos a Pagar (Contas 213 para Não Processados e subcontas de RPP)
+      if (acc.CONTA.startsWith('213') || acc.CONTA.startsWith('212')) {
+         restosAPagar += valor;
+      }
+    }
+  });
+
+  if (passivoFinanceiro < restosAPagar) {
     results.push({
-      ruleId: 'D3_00005',
+      ruleId: 'D3_00021',
       dimension: 'D3',
-      description: 'Igualdade da Receita Corrente Líquida (RCL) entre RREO e RGF',
+      description: '', // Preenchido dinamicamente via rulesMap
       severity: 'error',
-      impactsCapag: true,
-      message: 'Foi detectada divergência na Receita Corrente Líquida (RCL) informada no Anexo 3 do RREO e Anexo 1 do RGF. Corrige-o para evitar perda na nota CAPAG!',
+      impactsCapag: true, // Será sobreposto pelo metadado
+      message: `O somatório do Passivo Financeiro (R$ ${passivoFinanceiro.toFixed(2)}) é menor que os Restos a Pagar (R$ ${restosAPagar.toFixed(2)}).`,
+      affectedAccounts: ['21', '22']
     });
   }
 
