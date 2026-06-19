@@ -22,10 +22,10 @@ const findValueInSheet = (
     if (matchIndex === -1) continue;
 
     for (let i = matchIndex + startColOffset; i < row.length; i++) {
-      if (typeof row[i] === 'number' && row[i] !== 0) return row[i];
+      if (typeof row[i] === 'number') return row[i];           // inclui zero legítimo
       if (typeof row[i] === 'string') {
         const parsed = parseFloat(row[i].replace(/\./g, '').replace(',', '.'));
-        if (!isNaN(parsed) && parsed !== 0) return parsed;
+        if (!isNaN(parsed)) return parsed;                     // inclui zero legítimo
       }
     }
   }
@@ -60,10 +60,10 @@ const findValueInSection = (
       depth++;
       if (valRx.test(cell)) {
         for (let i = 1; i < row.length; i++) {
-          if (typeof row[i] === 'number' && row[i] !== 0) return row[i];
+          if (typeof row[i] === 'number') return row[i];
           if (typeof row[i] === 'string') {
             const n = parseFloat(row[i].replace(/\./g, '').replace(',', '.'));
-            if (!isNaN(n) && n !== 0) return n;
+            if (!isNaN(n)) return n;
           }
         }
         return null;
@@ -104,7 +104,8 @@ export const getRCLFromRREO = (rreo: any): number | null => {
 export const getRCLFromRGF = (rgf: any): number | null => {
   const sheet = getSheet(rgf, ['RGF-Anexo 01', 'RGF Anexo 01', 'Anexo 01']);
   if (!sheet) return null;
-  return findValueInSheet(sheet, 'RECEITA CORRENTE L[IÍ]QUIDA.*RCL|RECEITA CORRENTE L[IÍ]QUIDA');
+  // Padrão primário: linha que contém "- RCL" ou "(RCL)" — distingue da linha "AJUSTADA"
+  return findValueInSheet(sheet, 'RECEITA CORRENTE L[IÍ]QUIDA.*-.*RCL\\b|RECEITA CORRENTE L[IÍ]QUIDA.*\\(RCL\\)');
 };
 
 // ─── RREO Anexo 01 ───────────────────────────────────────────────────────────
@@ -147,9 +148,13 @@ export const getDespesasAnexo02 = (rreo: any): number | null =>
 
 // ─── RREO Anexo 04 (RPPS) ────────────────────────────────────────────────────
 
-// D3_00030: Total receitas previdenciárias
+// D3_00030: Total receitas do RPPS (Fundo em Capitalização) — Anexo 04
 export const getTotalReceitasRPPS_A04 = (rreo: any): number | null =>
   extractFromReport(rreo, ['RREO-Anexo 04', 'RREO Anexo 04'], 'TOTAL DAS RECEITAS DO FUNDO.*\\(IV\\)');
+
+// D3_00030: Receitas com fontes RPPS no Anexo 06 (soma das linhas com FONTES RPPS)
+export const getReceitasRPPS_A06 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RECEITAS PRIMÁRIAS CORRENTES.*COM FONTES RPPS.*\\(V\\)|RECEITAS.*COM FONTES RPPS.*\\(V\\)');
 
 // D3_00032: Recursos RPPS exercícios anteriores — Anexo 04
 // O valor fica em linha "  VALOR" abaixo do cabeçalho de seção
@@ -186,9 +191,10 @@ export const getReservaRPPS_A06 = (rreo: any): number | null =>
 export const getReservaContingencia_A06 = (rreo: any): number | null =>
   extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RESERVA DE CONTING[EÊ]NCIA.*\\(XXIX\\)|RESERVA DE CONTING[EÊ]NCIA');
 
-// D3_00028: Receitas realizadas totais — Anexo 06 (para comparar com Anexo 01)
-export const getReceitaRealizadaTotal_A06 = (rreo: any): number | null =>
-  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RECEITA PRIMÁRIA TOTAL.*\\(XVI\\)');
+// D3_00028: Receitas realizadas totais — Anexo 06 (Receita Primária Total)
+// Nota: A comparação completa exige identificar a coluna "Até o Bimestre" em ambos os Anexos.
+// Implementação pendente de inspeção de layout de colunas.
+// export const getReceitaRealizadaTotal_A06 = ...
 
 // ─── RREO Anexo 07 (Restos a Pagar) ─────────────────────────────────────────
 
@@ -211,9 +217,10 @@ export const findNegativosRP_A07 = (rreo: any): { label: string; value: number }
   return result;
 };
 
-// D3_00017: Total RP pagos no exercício — Anexo 07
-export const getTotalRPPagos_A07 = (rreo: any): number | null =>
-  extractFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'TOTAL.*\\(III\\)');
+// D3_00017: Total RP (exceto intra + intra) — Anexo 07 coluna "Pagos no Exercício"
+// Nota: Anexo 07 tem múltiplas colunas; "TOTAL (III)" retorna a primeira, que pode não ser "Pagos".
+// Implementação completa pendente de mapeamento de colunas.
+// export const getTotalRPPagos_A07 = ...
 
 // ─── RGF Anexo 01 ────────────────────────────────────────────────────────────
 

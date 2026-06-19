@@ -2,6 +2,7 @@ import { ParsedData, ValidationResult, MSCAccount, RuleDefinition } from './type
 import {
   getRCLFromRREO, getRCLFromRGF, getReceitasArrecadadasRREO, extractXLSMetadata,
   findNegativeValues, getEquilibrioOrcamentario, getTotalDespesasAnexo01, getDespesasAnexo02,
+  getTotalReceitasRPPS_A04, getReceitasRPPS_A06,
   getRPPSExercAnt_A01, getRPPSExercAnt_A04, getRPPSExercAnt_A06,
   getSuperavitFinanceiro_A01, getSuperavitFinanceiro_A06,
   getReservaRPPS_A01, getReservaRPPS_A04, getReservaRPPS_A06,
@@ -307,17 +308,32 @@ function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition
   }
 
   // D1_00028: Todas as classes (1–8) presentes na MSC
+  // Classes 7 e 8 (DDR — controle) podem ser ausentes em municípios sem RPPS ou obrigações
+  // contingentes: tratadas como 'info' para não gerar falso positivo.
   const presentClasses = new Set(msc.filter(a => a.Valor !== 0).map(a => a.CONTA[0]));
-  const missingClasses = ['1','2','3','4','5','6','7','8'].filter(c => !presentClasses.has(c));
-  if (missingClasses.length > 0) {
+  const missingObrig  = ['1','2','3','4','5','6'].filter(c => !presentClasses.has(c));
+  const missingDDR    = ['7','8'].filter(c => !presentClasses.has(c));
+
+  if (missingObrig.length > 0) {
     results.push({
       ruleId: 'D1_00028',
       dimension: 'D1',
       description: 'MSC com informação de todas as classes de contas',
       severity: 'warning',
       impactsCapag: false,
-      affectedAccounts: missingClasses.map(c => `Classe ${c}`),
-      message: `Classe(s) de contas ausente(s) na MSC: ${missingClasses.map(c => `Classe ${c}`).join(', ')}. A MSC deve conter valores em todas as classes patrimonial, orçamentária e de controle.`,
+      affectedAccounts: missingObrig.map(c => `Classe ${c}`),
+      message: `Classe(s) obrigatória(s) ausente(s) na MSC: ${missingObrig.map(c => `Classe ${c}`).join(', ')}. A MSC deve conter valores nas classes patrimonial (1–4) e orçamentária (5–6).`,
+    });
+  }
+  if (missingDDR.length > 0) {
+    results.push({
+      ruleId: 'D1_00028',
+      dimension: 'D1',
+      description: 'MSC com informação de todas as classes de contas',
+      severity: 'info',
+      impactsCapag: false,
+      affectedAccounts: missingDDR.map(c => `Classe ${c}`),
+      message: `Classe(s) de controle DDR ausente(s) na MSC: ${missingDDR.map(c => `Classe ${c}`).join(', ')}. Classes 7 e 8 são esperadas pelo Siconfi mas podem ser legitimamente ausentes em municípios sem RPPS ou sem obrigações contingentes registradas.`,
     });
   }
 
@@ -716,6 +732,15 @@ function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition>): Val
     });
   }
 
+  // D3_00030: Igualdade das receitas previdenciárias RPPS entre Anexo 04 e Anexo 06
+  results.push(...validatePairEquality(
+    'D3_00030', 'D3',
+    { label: 'RREO Anexo 04', val: getTotalReceitasRPPS_A04(rreo) },
+    { label: 'RREO Anexo 06', val: getReceitasRPPS_A06(rreo) },
+    'Total de Receitas Previdenciárias do RPPS diverge entre o Anexo 04 e o Anexo 06 do RREO.',
+    true
+  ));
+
   // D3_00032: Recursos RPPS arrecadados em exercícios anteriores — deve ser igual em A01, A04 e A06
   results.push(...validateTripleEquality(
     'D3_00032', 'D3',
@@ -941,7 +966,8 @@ function validateMSC_CAPAG(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinit
   msc.forEach(acc => {
     if (acc.Tipo_valor === 'ending_balance') {
       const valor = acc.Natureza_valor === 'C' ? acc.Valor : -acc.Valor;
-      if (acc.CONTA.startsWith('21') || acc.CONTA.startsWith('22')) {
+      // Passivo financeiro = apenas contas 21/22 com atributo F (superávit financeiro)
+      if ((acc.CONTA.startsWith('21') || acc.CONTA.startsWith('22')) && acc.FP === 'F') {
         passivoFinanceiro += valor;
       }
       if (acc.CONTA.startsWith('213') || acc.CONTA.startsWith('212')) {

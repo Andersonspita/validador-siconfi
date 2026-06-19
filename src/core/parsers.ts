@@ -100,17 +100,27 @@ const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; p
             return v === '' ? undefined : v;
           };
 
-          // IC2 pode ser FP (atributo superávit financeiro, 1 dígito) ou FS (função/subfunção, 5 dígitos)
-          // O TIPO2 da linha indica qual é qual: 'FP' ou 'FS'
+          // IC2 pode ser FP (atributo superávit financeiro) ou FS (função/subfunção, contas 622xxx).
+          // Prioridade: coluna TIPO2 da linha → fallback pelo prefixo da conta → fallback por nome de coluna legado.
+          const conta = getVal('CONTA') ?? '';
           const tipo2 = getVal('TIPO2');
-          const ic2 = getVal('IC2');
-          const fp = tipo2 === 'FP' ? ic2 : undefined;
-          const fs = tipo2 === 'FS' ? ic2 : undefined;
+          const ic2   = getVal('IC2');
+          const isDespOrcamentaria = conta.startsWith('622');
+          const fp = tipo2 === 'FP' ? ic2
+                   : tipo2 === 'FS' ? undefined
+                   : !tipo2 && !isDespOrcamentaria ? ic2    // sem TIPO2: infere pelo prefixo
+                   : undefined;
+          const fs = tipo2 === 'FS' ? ic2
+                   : tipo2 === 'FP' ? undefined
+                   : !tipo2 && isDespOrcamentaria ? ic2     // sem TIPO2: infere pelo prefixo
+                   : undefined;
 
-          // IC5 pode ser ND (natureza da despesa, 8 dígitos) para contas 622xxx
+          // IC5 é ND (natureza da despesa) para contas 622xxx.
           const tipo5 = getVal('TIPO5');
-          const ic5 = getVal('IC5');
-          const nd = tipo5 === 'ND' ? ic5 : undefined;
+          const ic5   = getVal('IC5');
+          const nd = tipo5 === 'ND' ? ic5
+                   : !tipo5 && isDespOrcamentaria ? ic5     // sem TIPO5: infere pelo prefixo
+                   : undefined;
 
           return {
             CONTA: getVal('CONTA') ?? '',
