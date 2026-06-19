@@ -253,10 +253,30 @@ export const getTransfEmendasIndividuais_RGF_A02 = (rgf: any): number | null =>
 
 // ─── RREO Anexo 03 ───────────────────────────────────────────────────────────
 
-// D3_00015/16: Transferências emendas individuais — RREO Anexo 03
+// D3_00015: Transferências emendas individuais — RREO Anexo 03
 export const getTransfEmendasIndividuais_RREO_A03 = (rreo: any): number | null =>
   extractFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'],
-    'Emendas Individuais|166-A');
+    'Emendas Individuais|166-A.*§.*1');
+
+// D3_00016: Transferências emendas de bancada — RREO Anexo 03
+export const getTransfEmendasBancada_RREO_A03 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'],
+    'emendas de bancada|166.*§.*16');
+
+// D3_00016: Transferências emendas de bancada — RGF Anexo 01
+export const getTransfEmendasBancada_RGF_A01 = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 01', 'RGF Anexo 01'],
+    'emendas de bancada|166.*§.*16');
+
+// D3_00044: Transferências agentes comunitários de saúde — RREO Anexo 03
+export const getTransfAgentesSaude_RREO_A03 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'],
+    'agentes comunit[aá]rios|198.*§.*11');
+
+// D3_00044: Transferências agentes comunitários de saúde — RGF Anexo 01
+export const getTransfAgentesSaude_RGF_A01 = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 01', 'RGF Anexo 01'],
+    'agentes comunit[aá]rios|198.*§.*11');
 
 // ─── Utilitários ─────────────────────────────────────────────────────────────
 

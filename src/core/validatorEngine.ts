@@ -11,6 +11,8 @@ import {
   getDCL_RREO_A06, getDCL_RGF_A02,
   getTransfEmendasIndividuais_RGF_A01, getTransfEmendasIndividuais_RGF_A02,
   getTransfEmendasIndividuais_RREO_A03,
+  getTransfEmendasBancada_RREO_A03, getTransfEmendasBancada_RGF_A01,
+  getTransfAgentesSaude_RREO_A03, getTransfAgentesSaude_RGF_A01,
   getDedInativos_RGF_A01, getTotalInativos_RGF_A01,
 } from './xmlExtractors';
 
@@ -23,6 +25,11 @@ export const runValidations = (data: ParsedData, rulesMap: Map<string, RuleDefin
     results.push(...validateD1_MSC(data.msc, rulesMap));
     results.push(...validateD2_MSC(data.msc, rulesMap));
     results.push(...validateMSC_CAPAG(data.msc, rulesMap));
+
+    // D1_00036: apenas para MSC de encerramento (período mês > 12 ou = 0)
+    if (data.mscPeriods?.some(p => { const m = parseInt(p.split('-')[1] ?? '0'); return m > 12 || m === 0; })) {
+      results.push(...validateD1_Encerramento(data.msc, rulesMap));
+    }
   }
 
   if (data.rreo) {
@@ -656,6 +663,26 @@ function validateD2_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition
     });
   }
 
+  // D2_00054: VPA/VPD com equivalência patrimonial (442xxx/362xxx) sem investimentos permanentes (122xxx)
+  const temEquivPatrimonial = msc.some(acc =>
+    (acc.CONTA.startsWith('442') || acc.CONTA.startsWith('362')) &&
+    acc.Tipo_valor === 'period_change' && acc.Valor > 0
+  );
+  const temInvestimentosPermanentes = msc.some(acc =>
+    acc.CONTA.startsWith('122') && acc.Tipo_valor === 'ending_balance' && acc.Valor > 0
+  );
+  if (temEquivPatrimonial && !temInvestimentosPermanentes) {
+    results.push({
+      ruleId: 'D2_00054',
+      dimension: 'D2',
+      description: 'VPA/VPD de equivalência patrimonial sem investimentos permanentes',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: ['442', '362', '122'],
+      message: `Há movimentações de VPA (442xxx) ou VPD (362xxx) de resultado de equivalência patrimonial, mas não foram encontrados saldos em contas de Investimentos Permanentes (122xxx). O PIPCP exige que esses investimentos estejam registrados.`,
+    });
+  }
+
   // D2_00095: Despesas com pessoal RGPS sem INSS/FGTS correspondente
   // Conta 311210101 (despesa ativa RGPS) deve ter 312210100 (INSS) ou 312230100 (FGTS)
   const temDespRGPS = msc.some(a => a.CONTA === '311210101' && a.Tipo_valor === 'period_change' && a.Valor > 0);
@@ -670,6 +697,38 @@ function validateD2_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition
       impactsCapag: false,
       affectedAccounts: ['311210101', '312210100', '312230100'],
       message: `Há despesas com pessoal ativo RGPS (311210101) mas sem registro de INSS patronal (312210100) nem FGTS (312230100). Verifique o registro das despesas previdenciárias.`,
+    });
+  }
+
+  return results;
+}
+
+
+// =============================================================================
+// D1 — MSC Encerramento
+// =============================================================================
+function validateD1_Encerramento(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+  const results: ValidationResult[] = [];
+
+  // D1_00036: MSC de encerramento não pode ter saldo final nas contas de VPA (classe 4) e VPD (classe 3)
+  const vpaVpdComSaldo = msc.filter(acc =>
+    (acc.CONTA.startsWith('3') || acc.CONTA.startsWith('4')) &&
+    acc.Tipo_valor === 'ending_balance' &&
+    acc.Valor !== 0
+  );
+  if (vpaVpdComSaldo.length > 0) {
+    results.push({
+      ruleId: 'D1_00036',
+      dimension: 'D1',
+      description: 'MSC encerramento com saldo final nas contas VPA e VPD',
+      severity: 'error',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(vpaVpdComSaldo.map(a => a.CONTA))).slice(0, 20),
+      detailedItems: vpaVpdComSaldo.slice(0, 30).map(a => ({
+        conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor,
+        detalhe: `Natureza: ${a.Natureza_valor} | As contas de resultado (VPA/VPD) devem ser zeradas no encerramento`,
+      })),
+      message: `${vpaVpdComSaldo.length} conta(s) de VPA (classe 4) ou VPD (classe 3) com saldo final diferente de zero na MSC de encerramento. O encerramento exige que essas contas sejam zeradas.`,
     });
   }
 
@@ -908,6 +967,24 @@ function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, RuleDefin
     { label: 'RREO Anexo 03', val: getTransfEmendasIndividuais_RREO_A03(rreo) },
     { label: 'RGF Anexo 01',  val: getTransfEmendasIndividuais_RGF_A01(rgf) },
     'Transferências relativas a Emendas Individuais divergem entre o Anexo 03 do RREO e o Anexo 01 do RGF.',
+    true
+  ));
+
+  // D3_00016: Transferências emendas de bancada RREO Anexo 03 = RGF Anexo 01 — CAPAG
+  results.push(...validatePairEquality(
+    'D3_00016', 'D3',
+    { label: 'RREO Anexo 03', val: getTransfEmendasBancada_RREO_A03(rreo) },
+    { label: 'RGF Anexo 01',  val: getTransfEmendasBancada_RGF_A01(rgf) },
+    'Transferências relativas a Emendas de Bancada (art. 166, §16, CF) divergem entre o Anexo 03 do RREO e o Anexo 01 do RGF.',
+    true
+  ));
+
+  // D3_00044: Transferências agentes comunitários de saúde RREO Anexo 03 = RGF Anexo 01 — CAPAG
+  results.push(...validatePairEquality(
+    'D3_00044', 'D3',
+    { label: 'RREO Anexo 03', val: getTransfAgentesSaude_RREO_A03(rreo) },
+    { label: 'RGF Anexo 01',  val: getTransfAgentesSaude_RGF_A01(rgf) },
+    'Transferências da União relativas à remuneração dos Agentes Comunitários de Saúde (CF, art. 198, §11) divergem entre o Anexo 03 do RREO e o Anexo 01 do RGF.',
     true
   ));
 
