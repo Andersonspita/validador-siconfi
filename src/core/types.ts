@@ -33,7 +33,8 @@ export interface XLSReport {
 
 export interface ParsedData {
   msc?: MSCAccount[];
-  rreo?: any; // XML ou XLSReport
+  mscPeriods?: string[];   // períodos detectados nos cabeçalhos CSV (YYYY-MM)
+  rreo?: any;
   rgf?: any;
   dca?: any;
 }
@@ -41,9 +42,11 @@ export interface ParsedData {
 export interface MSCAccount {
   CONTA: string;
   PO?: string;
-  FP?: string;
-  FR?: string;
-  CO?: string;
+  FP?: string;  // atributo superávit financeiro (IC2 quando TIPO2='FP')
+  FS?: string;  // função/subfunção (IC2 quando TIPO2='FS', contas 622xxx)
+  FR?: string;  // fonte ou destinação de recurso (IC3)
+  CO?: string;  // complemento (IC4)
+  ND?: string;  // natureza da despesa (IC5 quando TIPO5='ND', contas 622xxx)
   Valor: number;
   Tipo_valor: 'beginning_balance' | 'period_change' | 'ending_balance';
   Natureza_valor: 'D' | 'C';
