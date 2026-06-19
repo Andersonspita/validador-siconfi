@@ -32,6 +32,10 @@ export const runValidations = (data: ParsedData, rulesMap: Map<string, RuleDefin
     }
   }
 
+  if (data.mscByPeriod && Object.keys(data.mscByPeriod).length >= 2) {
+    results.push(...validateMultiMonth(data.mscByPeriod, rulesMap));
+  }
+
   if (data.rreo) {
     results.push(...validateD3_RREO(data.rreo, rulesMap));
   }
@@ -135,6 +139,202 @@ const buildInvertedItems = (accounts: MSCAccount[], expected: string) =>
     detalhe: `Natureza informada: ${a.Natureza_valor} (esperado: ${expected})`,
   }));
 
+
+// =============================================================================
+// Multi-mês — regras que exigem 2+ MSCs do mesmo exercício
+// =============================================================================
+function validateMultiMonth(
+  mscByPeriod: Record<string, MSCAccount[]>,
+  _rulesMap: Map<string, RuleDefinition>
+): ValidationResult[] {
+  const results: ValidationResult[] = [];
+
+  const allPeriods = Object.keys(mscByPeriod).sort();
+  // Meses regulares (1–12), excluindo encerramento (13 ou 0)
+  const regular = allPeriods.filter(p => { const m = parseInt(p.split('-')[1] ?? '0'); return m >= 1 && m <= 12; });
+
+  // ---- D1_00020: SF mês N-1 deve ser igual ao SI mês N ----
+  if (regular.length >= 2) {
+    const allDiv: DetailedItem[] = [];
+    const pairLabels = new Set<string>();
+
+    for (let i = 1; i < regular.length; i++) {
+      const prevP = regular[i - 1];
+      const currP = regular[i];
+
+      const sfMap = new Map<string, number>();
+      mscByPeriod[prevP].forEach(acc => {
+        if (acc.Tipo_valor !== 'ending_balance') return;
+        const k = `${acc.CONTA}-${acc.PO ?? ''}-${acc.FR ?? ''}-${acc.CO ?? ''}`;
+        const s = acc.Natureza_valor === 'C' ? -acc.Valor : acc.Valor;
+        sfMap.set(k, (sfMap.get(k) ?? 0) + s);
+      });
+
+      mscByPeriod[currP].forEach(acc => {
+        if (acc.Tipo_valor !== 'beginning_balance') return;
+        const k = `${acc.CONTA}-${acc.PO ?? ''}-${acc.FR ?? ''}-${acc.CO ?? ''}`;
+        const s = acc.Natureza_valor === 'C' ? -acc.Valor : acc.Valor;
+        const sf = sfMap.get(k) ?? 0;
+        if (Math.abs(sf - s) > 0.01) {
+          pairLabels.add(`${prevP}→${currP}`);
+          allDiv.push({ conta: acc.CONTA, po: acc.PO, fr: acc.FR, co: acc.CO,
+            detalhe: `SF ${prevP}: ${sf.toFixed(2)} ≠ SI ${currP}: ${s.toFixed(2)}` });
+        }
+      });
+    }
+
+    if (allDiv.length > 0) {
+      results.push({
+        ruleId: 'D1_00020', dimension: 'D1', description: '', severity: 'warning', impactsCapag: false,
+        detailedItems: allDiv.slice(0, 50),
+        message: `${allDiv.length} conta(s) com Saldo Final ≠ Saldo Inicial do mês seguinte. `
+          + `Pares: ${Array.from(pairLabels).join(', ')}.`,
+      });
+    }
+  }
+
+  // ---- D1_00023/24: MSC de um poder idêntica a outro mês (copy-paste) ----
+  // Compara hash simples (soma de ending_balance) por poder entre meses consecutivos
+  if (regular.length >= 2) {
+    for (const [label] of [['D1_00023'],['D1_00024']] as const) {
+      const fingerprint = (period: string) => {
+        const accs = mscByPeriod[period].filter(a =>
+          a.Tipo_valor === 'ending_balance' &&
+          (label === 'D1_00023'
+            ? (a.PO?.startsWith('01') || a.PO?.startsWith('02')) // executivo tipicamente 01xxx ou 02xxx
+            : (a.PO?.startsWith('03') || a.PO?.startsWith('04')))  // legislativo 03xxx ou 04xxx
+        );
+        if (accs.length === 0) return null;
+        return accs.reduce((s, a) => s + a.Valor, 0).toFixed(2) + ':' + accs.length;
+      };
+
+      const duplicatePairs: string[] = [];
+      for (let i = 1; i < regular.length; i++) {
+        const fp1 = fingerprint(regular[i - 1]);
+        const fp2 = fingerprint(regular[i]);
+        if (fp1 !== null && fp1 === fp2) {
+          duplicatePairs.push(`${regular[i-1]}=${regular[i]}`);
+        }
+      }
+      if (duplicatePairs.length > 0) {
+        const poder = label === 'D1_00023' ? 'Executivo' : 'Legislativo';
+        results.push({
+          ruleId: label, dimension: 'D1', description: '', severity: 'warning', impactsCapag: false,
+          message: `Dados do poder ${poder} aparentemente idênticos entre meses: ${duplicatePairs.join(', ')}. `
+            + `Possível envio duplicado (copy-paste) de MSC.`,
+        });
+      }
+    }
+  }
+
+  // ---- D2_00077: SI jan (227/228) DEVE DIFERIR do SF dez ----
+  const janP = regular.find(p => p.endsWith('-01'));
+  const decP = regular.slice().reverse().find(p => p.endsWith('-12'));
+
+  const sumGroup = (period: string, prefixes: string[], tipo: MSCAccount['Tipo_valor']) =>
+    (mscByPeriod[period] ?? [])
+      .filter(a => prefixes.some(p => a.CONTA.startsWith(p)) && a.Tipo_valor === tipo)
+      .reduce((s, a) => s + (a.Natureza_valor === 'C' ? a.Valor : -a.Valor), 0);
+
+  if (janP && decP) {
+    const si227 = sumGroup(janP, ['227', '228'], 'beginning_balance');
+    const sf227 = sumGroup(decP, ['227', '228'], 'ending_balance');
+    if (Math.abs(si227 - sf227) <= 0.01 && (si227 !== 0 || sf227 !== 0)) {
+      results.push({
+        ruleId: 'D2_00077', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
+        affectedAccounts: ['227', '228'],
+        message: `Passivos por competência (227/228): saldo inicial de ${janP} (R$ ${si227.toLocaleString('pt-BR', {minimumFractionDigits:2})}) igual ao saldo final de ${decP} (R$ ${sf227.toLocaleString('pt-BR', {minimumFractionDigits:2})}). Passivos não movimentados ao longo do exercício indicam ausência de registro por competência.`,
+      });
+    }
+
+    // ---- D2_00079: SI jan (119) DEVE DIFERIR do SF dez ----
+    const si119 = sumGroup(janP, ['119'], 'beginning_balance');
+    const sf119 = sumGroup(decP, ['119'], 'ending_balance');
+    if (Math.abs(si119 - sf119) <= 0.01 && (si119 !== 0 || sf119 !== 0)) {
+      results.push({
+        ruleId: 'D2_00079', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
+        affectedAccounts: ['119'],
+        message: `Antecipações (119): saldo inicial de ${janP} (R$ ${si119.toLocaleString('pt-BR', {minimumFractionDigits:2})}) igual ao saldo final de ${decP} (R$ ${sf119.toLocaleString('pt-BR', {minimumFractionDigits:2})}). Valores pagos antecipadamente não foram baixados por competência ao longo do exercício.`,
+      });
+    }
+  }
+
+  // ---- D2_00082: Depreciação/amortização/exaustão todo mês ----
+  if (regular.length >= 2) {
+    const deprPrefixes = ['1238101', '1238103', '1238105', '124810'];
+    const hasAssets = regular.some(p =>
+      mscByPeriod[p].some(a =>
+        (a.CONTA.startsWith('1231') || a.CONTA.startsWith('1232') || a.CONTA.startsWith('124')) &&
+        a.Tipo_valor === 'ending_balance' && a.Valor > 0)
+    );
+    if (hasAssets) {
+      const monthsWithout = regular.filter(p =>
+        !mscByPeriod[p].some(a => deprPrefixes.some(pf => a.CONTA.startsWith(pf)) &&
+          a.Tipo_valor === 'period_change' && a.Valor > 0)
+      );
+      if (monthsWithout.length > 0) {
+        results.push({
+          ruleId: 'D2_00082', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
+          affectedAccounts: monthsWithout,
+          message: `${monthsWithout.length} mês(es) sem movimentação de depreciação/amortização/exaustão (123810x/124810x): ${monthsWithout.join(', ')}.`,
+        });
+      }
+    }
+  }
+
+  // ---- D2_00086: VPD material de consumo (331xxx) todo mês ----
+  if (regular.length >= 2) {
+    const wo86 = regular.filter(p =>
+      !mscByPeriod[p].some(a => a.CONTA.startsWith('331') && a.Tipo_valor === 'period_change' && a.Valor > 0)
+    );
+    if (wo86.length > 0) {
+      results.push({
+        ruleId: 'D2_00086', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
+        affectedAccounts: wo86,
+        message: `${wo86.length} mês(es) sem VPD com material de consumo (331xxx): ${wo86.join(', ')}.`,
+      });
+    }
+  }
+
+  // ---- D2_00087: VPD serviços (332xxx) todo mês ----
+  if (regular.length >= 2) {
+    const wo87 = regular.filter(p =>
+      !mscByPeriod[p].some(a => a.CONTA.startsWith('332') && a.Tipo_valor === 'period_change' && a.Valor > 0)
+    );
+    if (wo87.length > 0) {
+      results.push({
+        ruleId: 'D2_00087', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
+        affectedAccounts: wo87,
+        message: `${wo87.length} mês(es) sem VPD com serviços (332xxx): ${wo87.join(', ')}.`,
+      });
+    }
+  }
+
+  // ---- D2_00088: VPA Transferências Intergovernamentais (441xxx) todo mês ----
+  if (regular.length >= 2) {
+    // Verificar se o ente realmente recebe transferências (ao menos em algum mês)
+    const recebe = regular.some(p =>
+      mscByPeriod[p].some(a => a.CONTA.startsWith('441') && a.Tipo_valor === 'period_change' && a.Valor > 0)
+    );
+    if (recebe) {
+      const wo88 = regular.filter(p =>
+        !mscByPeriod[p].some(a => a.CONTA.startsWith('441') && a.Tipo_valor === 'period_change' && a.Valor > 0)
+      );
+      if (wo88.length > 0) {
+        results.push({
+          ruleId: 'D2_00088', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
+          affectedAccounts: wo88,
+          message: `${wo88.length} mês(es) sem VPA com Transferências Intergovernamentais (441xxx): ${wo88.join(', ')}.`,
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+// Tipo auxiliar para detailedItems
+type DetailedItem = import('./types').DetailedItem;
 
 // =============================================================================
 // D1 — Entrega e completude dos demonstrativos (D1_00001–D1_00016)
@@ -730,6 +930,25 @@ function validateD1_Encerramento(msc: MSCAccount[], _rulesMap: Map<string, RuleD
       })),
       message: `${vpaVpdComSaldo.length} conta(s) de VPA (classe 4) ou VPD (classe 3) com saldo final diferente de zero na MSC de encerramento. O encerramento exige que essas contas sejam zeradas.`,
     });
+  }
+
+  // D2_00076: Se há VPA de juros de créditos previdenciários parcelados (44252xxx, beginning_balance > 0),
+  // deve haver crédito registrado no ativo (112127, 121120, 113620 — todos beginning_balance)
+  const temJurosParcelamento = msc.some(acc =>
+    acc.CONTA.startsWith('44252') && acc.Tipo_valor === 'beginning_balance' && acc.Valor > 0
+  );
+  if (temJurosParcelamento) {
+    const temCreditoAtivo = msc.some(acc =>
+      (acc.CONTA.startsWith('112127') || acc.CONTA.startsWith('121120') || acc.CONTA.startsWith('113620')) &&
+      acc.Tipo_valor === 'beginning_balance' && acc.Valor > 0
+    );
+    if (!temCreditoAtivo) {
+      results.push({
+        ruleId: 'D2_00076', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
+        affectedAccounts: ['44252', '112127', '121120', '113620'],
+        message: `Há VPA de juros de créditos previdenciários parcelados (44252xxx) mas não foram encontrados os respectivos créditos no ativo (112127/121120/113620). O PIPCP exige esse registro.`,
+      });
+    }
   }
 
   return results;

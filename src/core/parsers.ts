@@ -9,16 +9,24 @@ const xmlParser = new XMLParser({
   attributeNamePrefix: "@_"
 });
 
+// Auxiliar: registra um lote de contas MSC no resultado
+const storeMSC = (result: ParsedData, parsed: MSCAccount[], period: string | null) => {
+  result.msc = result.msc ? result.msc.concat(parsed) : parsed;
+  if (period) {
+    result.mscPeriods!.push(period);
+    if (!result.mscByPeriod) result.mscByPeriod = {};
+    result.mscByPeriod[period] = parsed;
+  }
+};
+
 export const parseFiles = async (files: File[]): Promise<ParsedData> => {
-  const result: ParsedData = { mscPeriods: [] };
+  const result: ParsedData = { mscPeriods: [], mscByPeriod: {} };
 
   for (const file of files) {
     if (file.name.endsWith('.csv')) {
       const text = await file.text();
       const { accounts, period } = parseMSCWithMeta(text);
-      const parsed = await accounts;
-      result.msc = result.msc ? result.msc.concat(parsed) : parsed;
-      if (period) result.mscPeriods!.push(period);
+      storeMSC(result, await accounts, period);
 
     } else if (file.name.endsWith('.zip')) {
       const zip = new JSZip();
@@ -38,9 +46,7 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
         } else if (lname.endsWith('.csv')) {
           const csvText = await zipEntry.async("string");
           const { accounts, period } = parseMSCWithMeta(csvText);
-          const parsed = await accounts;
-          result.msc = result.msc ? result.msc.concat(parsed) : parsed;
-          if (period) result.mscPeriods!.push(period);
+          storeMSC(result, await accounts, period);
         }
       }
 

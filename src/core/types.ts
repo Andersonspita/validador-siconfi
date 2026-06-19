@@ -33,7 +33,8 @@ export interface XLSReport {
 
 export interface ParsedData {
   msc?: MSCAccount[];
-  mscPeriods?: string[];   // períodos detectados nos cabeçalhos CSV (YYYY-MM)
+  mscPeriods?: string[];                    // períodos detectados (YYYY-MM)
+  mscByPeriod?: Record<string, MSCAccount[]>; // período → contas daquele mês
   rreo?: any;
   rgf?: any;
   dca?: any;
