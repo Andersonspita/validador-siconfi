@@ -14,6 +14,10 @@ import {
   getTransfEmendasBancada_RREO_A03, getTransfEmendasBancada_RGF_A01,
   getTransfAgentesSaude_RREO_A03, getTransfAgentesSaude_RGF_A01,
   getDedInativos_RGF_A01, getTotalInativos_RGF_A01,
+  getReceitasRealizadasTotal_A01, getReceitasRealizadasTotal_A06,
+  getDotacaoAtualizada_A01, getDespesasEmpenhadas_A01, getDespesasLiquidadas_A01,
+  getDotacaoAtualizada_A06, getDespesasEmpenhadas_A06, getDespesasLiquidadas_A06,
+  getRPNP_inscricoes_A01,
 } from './xmlExtractors';
 
 export const runValidations = (data: ParsedData, rulesMap: Map<string, RuleDefinition>): ValidationResult[] => {
@@ -405,6 +409,29 @@ function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string, RuleDefinit
 // =============================================================================
 function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
   const results: ValidationResult[] = [];
+
+  // D1_00019: PO (Poder/Órgão) com formato inválido
+  // O PO deve ser um código de exatamente 5 dígitos numéricos
+  const poInvalidos = msc.filter(acc => {
+    const po = acc.PO?.trim();
+    return po && !/^\d{5}$/.test(po);
+  });
+  if (poInvalidos.length > 0) {
+    const posUnicas = Array.from(new Set(poInvalidos.map(a => a.PO ?? '')));
+    results.push({
+      ruleId: 'D1_00019',
+      dimension: 'D1',
+      description: 'Envio de MSCs com códigos de poder/órgão incorretos',
+      severity: 'error',
+      impactsCapag: false,
+      affectedAccounts: posUnicas.slice(0, 20),
+      detailedItems: poInvalidos.slice(0, 30).map(a => ({
+        conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor,
+        detalhe: `PO "${a.PO}" deve ter exatamente 5 dígitos numéricos`,
+      })),
+      message: `${poInvalidos.length} lançamento(s) com código de Poder/Órgão inválido (deve ter 5 dígitos): ${posUnicas.slice(0, 5).join(', ')}${posUnicas.length > 5 ? '...' : ''}.`,
+    });
+  }
 
   // D1_00017: Valores negativos
   const negativeAccounts = msc.filter(acc => acc.Valor < 0);
@@ -1057,6 +1084,31 @@ function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition>): Val
     false
   ));
 
+  // D3_00027: Dotação Atualizada, Empenhadas Até, Liquidadas Até — Anexo 01 = Anexo 06
+  // Nota: A06 mostra "despesas primárias exceto RPPS"; municípios com RPPS terão diferença.
+  for (const [, a01val, a06val, label] of [
+    ['dot', getDotacaoAtualizada_A01(rreo), getDotacaoAtualizada_A06(rreo), 'Dotação Atualizada'],
+    ['emp', getDespesasEmpenhadas_A01(rreo), getDespesasEmpenhadas_A06(rreo), 'Despesas Empenhadas Até o Bimestre'],
+    ['liq', getDespesasLiquidadas_A01(rreo), getDespesasLiquidadas_A06(rreo), 'Despesas Liquidadas Até o Bimestre'],
+  ] as [string, number|null, number|null, string][]) {
+    if (a01val !== null && a06val !== null && Math.abs(a01val - a06val) > 0.01) {
+      results.push({
+        ruleId: 'D3_00027', dimension: 'D3', description: '', severity: 'warning', impactsCapag: false,
+        message: `${label} diverge entre Anexo 01 (R$ ${a01val.toLocaleString('pt-BR', {minimumFractionDigits:2})}) e Anexo 06 (R$ ${a06val.toLocaleString('pt-BR', {minimumFractionDigits:2})}). (Diferença pode ser esperada em municípios com RPPS.)`,
+      });
+    }
+  }
+
+  // D3_00028: Receitas Realizadas Até o Bimestre — Anexo 01 = Anexo 06 (CAPAG)
+  // A01 col[5] vs A06 col[2] (A06 exclui RPPS; pequena diferença pode ser esperada)
+  results.push(...validatePairEquality(
+    'D3_00028', 'D3',
+    { label: 'RREO Anexo 01 (Subtotal III, col Realizadas Até)', val: getReceitasRealizadasTotal_A01(rreo) },
+    { label: 'RREO Anexo 06 (Receita Primária Total XVI)',         val: getReceitasRealizadasTotal_A06(rreo) },
+    'Receitas Realizadas Até o Bimestre divergem entre o Anexo 01 e o Anexo 06 do RREO.',
+    true
+  ));
+
   // D3_00045: Valores negativos em Restos a Pagar (Anexo 07)
   const negRP = findNegativosRP_A07(rreo);
   if (negRP.length > 0) {
@@ -1216,6 +1268,24 @@ function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, RuleDefin
 // =============================================================================
 function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
   const results: ValidationResult[] = [];
+
+  // D4_00026: Restos a Pagar Não Processados — MSC dezembro (213xxx) vs RREO Anexo 01 col[10]
+  if (data.msc && data.rreo) {
+    const rpnpMSC  = sumAccounts(data.msc, ['213'], 'ending_balance', 'C');
+    const rpnpRREO = getRPNP_inscricoes_A01(data.rreo);
+
+    if (rpnpRREO === null) {
+      results.push({
+        ruleId: 'D4_00026', dimension: 'D4', description: '', severity: 'info', impactsCapag: false,
+        message: `Não foi possível extrair o valor de RPNP do RREO Anexo 01 para verificação D4_00026.`,
+      });
+    } else if (Math.abs(rpnpMSC - rpnpRREO) > 0.01) {
+      results.push({
+        ruleId: 'D4_00026', dimension: 'D4', description: '', severity: 'error', impactsCapag: false,
+        message: `Restos a Pagar Não Processados divergem. MSC (213xxx): R$ ${rpnpMSC.toLocaleString('pt-BR', {minimumFractionDigits:2})} | RREO Anexo 01 (col RPNP): R$ ${rpnpRREO.toLocaleString('pt-BR', {minimumFractionDigits:2})}.`,
+      });
+    }
+  }
 
   // D4_00020: Receitas arrecadadas na MSC (6212) vs Anexo 01 do RREO
   if (data.msc && data.rreo) {

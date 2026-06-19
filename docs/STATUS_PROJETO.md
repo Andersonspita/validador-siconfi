@@ -11,7 +11,7 @@
 
 O **Validador Siconfi** é uma SPA React/TypeScript que replica localmente as 201 regras de validação do SICONFI (sistema do Tesouro Nacional), permitindo que municípios antecipem erros antes do envio oficial. Tudo roda no browser — nenhum dado sai da máquina do usuário.
 
-**Estado atual:** 48 de 201 regras implementadas (24%).
+**Estado atual:** 62 de 201 regras implementadas (30%).
 
 ---
 
@@ -30,21 +30,47 @@ O **Validador Siconfi** é uma SPA React/TypeScript que replica localmente as 20
 
 ---
 
-## 3. Regras Implementadas (48)
+## 3. Regras Implementadas (62)
 
 ```
-D1: D1_00001(info), D1_00016, D1_00017, D1_00018, D1_00021, D1_00025, D1_00026,
-    D1_00027, D1_00028, D1_00029, D1_00030, D1_00031, D1_00032, D1_00033,
-    D1_00034, D1_00035, D1_00036, D1_00037, D1_00038
+D1: D1_00001(info), D1_00016, D1_00017, D1_00018, D1_00019, D1_00020, D1_00021,
+    D1_00023, D1_00024, D1_00025, D1_00026, D1_00027, D1_00028, D1_00029,
+    D1_00030, D1_00031, D1_00032, D1_00033, D1_00034, D1_00035, D1_00036,
+    D1_00037, D1_00038
 
-D2: D2_00054, D2_00055, D2_00067, D2_00068, D2_00080, D2_00081, D2_00083,
+D2: D2_00054, D2_00055, D2_00067, D2_00068, D2_00076, D2_00077, D2_00079,
+    D2_00080, D2_00081, D2_00082, D2_00083, D2_00086, D2_00087, D2_00088,
     D2_00093, D2_00094, D2_00095
 
 D3: D3_00001, D3_00002, D3_00005, D3_00006, D3_00011, D3_00012, D3_00013,
-    D3_00014, D3_00015, D3_00016, D3_00021, D3_00030, D3_00032, D3_00033,
-    D3_00034, D3_00035, D3_00044, D3_00045
+    D3_00014, D3_00015, D3_00016, D3_00021, D3_00027, D3_00028, D3_00030,
+    D3_00032, D3_00033, D3_00034, D3_00035, D3_00044, D3_00045
 
-D4: D4_00020
+D4: D4_00020, D4_00026
+```
+
+### Como verificar a contagem atual
+
+```bash
+python3 -c "
+import csv
+impl = {
+  'D1_00001','D1_00016','D1_00017','D1_00018','D1_00019','D1_00020','D1_00021',
+  'D1_00023','D1_00024','D1_00025','D1_00026','D1_00027','D1_00028','D1_00029',
+  'D1_00030','D1_00031','D1_00032','D1_00033','D1_00034','D1_00035','D1_00036',
+  'D1_00037','D1_00038',
+  'D2_00054','D2_00055','D2_00067','D2_00068','D2_00076','D2_00077','D2_00079',
+  'D2_00080','D2_00081','D2_00082','D2_00083','D2_00086','D2_00087','D2_00088',
+  'D2_00093','D2_00094','D2_00095',
+  'D3_00001','D3_00002','D3_00005','D3_00006','D3_00011','D3_00012','D3_00013',
+  'D3_00014','D3_00015','D3_00016','D3_00021','D3_00027','D3_00028','D3_00030',
+  'D3_00032','D3_00033','D3_00034','D3_00035','D3_00044','D3_00045',
+  'D4_00020','D4_00026'
+}
+with open('public/data/Descricao_verificacoes.csv', encoding='utf-8-sig') as f:
+    rows = [r for r in csv.DictReader(f, delimiter=';') if r['no_verificacao'].startswith('D')]
+print(f'{len(impl)} de {len(rows)} ({len(impl)*100//len(rows)}%)')
+"
 ```
 
 ---
