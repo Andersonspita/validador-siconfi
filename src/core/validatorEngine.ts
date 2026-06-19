@@ -2,6 +2,15 @@ import { ParsedData, ValidationResult, MSCAccount, RuleDefinition } from './type
 import {
   getRCLFromRREO, getRCLFromRGF, getReceitasArrecadadasRREO, extractXLSMetadata,
   findNegativeValues, getEquilibrioOrcamentario, getTotalDespesasAnexo01, getDespesasAnexo02,
+  getRPPSExercAnt_A01, getRPPSExercAnt_A04, getRPPSExercAnt_A06,
+  getSuperavitFinanceiro_A01, getSuperavitFinanceiro_A06,
+  getReservaRPPS_A01, getReservaRPPS_A04, getReservaRPPS_A06,
+  getReservaContingencia_A01, getReservaContingencia_A06,
+  findNegativosRP_A07,
+  getDCL_RREO_A06, getDCL_RGF_A02,
+  getTransfEmendasIndividuais_RGF_A01, getTransfEmendasIndividuais_RGF_A02,
+  getTransfEmendasIndividuais_RREO_A03,
+  getDedInativos_RGF_A01, getTotalInativos_RGF_A01,
 } from './xmlExtractors';
 
 export const runValidations = (data: ParsedData, rulesMap: Map<string, RuleDefinition>): ValidationResult[] => {
@@ -37,6 +46,45 @@ export const runValidations = (data: ParsedData, rulesMap: Map<string, RuleDefin
     return res;
   });
 };
+
+// Compara dois valores de demonstrativos; retorna ValidationResult[] (vazio se ok ou dados ausentes)
+function validatePairEquality(
+  ruleId: string,
+  dimension: ValidationResult['dimension'],
+  a: { label: string; val: number | null },
+  b: { label: string; val: number | null },
+  msgBase: string,
+  impactsCapag: boolean
+): ValidationResult[] {
+  if (a.val === null || b.val === null) return [];
+  if (Math.abs(a.val - b.val) <= 0.01) return [];
+  return [{
+    ruleId, dimension, description: '', severity: 'error', impactsCapag,
+    message: `${msgBase} ${a.label}: R$ ${a.val.toLocaleString('pt-BR', {minimumFractionDigits:2})} | ${b.label}: R$ ${b.val.toLocaleString('pt-BR', {minimumFractionDigits:2})}.`,
+  }];
+}
+
+// Compara três valores; gera erro para cada par que divergir
+function validateTripleEquality(
+  ruleId: string,
+  dimension: ValidationResult['dimension'],
+  a: { label: string; val: number | null },
+  b: { label: string; val: number | null },
+  c: { label: string; val: number | null },
+  msgBase: string,
+  impactsCapag: boolean
+): ValidationResult[] {
+  const pairs = [
+    [a, b], [a, c], [b, c]
+  ] as [typeof a, typeof b][];
+  const diverging = pairs.filter(([x, y]) => x.val !== null && y.val !== null && Math.abs(x.val - y.val) > 0.01);
+  if (diverging.length === 0) return [];
+  const detail = diverging.map(([x, y]) => `${x.label}: R$ ${x.val!.toLocaleString('pt-BR', {minimumFractionDigits:2})} ≠ ${y.label}: R$ ${y.val!.toLocaleString('pt-BR', {minimumFractionDigits:2})}`).join(' | ');
+  return [{
+    ruleId, dimension, description: '', severity: 'error', impactsCapag,
+    message: `${msgBase} ${detail}.`,
+  }];
+}
 
 // Soma valores de contas com prefixo, tipo e natureza especificados
 const sumAccounts = (
@@ -668,6 +716,61 @@ function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition>): Val
     });
   }
 
+  // D3_00032: Recursos RPPS arrecadados em exercícios anteriores — deve ser igual em A01, A04 e A06
+  results.push(...validateTripleEquality(
+    'D3_00032', 'D3',
+    { label: 'RREO Anexo 01', val: getRPPSExercAnt_A01(rreo) },
+    { label: 'RREO Anexo 04', val: getRPPSExercAnt_A04(rreo) },
+    { label: 'RREO Anexo 06', val: getRPPSExercAnt_A06(rreo) },
+    'Recursos RPPS Arrecadados em Exercícios Anteriores divergem entre os Anexos 01, 04 e 06 do RREO.',
+    false
+  ));
+
+  // D3_00033: Superávit financeiro utilizado para créditos adicionais — A01 = A06
+  results.push(...validatePairEquality(
+    'D3_00033', 'D3',
+    { label: 'RREO Anexo 01', val: getSuperavitFinanceiro_A01(rreo) },
+    { label: 'RREO Anexo 06', val: getSuperavitFinanceiro_A06(rreo) },
+    'Superávit Financeiro Utilizado para Créditos Adicionais diverge entre os Anexos 01 e 06 do RREO.',
+    false
+  ));
+
+  // D3_00034: Reserva do RPPS — deve ser igual em A01, A04 e A06
+  results.push(...validateTripleEquality(
+    'D3_00034', 'D3',
+    { label: 'RREO Anexo 01', val: getReservaRPPS_A01(rreo) },
+    { label: 'RREO Anexo 04', val: getReservaRPPS_A04(rreo) },
+    { label: 'RREO Anexo 06', val: getReservaRPPS_A06(rreo) },
+    'Reserva do RPPS diverge entre os Anexos 01, 04 e 06 do RREO.',
+    false
+  ));
+
+  // D3_00035: Reserva de Contingência — A01 = A06
+  results.push(...validatePairEquality(
+    'D3_00035', 'D3',
+    { label: 'RREO Anexo 01', val: getReservaContingencia_A01(rreo) },
+    { label: 'RREO Anexo 06', val: getReservaContingencia_A06(rreo) },
+    'Reserva de Contingência diverge entre os Anexos 01 e 06 do RREO.',
+    false
+  ));
+
+  // D3_00045: Valores negativos em Restos a Pagar (Anexo 07)
+  const negRP = findNegativosRP_A07(rreo);
+  if (negRP.length > 0) {
+    results.push({
+      ruleId: 'D3_00045',
+      dimension: 'D3',
+      description: '',
+      severity: 'warning',
+      impactsCapag: true,
+      detailedItems: negRP.slice(0, 20).map(n => ({
+        conta: 'RREO-Anexo 07',
+        detalhe: `"${n.label}" = R$ ${n.value.toLocaleString('pt-BR', {minimumFractionDigits:2})}`,
+      })),
+      message: `${negRP.length} linha(s) com valor negativo nas colunas de Restos a Pagar (Anexo 07). O RREO não admite valores negativos em RP fora das linhas de resultado.`,
+    });
+  }
+
   return results;
 }
 
@@ -724,6 +827,29 @@ function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, RuleDefin
     });
   }
 
+  // D3_00006: Igualdade da DCL entre RREO Anexo 06 e RGF Anexo 02 — CAPAG
+  results.push(...validatePairEquality(
+    'D3_00006', 'D3',
+    { label: 'RREO Anexo 06', val: getDCL_RREO_A06(rreo) },
+    { label: 'RGF Anexo 02',  val: getDCL_RGF_A02(rgf) },
+    'Dívida Consolidada Líquida (DCL) diverge entre o Anexo 06 do RREO e o Anexo 02 do RGF.',
+    true
+  ));
+
+  // D3_00011: Dedução de inativos/pensionistas com recursos vinculados ≤ total inativos/pensionistas
+  const dedInativ = getDedInativos_RGF_A01(rgf);
+  const totInativ  = getTotalInativos_RGF_A01(rgf);
+  if (dedInativ !== null && totInativ !== null && dedInativ > totInativ + 0.01) {
+    results.push({
+      ruleId: 'D3_00011',
+      dimension: 'D3',
+      description: '',
+      severity: 'error',
+      impactsCapag: false,
+      message: `Dedução de Inativos e Pensionistas com Recursos Vinculados (R$ ${dedInativ.toLocaleString('pt-BR', {minimumFractionDigits:2})}) é maior que o total de Inativos e Pensionistas (R$ ${totInativ.toLocaleString('pt-BR', {minimumFractionDigits:2})}) no RGF Anexo 01.`,
+    });
+  }
+
   // D3_00013: Valores negativos no RGF
   const negativosRGF = findNegativeValues(rgf);
   if (negativosRGF.length > 0) {
@@ -741,6 +867,24 @@ function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, RuleDefin
       message: `${negativosRGF.length} célula(s) com valor negativo encontrada(s) no RGF. Verifique as abas: ${Array.from(new Set(negativosRGF.map(n => n.sheet))).join(', ')}.`,
     });
   }
+
+  // D3_00014: Transferências emendas individuais devem ser iguais nos Anexos 01 e 02 do RGF — CAPAG
+  results.push(...validatePairEquality(
+    'D3_00014', 'D3',
+    { label: 'RGF Anexo 01', val: getTransfEmendasIndividuais_RGF_A01(rgf) },
+    { label: 'RGF Anexo 02', val: getTransfEmendasIndividuais_RGF_A02(rgf) },
+    'Transferências Obrigatórias da União relativas a Emendas Individuais (art. 166-A §1º CF) divergem entre os Anexos 01 e 02 do RGF.',
+    true
+  ));
+
+  // D3_00015: Transferências emendas individuais RREO Anexo 03 = RGF Anexo 01 — CAPAG
+  results.push(...validatePairEquality(
+    'D3_00015', 'D3',
+    { label: 'RREO Anexo 03', val: getTransfEmendasIndividuais_RREO_A03(rreo) },
+    { label: 'RGF Anexo 01',  val: getTransfEmendasIndividuais_RGF_A01(rgf) },
+    'Transferências relativas a Emendas Individuais divergem entre o Anexo 03 do RREO e o Anexo 01 do RGF.',
+    true
+  ));
 
   return results;
 }

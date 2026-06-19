@@ -6,7 +6,6 @@
  */
 
 // Busca um valor numérico em uma planilha procurando o texto na primeira coluna.
-// Aceita variações de acento (ex: LIQUIDA / LÍQUIDA) via regex case-insensitive.
 const findValueInSheet = (
   sheet: any[][],
   searchTerm: string,
@@ -33,6 +32,48 @@ const findValueInSheet = (
   return null;
 };
 
+// Busca valor em linha imediatamente abaixo de um cabeçalho de seção.
+// Útil para planilhas onde a linha "VALOR" fica separada do título da seção (ex: Anexo 04 RPPS).
+const findValueInSection = (
+  sheet: any[][],
+  sectionTerm: string,
+  valueTerm: string,
+  maxLines: number = 8
+): number | null => {
+  if (!Array.isArray(sheet)) return null;
+  const secRx = new RegExp(sectionTerm, 'i');
+  const valRx = new RegExp(valueTerm, 'i');
+  let inSection = false;
+  let depth = 0;
+
+  for (const row of sheet) {
+    if (!Array.isArray(row)) continue;
+    const cell = typeof row[0] === 'string' ? row[0] : '';
+
+    if (!inSection && secRx.test(cell)) {
+      inSection = true;
+      depth = 0;
+      continue;
+    }
+
+    if (inSection) {
+      depth++;
+      if (valRx.test(cell)) {
+        for (let i = 1; i < row.length; i++) {
+          if (typeof row[i] === 'number' && row[i] !== 0) return row[i];
+          if (typeof row[i] === 'string') {
+            const n = parseFloat(row[i].replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(n) && n !== 0) return n;
+          }
+        }
+        return null;
+      }
+      if (depth > maxLines) inSection = false;
+    }
+  }
+  return null;
+};
+
 // Tenta múltiplas variações de nome de aba para tolerar versões diferentes do Siconfi
 const getSheet = (report: any, candidates: string[]): any[][] | null => {
   for (const name of candidates) {
@@ -41,50 +82,36 @@ const getSheet = (report: any, candidates: string[]): any[][] | null => {
   return null;
 };
 
+// Extrator genérico: dado o report, os candidatos de aba e o termo de busca
+export const extractFromReport = (
+  report: any,
+  sheetCandidates: string[],
+  searchTerm: string,
+  colOffset: number = 1
+): number | null => {
+  const sheet = getSheet(report, sheetCandidates);
+  return sheet ? findValueInSheet(sheet, searchTerm, colOffset) : null;
+};
+
+// ─── RCL ─────────────────────────────────────────────────────────────────────
+
 export const getRCLFromRREO = (rreo: any): number | null => {
   const sheet = getSheet(rreo, ['RREO-Anexo 03', 'RREO Anexo 03', 'Anexo 03']);
   if (!sheet) return null;
-  // "RECEITA CORRENTE LÍQUIDA (III) = (I - II)"
   return findValueInSheet(sheet, 'RECEITA CORRENTE L[IÍ]QUIDA.*\\(III\\)');
 };
 
 export const getRCLFromRGF = (rgf: any): number | null => {
   const sheet = getSheet(rgf, ['RGF-Anexo 01', 'RGF Anexo 01', 'Anexo 01']);
   if (!sheet) return null;
-  // "RECEITA CORRENTE LIQUIDA - RCL (IV)" ou "RECEITA CORRENTE LÍQUIDA - RCL"
   return findValueInSheet(sheet, 'RECEITA CORRENTE L[IÍ]QUIDA.*RCL|RECEITA CORRENTE L[IÍ]QUIDA');
 };
 
-export const getReceitasArrecadadasRREO = (rreo: any): number | null => {
-  const sheet = getSheet(rreo, ['RREO-Anexo 01', 'RREO Anexo 01', 'Anexo 01']);
-  if (!sheet) return null;
-  // "RECEITAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)"
-  return findValueInSheet(sheet, 'RECEITAS.*EXCETO INTRA', 1);
-};
+// ─── RREO Anexo 01 ───────────────────────────────────────────────────────────
 
-// Retorna todos os valores numéricos negativos presentes nas abas de um demonstrativo XLS
-export const findNegativeValues = (report: any): { sheet: string; row: number; value: number; label: string }[] => {
-  const found: { sheet: string; row: number; value: number; label: string }[] = [];
-  for (const [sheetName, rows] of Object.entries(report)) {
-    if (!Array.isArray(rows)) continue;
-    (rows as any[][]).forEach((row, rowIdx) => {
-      if (!Array.isArray(row)) return;
-      const label = typeof row[0] === 'string' ? row[0].trim() : '';
-      // Ignora linhas de total/subtotal (geralmente podem ter sinal oposto por convenção)
-      if (/DEFICIT|DÉFICIT|SUPERÁV|RESULTADO/i.test(label)) return;
-      for (let col = 1; col < row.length; col++) {
-        const v = row[col];
-        if (typeof v === 'number' && v < 0) {
-          found.push({ sheet: sheetName, row: rowIdx + 1, value: v, label: label.slice(0, 60) });
-          break; // um por linha é suficiente
-        }
-      }
-    });
-  }
-  return found;
-};
+export const getReceitasArrecadadasRREO = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'RECEITAS.*EXCETO INTRA');
 
-// RREO Anexo 01 — equilíbrio: TOTAL COM DÉFICIT (VII) e TOTAL COM SUPERÁVIT (XIV)
 export const getEquilibrioOrcamentario = (rreo: any): { comDeficit: number | null; comSuperavit: number | null } => {
   const sheet = getSheet(rreo, ['RREO-Anexo 01', 'RREO Anexo 01']);
   if (!sheet) return { comDeficit: null, comSuperavit: null };
@@ -94,18 +121,157 @@ export const getEquilibrioOrcamentario = (rreo: any): { comDeficit: number | nul
   };
 };
 
-// RREO Anexo 01 — total das despesas (exceto + intra)
-export const getTotalDespesasAnexo01 = (rreo: any): number | null => {
-  const sheet = getSheet(rreo, ['RREO-Anexo 01', 'RREO Anexo 01']);
-  if (!sheet) return null;
-  return findValueInSheet(sheet, 'SUBTOTAL DAS DESPESAS.*\\(X\\)');
+export const getTotalDespesasAnexo01 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)');
+
+// D3_00032: Recursos RPPS arrecadados em exercícios anteriores — Anexo 01
+export const getRPPSExercAnt_A01 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'Recursos Arrecadados.*Exerc.*Anteriores.*RPPS|RPPS.*Exerc.*Anteriores');
+
+// D3_00033: Superávit financeiro para créditos adicionais — Anexo 01
+export const getSuperavitFinanceiro_A01 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'Super[aá]vit Financeiro.*Cr[eé]ditos Adicionais');
+
+// D3_00034: Reserva do RPPS — Anexo 01
+export const getReservaRPPS_A01 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'RESERVA DO RPPS|RESERVA.*RPPS');
+
+// D3_00035: Reserva de Contingência — Anexo 01
+export const getReservaContingencia_A01 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'RESERVA DE CONTING[EÊ]NCIA');
+
+// ─── RREO Anexo 02 ───────────────────────────────────────────────────────────
+
+export const getDespesasAnexo02 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], 'DESPESAS.*EXCETO INTRA.*\\(I\\)');
+
+// ─── RREO Anexo 04 (RPPS) ────────────────────────────────────────────────────
+
+// D3_00030: Total receitas previdenciárias
+export const getTotalReceitasRPPS_A04 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 04', 'RREO Anexo 04'], 'TOTAL DAS RECEITAS DO FUNDO.*\\(IV\\)');
+
+// D3_00032: Recursos RPPS exercícios anteriores — Anexo 04
+// O valor fica em linha "  VALOR" abaixo do cabeçalho de seção
+export const getRPPSExercAnt_A04 = (rreo: any): number | null => {
+  const sheet = getSheet(rreo, ['RREO-Anexo 04', 'RREO Anexo 04']);
+  return sheet ? findValueInSection(sheet, 'Recursos.*RPPS.*Arrecadados.*Exerc.*Anteriores', 'VALOR') : null;
 };
 
-// RREO Anexo 02 — total das despesas exceto intra (para comparar com Anexo 01)
-export const getDespesasAnexo02 = (rreo: any): number | null => {
-  const sheet = getSheet(rreo, ['RREO-Anexo 02', 'RREO Anexo 02']);
-  if (!sheet) return null;
-  return findValueInSheet(sheet, 'DESPESAS.*EXCETO INTRA.*\\(I\\)');
+// D3_00034: Reserva RPPS — Anexo 04
+export const getReservaRPPS_A04 = (rreo: any): number | null => {
+  const sheet = getSheet(rreo, ['RREO-Anexo 04', 'RREO Anexo 04']);
+  return sheet ? findValueInSection(sheet, 'Reserva.*RPPS|RPPS.*Reserva', 'VALOR') : null;
+};
+
+// ─── RREO Anexo 06 (Resultado Primário/Nominal) ──────────────────────────────
+
+// D3_00006: DCL no Anexo 06
+export const getDCL_RREO_A06 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'DÍVIDA CONSOLIDADA LÍQUIDA.*\\(XLII\\)|DCL.*XLII');
+
+// D3_00032: Recursos RPPS anteriores — Anexo 06 (seção "Informações Adicionais")
+export const getRPPSExercAnt_A06 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Recursos Arrecadados.*Exerc.*Anteriores.*RPPS|RPPS.*Exerc.*Anteriores');
+
+// D3_00033: Superávit financeiro — Anexo 06
+export const getSuperavitFinanceiro_A06 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Super[aá]vit Financeiro.*Cr[eé]ditos Adicionais|Super[aá]vit Financeiro.*Abertura');
+
+// D3_00034: Reserva RPPS — Anexo 06
+export const getReservaRPPS_A06 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RESERVA.*RPPS|RESERVA ORÇAMENTÁRIA.*RPPS');
+
+// D3_00035: Reserva Contingência — Anexo 06
+export const getReservaContingencia_A06 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RESERVA DE CONTING[EÊ]NCIA.*\\(XXIX\\)|RESERVA DE CONTING[EÊ]NCIA');
+
+// D3_00028: Receitas realizadas totais — Anexo 06 (para comparar com Anexo 01)
+export const getReceitaRealizadaTotal_A06 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RECEITA PRIMÁRIA TOTAL.*\\(XVI\\)');
+
+// ─── RREO Anexo 07 (Restos a Pagar) ─────────────────────────────────────────
+
+// D3_00045: Valores negativos em Restos a Pagar
+export const findNegativosRP_A07 = (rreo: any): { label: string; value: number }[] => {
+  const sheet = getSheet(rreo, ['RREO-Anexo 07', 'RREO Anexo 07']);
+  if (!sheet) return [];
+  const result: { label: string; value: number }[] = [];
+  for (const row of sheet) {
+    if (!Array.isArray(row)) continue;
+    const label = typeof row[0] === 'string' ? row[0].trim() : '';
+    if (/TOTAL|SUBTOTAL/i.test(label)) continue;
+    for (let c = 1; c < row.length; c++) {
+      if (typeof row[c] === 'number' && row[c] < 0) {
+        result.push({ label: label.slice(0, 60), value: row[c] });
+        break;
+      }
+    }
+  }
+  return result;
+};
+
+// D3_00017: Total RP pagos no exercício — Anexo 07
+export const getTotalRPPagos_A07 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'TOTAL.*\\(III\\)');
+
+// ─── RGF Anexo 01 ────────────────────────────────────────────────────────────
+
+// D3_00015: Transferências emendas individuais — RGF Anexo 01
+export const getTransfEmendasIndividuais_RGF_A01 = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 01', 'RGF Anexo 01'],
+    'Emendas Individuais.*166-A|Transferências.*Emendas.*Individuais|166-A.*Emendas');
+
+// D3_00011: Deduções de inativos/pensionistas com recursos vinculados — RGF Anexo 01
+export const getDedInativos_RGF_A01 = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 01', 'RGF Anexo 01'],
+    'Inativos.*Pensionistas.*Recursos Vinculados|Recursos Vinculados.*Inativos');
+
+// D3_00011: Total inativos e pensionistas — RGF Anexo 01
+export const getTotalInativos_RGF_A01 = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 01', 'RGF Anexo 01'],
+    'Inativos e Pensionistas(?!.*Recursos)');
+
+// ─── RGF Anexo 02 ────────────────────────────────────────────────────────────
+
+// D3_00006: DCL — RGF Anexo 02
+export const getDCL_RGF_A02 = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 02', 'RGF Anexo 02'],
+    'DÍVIDA CONSOLIDADA LÍQUIDA.*DCL.*\\(III\\)|DÍVIDA CONSOLIDADA LÍQUIDA.*\\(III\\)');
+
+// D3_00014: Transferências emendas individuais — RGF Anexo 02
+export const getTransfEmendasIndividuais_RGF_A02 = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 02', 'RGF Anexo 02'],
+    'Emendas Individuais|166-A.*§.*1');
+
+// ─── RREO Anexo 03 ───────────────────────────────────────────────────────────
+
+// D3_00015/16: Transferências emendas individuais — RREO Anexo 03
+export const getTransfEmendasIndividuais_RREO_A03 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'],
+    'Emendas Individuais|166-A');
+
+// ─── Utilitários ─────────────────────────────────────────────────────────────
+
+// Retorna valores negativos em qualquer aba do demonstrativo
+export const findNegativeValues = (report: any): { sheet: string; row: number; value: number; label: string }[] => {
+  const found: { sheet: string; row: number; value: number; label: string }[] = [];
+  for (const [sheetName, rows] of Object.entries(report)) {
+    if (!Array.isArray(rows)) continue;
+    (rows as any[][]).forEach((row, rowIdx) => {
+      if (!Array.isArray(row)) return;
+      const label = typeof row[0] === 'string' ? row[0].trim() : '';
+      if (/DEFICIT|DÉFICIT|SUPERÁV|RESULTADO/i.test(label)) return;
+      for (let col = 1; col < row.length; col++) {
+        const v = row[col];
+        if (typeof v === 'number' && v < 0) {
+          found.push({ sheet: sheetName, row: rowIdx + 1, value: v, label: label.slice(0, 60) });
+          break;
+        }
+      }
+    });
+  }
+  return found;
 };
 
 // Extrai metadados de identificação do demonstrativo (ente, período, exercício)
