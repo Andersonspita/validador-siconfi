@@ -32,6 +32,8 @@ export interface XLSReport {
 }
 
 export interface ParsedData {
+  enteId?: string;
+  anoReferencia?: string;
   msc?: MSCAccount[];
   mscPeriods?: string[];                    // períodos detectados (YYYY-MM)
   mscByPeriod?: Record<string, MSCAccount[]>; // período → contas daquele mês

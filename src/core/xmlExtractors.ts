@@ -244,6 +244,30 @@ export const getDespesasEmpenhadas_A06 = (rreo: any): number | null =>
 export const getDespesasLiquidadas_A06 = (rreo: any): number | null =>
   extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'DESPESA PRIMÁRIA TOTAL.*\\(XXXII\\)', 3);
 
+// D3_00022: Receitas Correntes (exceto intra) — col[5] = Realizadas Até o Bimestre
+export const getReceitasCorrentes_A01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'RECEITAS CORRENTES\\s*$|^\\s+RECEITAS CORRENTES\\s+$', 5);
+
+// D3_00023: Receitas de Capital (exceto intra) — col[5]
+export const getReceitasCapital_A01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'RECEITAS DE CAPITAL', 5);
+
+// D3_00024: Despesas Correntes (exceto intra) — col[7] = Liquidadas Até o Bimestre
+export const getDespesasCorrentes_A01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'DESPESAS CORRENTES\\s*$|^\\s+DESPESAS CORRENTES\\s+$', 7);
+
+// D3_00025: Despesas de Capital (exceto intra) — col[7]
+export const getDespesasCapital_A01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'DESPESAS DE CAPITAL', 7);
+
+// D4_00025: Despesas empenhadas/liquidadas/pagas — col[4]=emp, col[7]=liq, col[9]=pagas
+export const getDespesasEmpenhadas_SubtotalA01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 4);
+export const getDespesasLiquidadas_SubtotalA01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 7);
+export const getDespesasPagas_SubtotalA01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 9);
+
 // D4_00025/026: valores para cruzamento MSC × RREO (A01)
 // A01: Inscrições em RPNP (col[10] do subtotal de despesas)
 export const getRPNP_inscricoes_A01 = (rreo: any): number | null =>
@@ -368,4 +392,33 @@ export const extractXLSMetadata = (report: any): { ente?: string; periodo?: stri
     if (cell.startsWith('Exercício:')) meta.exercicio = cell.replace('Exercício:', '').trim();
   }
   return meta;
+};
+
+
+// =============================================================================
+// DCA - Declaração de Contas Anuais
+// =============================================================================
+
+export const hasValueInDCA = (
+  dca: any,
+  sheetNames: string[],
+  searchTerm: string,
+  startColOffset: number = 1
+): boolean => {
+  const sheet = getSheet(dca, sheetNames);
+  if (!sheet) return false;
+  
+  const val = findValueInSheet(sheet, searchTerm, startColOffset);
+  return val !== null && val !== 0;
+};
+
+export const getDCAValue = (
+  dca: any,
+  sheetNames: string[],
+  searchTerm: string,
+  startColOffset: number = 1
+): number | null => {
+  const sheet = getSheet(dca, sheetNames);
+  if (!sheet) return null;
+  return findValueInSheet(sheet, searchTerm, startColOffset);
 };

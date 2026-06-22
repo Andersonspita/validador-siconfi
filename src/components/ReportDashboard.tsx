@@ -21,7 +21,7 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
     const process = async () => {
       try {
         const parsedData = await parseFiles(files);
-        const validationResults = runValidations(parsedData, rulesMap);
+        const validationResults = await runValidations(parsedData, rulesMap);
         setResults(validationResults);
       } catch (err) {
         console.error("Error processing files:", err);

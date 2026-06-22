@@ -1,0 +1,561 @@
+import { ParsedData, ValidationResult, MSCAccount, RuleDefinition } from '../types';
+import { findInvertedAccounts, buildInvertedItems } from './utils';
+import { getExtratoEntregas } from '../../services/siconfiApi';
+
+export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): Promise<ValidationResult[]> {
+  const results: ValidationResult[] = [];
+
+  const temMSC  = !!data.msc  && data.msc.length > 0;
+  const temRREO = !!data.rreo;
+  const temRGF  = !!data.rgf;
+  const temDCA  = !!data.dca;
+
+  const ausentes: string[] = [];
+  if (!temRREO) ausentes.push('RREO');
+  if (!temRGF)  ausentes.push('RGF');
+  if (!temDCA)  ausentes.push('DCA');
+
+  // Integracao Siconfi API para Tempestividade
+  if (data.enteId && data.anoReferencia) {
+    const entregas = await getExtratoEntregas(data.enteId, data.anoReferencia);
+    
+    if (entregas.length > 0) {
+      // Regras de Tempestividade LRF:
+      // MSC: Geralmente avaliada no encerramento (D1_00016 já cobre upload local, a API pode confirmar status)
+      // RREO: 30 dias após bimestre
+      // RGF: 30 dias após quadrimestre/semestre
+      // DCA: 30 de abril do ano seguinte
+      
+      const missingHomologados = ausentes.filter(rep => {
+        // Se falta localmente, vamos ver se pelo menos tá homologado na API
+        const noSiconfi = entregas.find(e => e.relatorio.includes(rep) && e.status_relatorio.toLowerCase().includes('homologado'));
+        return !noSiconfi; // se não achou no siconfi também, aí é problema
+      });
+
+      if (missingHomologados.length > 0 && (temMSC || temRREO || temRGF || temDCA)) {
+        results.push({
+          ruleId: 'D1_00001',
+          dimension: 'D1',
+          description: 'Verificação de entrega dos demonstrativos',
+          severity: 'error',
+          impactsCapag: true,
+          affectedAccounts: missingHomologados,
+          message:
+            `Demonstrativo(s) não enviados localmente e NÃO homologados na API do Siconfi para ${data.anoReferencia}: ${missingHomologados.join(', ')}.`,
+        });
+      } else if (ausentes.length > 0) {
+        results.push({
+          ruleId: 'D1_00001',
+          dimension: 'D1',
+          description: 'Verificação de entrega dos demonstrativos',
+          severity: 'info',
+          impactsCapag: false,
+          affectedAccounts: ausentes,
+          message:
+            `Os arquivos ${ausentes.join(', ')} não foram inseridos para validação de cruzamento (D3/D4), mas constam como homologados na API do Siconfi.`,
+        });
+      }
+
+      // TODO: Futuramente, podemos adicionar checagem exata de data_entrega x prazos legais.
+    } else {
+       // Falha na API ou sem dados
+       if (ausentes.length > 0 && (temMSC || temRREO || temRGF || temDCA)) {
+         results.push({
+           ruleId: 'D1_00001',
+           dimension: 'D1',
+           description: 'Verificação de entrega dos demonstrativos',
+           severity: 'warning',
+           impactsCapag: false,
+           affectedAccounts: ausentes,
+           message:
+             `Demonstrativo(s) não incluído(s) no upload: ${ausentes.join(', ')}. ` +
+             `A API do Siconfi não retornou dados para confirmar homologação. Confirme manualmente no SICONFI.`,
+         });
+       }
+    }
+  } else {
+    // Modo Offline (sem enteId)
+    if (ausentes.length > 0 && (temMSC || temRREO || temRGF || temDCA)) {
+      results.push({
+        ruleId: 'D1_00001',
+        dimension: 'D1',
+        description: 'Verificação de entrega dos demonstrativos',
+        severity: 'info',
+        impactsCapag: false,
+        affectedAccounts: ausentes,
+        message:
+          `Demonstrativo(s) ausentes no upload: ${ausentes.join(', ')}. ` +
+          `Não foi possível validar a tempestividade (D1) via API porque o código do ente (IBGE) não foi detectado na MSC.`,
+      });
+    }
+  }
+
+  // D1_00016: verifica se todas as MSCs do exercício foram enviadas localmente
+  if (temMSC && data.mscPeriods && data.mscPeriods.length > 0) {
+    const periods = data.mscPeriods;
+    const years = Array.from(new Set(periods.map(p => p.split('-')[0])));
+
+    for (const year of years) {
+      const yearPeriods = periods.filter(p => p.startsWith(year + '-'));
+      const meses = yearPeriods.map(p => parseInt(p.split('-')[1])).sort((a, b) => a - b);
+      const allMonths = [1,2,3,4,5,6,7,8,9,10,11,12];
+      const missing = allMonths.filter(m => !meses.includes(m));
+
+      if (missing.length > 0) {
+        results.push({
+          ruleId: 'D1_00016',
+          dimension: 'D1',
+          description: 'Envio de todas as MSCs do período',
+          severity: 'warning',
+          impactsCapag: false,
+          affectedAccounts: missing.map(m => `${year}-${String(m).padStart(2,'0')}`),
+          message:
+            `Exercício ${year}: localmente foram enviadas ${yearPeriods.length} MSC(s) (meses: ${meses.join(', ')}). ` +
+            `Mês(es) ausente(s): ${missing.map(m => String(m).padStart(2,'0')).join(', ')}. ` +
+            `Verifique se as demais foram homologadas no Siconfi.`,
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+  const results: ValidationResult[] = [];
+
+  // D1_00019: PO (Poder/Órgão) com formato inválido
+  // O PO deve ser um código de exatamente 5 dígitos numéricos
+  const poInvalidos = msc.filter(acc => {
+    const po = acc.PO?.trim();
+    return po && !/^\d{5}$/.test(po);
+  });
+  if (poInvalidos.length > 0) {
+    const posUnicas = Array.from(new Set(poInvalidos.map(a => a.PO ?? '')));
+    results.push({
+      ruleId: 'D1_00019',
+      dimension: 'D1',
+      description: 'Envio de MSCs com códigos de poder/órgão incorretos',
+      severity: 'error',
+      impactsCapag: false,
+      affectedAccounts: posUnicas.slice(0, 20),
+      detailedItems: poInvalidos.slice(0, 30).map(a => ({
+        conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor,
+        detalhe: `PO "${a.PO}" deve ter exatamente 5 dígitos numéricos`,
+      })),
+      message: `${poInvalidos.length} lançamento(s) com código de Poder/Órgão inválido (deve ter 5 dígitos): ${posUnicas.slice(0, 5).join(', ')}${posUnicas.length > 5 ? '...' : ''}.`,
+    });
+  }
+
+  // D1_00017: Valores negativos
+  const negativeAccounts = msc.filter(acc => acc.Valor < 0);
+  if (negativeAccounts.length > 0) {
+    results.push({
+      ruleId: 'D1_00017',
+      dimension: 'D1',
+      description: 'Envio de MSCs com valores negativos',
+      severity: 'error',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(negativeAccounts.map(a => a.CONTA))),
+      detailedItems: negativeAccounts.map(a => ({
+        conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor,
+        detalhe: `Tipo: ${a.Tipo_valor} | Natureza: ${a.Natureza_valor}`,
+      })),
+      message: `${negativeAccounts.length} lançamento(s) com valor negativo. O Siconfi não aceita valores negativos na MSC.`,
+    });
+  }
+
+  // D1_00018: SI + MOV <> SF
+  const accountsMap = new Map<string, { si: number; mov: number; sf: number }>();
+  msc.forEach(acc => {
+    const key = `${acc.CONTA}-${acc.PO}-${acc.FR}-${acc.CO}`;
+    if (!accountsMap.has(key)) accountsMap.set(key, { si: 0, mov: 0, sf: 0 });
+    const entry = accountsMap.get(key)!;
+    const signed = acc.Natureza_valor === 'C' ? -acc.Valor : acc.Valor;
+    if (acc.Tipo_valor === 'beginning_balance') entry.si += signed;
+    else if (acc.Tipo_valor === 'period_change') entry.mov += signed;
+    else if (acc.Tipo_valor === 'ending_balance') entry.sf += signed;
+  });
+
+  const inconsistentAccounts: string[] = [];
+  const detailedInconsistencies: import('../types').DetailedItem[] = [];
+  accountsMap.forEach((vals, key) => {
+    const diff = Math.abs((vals.si + vals.mov) - vals.sf);
+    if (diff > 0.01) {
+      const parts = key.split('-');
+      inconsistentAccounts.push(parts[0]);
+      const fmt = (v: number) => Math.abs(v).toFixed(2) + (v < 0 ? 'C' : 'D');
+      detailedInconsistencies.push({
+        conta: parts[0], po: parts[1], fr: parts[2], co: parts[3],
+        detalhe: `SI: ${fmt(vals.si)} | MOV: ${fmt(vals.mov)} | SF Esp: ${fmt(vals.si + vals.mov)} | SF Inf: ${fmt(vals.sf)} | Dif: ${diff.toFixed(2)}`,
+      });
+    }
+  });
+  if (inconsistentAccounts.length > 0) {
+    results.push({
+      ruleId: 'D1_00018',
+      dimension: 'D1',
+      description: 'SI + MOV <> SF',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(inconsistentAccounts)),
+      detailedItems: detailedInconsistencies,
+      message: `${inconsistentAccounts.length} conta(s) com movimentação inconsistente (SI + MOV ≠ SF).`,
+    });
+  }
+
+  // D1_00021: Ativo com saldo invertido (grupos 1111, 1121, 1125, 1231, 1232) — natureza padrão D
+  const activePrefixes = ['1111', '1121', '1125', '1231', '1232'];
+  const activeInverted = findInvertedAccounts(msc, activePrefixes, 'D');
+  if (activeInverted.length > 0) {
+    results.push({
+      ruleId: 'D1_00021',
+      dimension: 'D1',
+      description: 'Contas do ativo com saldo invertido',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(activeInverted.map(a => a.CONTA))),
+      detailedItems: buildInvertedItems(activeInverted, 'D'),
+      message: `${activeInverted.length} conta(s) do ativo (grupos 1111/1121/1125/1231/1232) com natureza Credora (C). Natureza padrão: Devedora (D).`,
+    });
+  }
+
+  // D1_00025: Passivo circulante/não-circulante com saldo invertido — natureza padrão C
+  const passivoPrefixes = [
+    '2111','2112','2113','2114','2121','2122','2123','2124','2125','2126',
+    '213','214','215','221','222','223',
+  ];
+  const passivoInverted = findInvertedAccounts(msc, passivoPrefixes, 'C');
+  if (passivoInverted.length > 0) {
+    results.push({
+      ruleId: 'D1_00025',
+      dimension: 'D1',
+      description: 'Contas do passivo com saldo invertido',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(passivoInverted.map(a => a.CONTA))),
+      detailedItems: buildInvertedItems(passivoInverted, 'C'),
+      message: `${passivoInverted.length} conta(s) do passivo com natureza Devedora (D). Natureza padrão: Credora (C).`,
+    });
+  }
+
+  // D1_00026: Patrimônio líquido com saldo invertido — natureza padrão C
+  const plPrefixes = ['2311','2312','232','233','234','235','236'];
+  const plInverted = findInvertedAccounts(msc, plPrefixes, 'C');
+  if (plInverted.length > 0) {
+    results.push({
+      ruleId: 'D1_00026',
+      dimension: 'D1',
+      description: 'Contas de patrimônio líquido com saldo invertido',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(plInverted.map(a => a.CONTA))),
+      detailedItems: buildInvertedItems(plInverted, 'C'),
+      message: `${plInverted.length} conta(s) do Patrimônio Líquido com natureza Devedora (D). Natureza padrão: Credora (C).`,
+    });
+  }
+
+  // D1_00028: Todas as classes (1–8) presentes na MSC
+  // Classes 7 e 8 (DDR — controle) podem ser ausentes em municípios sem RPPS ou obrigações
+  // contingentes: tratadas como 'info' para não gerar falso positivo.
+  const presentClasses = new Set(msc.filter(a => a.Valor !== 0).map(a => a.CONTA[0]));
+  const missingObrig  = ['1','2','3','4','5','6'].filter(c => !presentClasses.has(c));
+  const missingDDR    = ['7','8'].filter(c => !presentClasses.has(c));
+
+  if (missingObrig.length > 0) {
+    results.push({
+      ruleId: 'D1_00028',
+      dimension: 'D1',
+      description: 'MSC com informação de todas as classes de contas',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: missingObrig.map(c => `Classe ${c}`),
+      message: `Classe(s) obrigatória(s) ausente(s) na MSC: ${missingObrig.map(c => `Classe ${c}`).join(', ')}. A MSC deve conter valores nas classes patrimonial (1–4) e orçamentária (5–6).`,
+    });
+  }
+  if (missingDDR.length > 0) {
+    results.push({
+      ruleId: 'D1_00028',
+      dimension: 'D1',
+      description: 'MSC com informação de todas as classes de contas',
+      severity: 'info',
+      impactsCapag: false,
+      affectedAccounts: missingDDR.map(c => `Classe ${c}`),
+      message: `Classe(s) de controle DDR ausente(s) na MSC: ${missingDDR.map(c => `Classe ${c}`).join(', ')}. Classes 7 e 8 são esperadas pelo Siconfi mas podem ser legitimamente ausentes em municípios sem RPPS ou sem obrigações contingentes registradas.`,
+    });
+  }
+
+  // D1_00029: Contas de receita (6211, 6212, 6213) sem FR
+  const receitaSemFR = msc.filter(acc =>
+    (acc.CONTA.startsWith('6211') || acc.CONTA.startsWith('6212') || acc.CONTA.startsWith('6213')) &&
+    (!acc.FR || acc.FR.trim() === '' || acc.FR.trim() === '0000')
+  );
+  if (receitaSemFR.length > 0) {
+    results.push({
+      ruleId: 'D1_00029',
+      dimension: 'D1',
+      description: 'Contas de receita orçamentária sem fonte ou destinação de recurso',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(receitaSemFR.map(a => a.CONTA))),
+      detailedItems: receitaSemFR.map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: 'FR ausente ou zerado' })),
+      message: `${receitaSemFR.length} lançamento(s) nos grupos 6211/6212/6213 sem detalhamento de Fonte ou Destinação de Recurso (FR).`,
+    });
+  }
+
+  // D1_00030: Contas de receita (6211, 6212, 6213) sem natureza de receita (CO)
+  const receitaSemCO = msc.filter(acc =>
+    (acc.CONTA.startsWith('6211') || acc.CONTA.startsWith('6212') || acc.CONTA.startsWith('6213')) &&
+    (!acc.CO || acc.CO.trim() === '' || acc.CO.trim() === '0000')
+  );
+  if (receitaSemCO.length > 0) {
+    results.push({
+      ruleId: 'D1_00030',
+      dimension: 'D1',
+      description: 'Contas de receita orçamentária sem natureza da receita',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(receitaSemCO.map(a => a.CONTA))),
+      detailedItems: receitaSemCO.map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: 'Natureza de receita (CO) ausente' })),
+      message: `${receitaSemCO.length} lançamento(s) nos grupos 6211/6212/6213 sem detalhamento de Natureza da Receita (CO).`,
+    });
+  }
+
+  // D1_00027: Contas com atributo F (superávit financeiro) sem detalhamento de FR
+  const fpSemFR = msc.filter(acc =>
+    acc.FP === 'F' &&
+    (!acc.FR || acc.FR.trim() === '' || acc.FR.trim() === '0000')
+  );
+  if (fpSemFR.length > 0) {
+    results.push({
+      ruleId: 'D1_00027',
+      dimension: 'D1',
+      description: 'Contas com atributo F (financeiro) sem detalhamento de fonte ou destinação de recursos',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(fpSemFR.map(a => a.CONTA))),
+      detailedItems: fpSemFR.map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: `FP: ${a.FP} | FR: ${a.FR || '(vazio)'}` })),
+      message: `${fpSemFR.length} lançamento(s) com atributo F (superávit financeiro) sem detalhamento de Fonte ou Destinação de Recurso (FR). Contas com atributo F precisam de FR preenchido.`,
+    });
+  }
+
+  // D1_00031: Contas de despesa (62213) sem natureza de despesa (ND = IC5)
+  const despesaSemND = msc.filter(acc =>
+    acc.CONTA.startsWith('62213') &&
+    (!acc.ND || acc.ND.trim() === '' || acc.ND === '00000000')
+  );
+  if (despesaSemND.length > 0) {
+    results.push({
+      ruleId: 'D1_00031',
+      dimension: 'D1',
+      description: 'Contas de despesa orçamentária sem natureza de despesa',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(despesaSemND.map(a => a.CONTA))),
+      detailedItems: despesaSemND.map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: 'Natureza de despesa (ND/IC5) ausente ou zerada' })),
+      message: `${despesaSemND.length} lançamento(s) no grupo 62213 sem detalhamento de Natureza da Despesa (ND).`,
+    });
+  }
+
+  // D1_00032: Contas de despesa (622xxx) sem função/subfunção (FS = IC2)
+  const despesaSemFS = msc.filter(acc =>
+    acc.CONTA.startsWith('622') &&
+    (!acc.FS || acc.FS.trim() === '' || acc.FS.trim() === '00000')
+  );
+  if (despesaSemFS.length > 0) {
+    results.push({
+      ruleId: 'D1_00032',
+      dimension: 'D1',
+      description: 'Contas de despesa orçamentária sem detalhamento de função/subfunção',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(despesaSemFS.map(a => a.CONTA))),
+      detailedItems: despesaSemFS.map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: `FS: ${a.FS || '(vazio)'}` })),
+      message: `${despesaSemFS.length} lançamento(s) no grupo 622 sem detalhamento de Função/Subfunção (FS).`,
+    });
+  }
+
+  // D1_00033: Contas de despesa (62213) sem fonte de recurso (FR)
+  const despesaSemFR = msc.filter(acc =>
+    acc.CONTA.startsWith('62213') &&
+    (!acc.FR || acc.FR.trim() === '' || acc.FR.trim() === '0000')
+  );
+  if (despesaSemFR.length > 0) {
+    results.push({
+      ruleId: 'D1_00033',
+      dimension: 'D1',
+      description: 'Contas de despesa orçamentária sem fonte ou destinação de recursos',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(despesaSemFR.map(a => a.CONTA))),
+      detailedItems: despesaSemFR.map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: 'FR ausente ou zerado' })),
+      message: `${despesaSemFR.length} lançamento(s) no grupo 62213 sem detalhamento de Fonte ou Destinação de Recurso (FR).`,
+    });
+  }
+
+  // D1_00034: VPD (grupos 311–363) com saldo invertido — natureza padrão D
+  const vpdPrefixes = [
+    '311','312','313','321','322','323',
+    '331','332','333','351','352','353','361','362','363',
+  ];
+  const vpdInverted = findInvertedAccounts(msc, vpdPrefixes, 'D');
+  if (vpdInverted.length > 0) {
+    results.push({
+      ruleId: 'D1_00034',
+      dimension: 'D1',
+      description: 'Contas de VPD com saldo invertido',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(vpdInverted.map(a => a.CONTA))),
+      detailedItems: buildInvertedItems(vpdInverted, 'D'),
+      message: `${vpdInverted.length} conta(s) de VPD (Variação Patrimonial Diminutiva) com natureza Credora (C). Natureza padrão: Devedora (D).`,
+    });
+  }
+
+  // D1_00035: VPA (classe 4) com saldo invertido — natureza padrão C
+  const vpaInverted = findInvertedAccounts(msc, ['4'], 'C');
+  if (vpaInverted.length > 0) {
+    results.push({
+      ruleId: 'D1_00035',
+      dimension: 'D1',
+      description: 'Contas de VPA com saldo invertido',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(vpaInverted.map(a => a.CONTA))),
+      detailedItems: buildInvertedItems(vpaInverted, 'C'),
+      message: `${vpaInverted.length} conta(s) de VPA (Variação Patrimonial Aumentativa) com natureza Devedora (D). Natureza padrão: Credora (C).`,
+    });
+  }
+
+  // D1_00037: Fontes de recursos da União (FR 001–499) em MSC de estados/municípios
+  // Estados e municípios não devem registrar movimentações em fontes 001-499 (reservadas à União)
+  const frUniao = msc.filter(acc => {
+    const frNum = parseInt(acc.FR ?? '', 10);
+    return !isNaN(frNum) && frNum >= 1 && frNum <= 499 && acc.Valor !== 0;
+  });
+  if (frUniao.length > 0) {
+    const frsUnicas = Array.from(new Set(frUniao.map(a => a.FR!.padStart(4, '0')))).sort();
+    results.push({
+      ruleId: 'D1_00037',
+      dimension: 'D1',
+      description: 'MSC com fontes de recursos da União (000–499)',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: frsUnicas,
+      detailedItems: frUniao.slice(0, 50).map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: `FR: ${a.FR} (faixa reservada à União)` })),
+      message: `${frUniao.length} lançamento(s) utilizam Fonte(s) de Recurso da União (${frsUnicas.slice(0,5).join(', ')}${frsUnicas.length > 5 ? '...' : ''}). Estados e municípios devem usar fontes ≥ 500.`,
+    });
+  }
+
+  // D1_00038: Classe 5/6 com saldo invertido — natureza padrão por grupo
+  // 511/621 = previsão/arrecadação de receita → C; 512/622 = fixação/execução de despesa → D
+  const orcamInvertedC = findInvertedAccounts(msc, ['511', '621'], 'C');
+  const orcamInvertedD = findInvertedAccounts(msc, ['512', '622'], 'D');
+  const orcamInverted = [...orcamInvertedC, ...orcamInvertedD];
+  if (orcamInverted.length > 0) {
+    results.push({
+      ruleId: 'D1_00038',
+      dimension: 'D1',
+      description: 'Contas de classe 5 e 6 com saldo invertido',
+      severity: 'warning',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(orcamInverted.map(a => a.CONTA))),
+      detailedItems: orcamInverted.map(a => {
+        const esperado = a.CONTA.startsWith('511') || a.CONTA.startsWith('621') ? 'C' : 'D';
+        return { conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: `Natureza informada: ${a.Natureza_valor} (esperado: ${esperado})` };
+      }),
+      message: `${orcamInverted.length} conta(s) orçamentária(s) (classes 5/6) com natureza diferente do padrão PCASP.`,
+    });
+  }
+
+  return results;
+}
+
+export function validateD1_Encerramento(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+  const results: ValidationResult[] = [];
+
+  // D1_00036: MSC de encerramento não pode ter saldo final nas contas de VPA (classe 4) e VPD (classe 3)
+  const vpaVpdComSaldo = msc.filter(acc =>
+    (acc.CONTA.startsWith('3') || acc.CONTA.startsWith('4')) &&
+    acc.Tipo_valor === 'ending_balance' &&
+    acc.Valor !== 0
+  );
+  if (vpaVpdComSaldo.length > 0) {
+    results.push({
+      ruleId: 'D1_00036',
+      dimension: 'D1',
+      description: 'MSC encerramento com saldo final nas contas VPA e VPD',
+      severity: 'error',
+      impactsCapag: false,
+      affectedAccounts: Array.from(new Set(vpaVpdComSaldo.map(a => a.CONTA))).slice(0, 20),
+      detailedItems: vpaVpdComSaldo.slice(0, 30).map(a => ({
+        conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor,
+        detalhe: `Natureza: ${a.Natureza_valor} | As contas de resultado (VPA/VPD) devem ser zeradas no encerramento`,
+      })),
+      message: `${vpaVpdComSaldo.length} conta(s) de VPA (classe 4) ou VPD (classe 3) com saldo final diferente de zero na MSC de encerramento. O encerramento exige que essas contas sejam zeradas.`,
+    });
+  }
+
+  // D2_00076: Se há VPA de juros de créditos previdenciários parcelados (44252xxx, beginning_balance > 0),
+  // deve haver crédito registrado no ativo (112127, 121120, 113620 — todos beginning_balance)
+  const temJurosParcelamento = msc.some(acc =>
+    acc.CONTA.startsWith('44252') && acc.Tipo_valor === 'beginning_balance' && acc.Valor > 0
+  );
+  if (temJurosParcelamento) {
+    const temCreditoAtivo = msc.some(acc =>
+      (acc.CONTA.startsWith('112127') || acc.CONTA.startsWith('121120') || acc.CONTA.startsWith('113620')) &&
+      acc.Tipo_valor === 'beginning_balance' && acc.Valor > 0
+    );
+    if (!temCreditoAtivo) {
+      results.push({
+        ruleId: 'D2_00076', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
+        affectedAccounts: ['44252', '112127', '121120', '113620'],
+        message: `Há VPA de juros de créditos previdenciários parcelados (44252xxx) mas não foram encontrados os respectivos créditos no ativo (112127/121120/113620). O PIPCP exige esse registro.`,
+      });
+    }
+  }
+
+  return results;
+}
+
+
+export function validateMultiMonth(
+  mscByPeriod: Record<string, MSCAccount[]>,
+  _rulesMap: Map<string, RuleDefinition>
+): ValidationResult[] {
+  const results: ValidationResult[] = [];
+
+  const allPeriods = Object.keys(mscByPeriod).sort();
+  const regular = allPeriods.filter(p => {
+    const m = parseInt(p.split('-')[1] || '0');
+    return m >= 1 && m <= 12;
+  });
+
+  for (let i = 1; i < regular.length; i++) {
+    const prevPeriod = regular[i - 1];
+    const currPeriod = regular[i];
+    const prevMsc = mscByPeriod[prevPeriod];
+    const currMsc = mscByPeriod[currPeriod];
+
+    const accsPrev = prevMsc.filter(a => a.CONTA.startsWith('1') || a.CONTA.startsWith('2'));
+    
+    // D2_00077 etc... (Simplified re-implementation for now)
+    for (const pAcc of accsPrev) {
+      const cAcc = currMsc.find(a => a.CONTA === pAcc.CONTA);
+      if (cAcc && cAcc.Tipo_valor === 'beginning_balance' && pAcc.Tipo_valor === 'ending_balance') {
+         if (Math.abs(cAcc.Valor - pAcc.Valor) > 0.01) {
+             results.push({
+               ruleId: 'D2_00077',
+               dimension: 'D2',
+               description: 'Validação de saldo inicial x final',
+               severity: 'error',
+               impactsCapag: false,
+               message: `Conta ${pAcc.CONTA}: O saldo final de ${prevPeriod} (R$ ${pAcc.Valor}) difere do saldo inicial de ${currPeriod} (R$ ${cAcc.Valor}).`
+             });
+         }
+      }
+    }
+  }
+
+  return results;
+}

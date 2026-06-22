@@ -25,7 +25,8 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
   for (const file of files) {
     if (file.name.endsWith('.csv')) {
       const text = await file.text();
-      const { accounts, period } = parseMSCWithMeta(text);
+      const { accounts, period, enteId } = parseMSCWithMeta(text);
+      if (enteId) result.enteId = enteId;
       storeMSC(result, await accounts, period);
 
     } else if (file.name.endsWith('.zip')) {
@@ -45,7 +46,8 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
 
         } else if (lname.endsWith('.csv')) {
           const csvText = await zipEntry.async("string");
-          const { accounts, period } = parseMSCWithMeta(csvText);
+          const { accounts, period, enteId } = parseMSCWithMeta(csvText);
+          if (enteId) result.enteId = enteId;
           storeMSC(result, await accounts, period);
         }
       }
@@ -77,14 +79,16 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
 
 // Extrai o período (YYYY-MM) do cabeçalho do CSV da MSC antes de parsear as contas.
 // Formato esperado da linha 1: "Codigo de Instituicao Siconfi;YYYY-MM;..."
-const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; period: string | null } => {
+const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; period: string | null; enteId: string | null } => {
   const lines = csvText.split(/\r?\n/);
   let period: string | null = null;
+  let enteId: string | null = null;
 
   // Tenta extrair período da primeira linha antes do cabeçalho CONTA
   if (lines.length > 0) {
     const firstLineParts = lines[0].split(';');
     if (firstLineParts.length >= 2) {
+      enteId = firstLineParts[0].trim();
       const candidate = firstLineParts[1].trim();
       if (/^\d{4}-\d{2}$/.test(candidate)) period = candidate;
     }
@@ -146,5 +150,5 @@ const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; p
     });
   });
 
-  return { accounts, period };
+  return { accounts, period, enteId };
 };
