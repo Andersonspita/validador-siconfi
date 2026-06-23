@@ -38,7 +38,7 @@ D1: D1_00001(info), D1_00016, D1_00017, D1_00018, D1_00019, D1_00020, D1_00021,
     D1_00030, D1_00031, D1_00032, D1_00033, D1_00034, D1_00035, D1_00036,
     D1_00037, D1_00038
 
-D2: D2_00054, D2_00055, D2_00067, D2_00068, D2_00076, D2_00077, D2_00079,
+D2: D2_00001, D2_00002, D2_00003, D2_00004, D2_00005, D2_00054, D2_00055, D2_00067, D2_00068, D2_00076, D2_00077, D2_00079,
     D2_00080, D2_00081, D2_00082, D2_00083, D2_00086, D2_00087, D2_00088,
     D2_00093, D2_00094, D2_00095
 
@@ -59,7 +59,7 @@ impl = {
   'D1_00022','D1_00023','D1_00024','D1_00025','D1_00026','D1_00027','D1_00028',
   'D1_00029','D1_00030','D1_00031','D1_00032','D1_00033','D1_00034','D1_00035',
   'D1_00036','D1_00037','D1_00038',
-  'D2_00053','D2_00054','D2_00055','D2_00059','D2_00060','D2_00067','D2_00068',
+  'D2_00001','D2_00002','D2_00003','D2_00004','D2_00005','D2_00053','D2_00054','D2_00055','D2_00059','D2_00060','D2_00067','D2_00068',
   'D2_00076','D2_00077','D2_00079','D2_00080','D2_00081','D2_00082','D2_00083',
   'D2_00086','D2_00087','D2_00088','D2_00093','D2_00094','D2_00095',
   'D3_00001','D3_00002','D3_00003','D3_00005','D3_00006','D3_00007','D3_00008',
@@ -99,11 +99,21 @@ print(f'{len(impl)} de {len(rows)} ({len(impl)*100//len(rows)}%)')
 
 > **Nota D3_00008/009:** Precisam do RGF Anexo 05 (Disponibilidade de Caixa). O arquivo de teste de Correntina não tem Anexo 05.
 
-#### SÓ_MSC — 1 regra
-
-| Regra | Descrição | Dificuldade |
+#### Dimensão 2 (Cruzamentos de Saldos)
+| Regra | Status | Descrição Simplificada |
 |---|---|---|
-| D2_00097 | Transferências especiais emendas individuais | Alta — CAPAG, precisa dados externos |
+| **D2_00055** | 🟢 Implementada | Amortização acumulada > valor bruto (Intangível) |
+| **D2_00067** | 🟢 Implementada | Depreciação acumulada > valor bruto (Móveis) |
+| **D2_00068** | 🟢 Implementada | Depreciação acumulada > valor bruto (Imóveis) |
+| **D2_00080** | 🟢 Implementada | Saldo zerado em Estoques (Almoxarifado) |
+| **D2_00081** | 🟢 Implementada | Desp. Pessoal registradas sem provisão de Férias/13º |
+| **D2_00083** | 🟢 Implementada | Integridade DDR (Classe 721 vs 821) |
+| **D2_00095** | 🟢 Implementada | Desp. Pessoal RGPS ativas sem registro de INSS/FGTS |
+| **D2_00001** | 🟢 Implementada | FUNDEB VPA no Anexo I-HI da DCA |
+| **D2_00002** | 🟢 Implementada | FUNDEB VPD no Anexo I-HI da DCA |
+| **D2_00003** | 🟢 Implementada | Deduções FUNDEB no Anexo I-C da DCA |
+| **D2_00004** | 🟢 Implementada | Receitas FUNDEB no Anexo I-C da DCA |
+| **D2_00005** | 🟢 Implementada | Encargos patronais no Anexo I-D da DCA |
 
 ### 4.2 Implementáveis quando tivermos arquivo DCA (44 regras SÓ_DCA + 36 DCA+OUTRO)
 

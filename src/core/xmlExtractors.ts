@@ -478,9 +478,33 @@ export const getDCAValue = (
   dca: any,
   sheetNames: string[],
   searchTerm: string,
-  startColOffset: number = 1
+  colOffset: number = 1
 ): number | null => {
-  const sheet = getSheet(dca, sheetNames);
-  if (!sheet) return null;
-  return findValueInSheet(sheet, searchTerm, startColOffset);
+  return extractFromReport(dca, sheetNames, searchTerm, colOffset);
+};
+
+// D2_00001: FUNDEB VPA (Anexo I-HI)
+export const getDCA_VPA_Fundeb = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-HI', 'Anexo I-HI'], '4\\.5\\.2\\.2\\.0\\.00\\.00.*Transfer[eê]ncias do FUNDEB');
+
+// D2_00002: FUNDEB VPD (Anexo I-HI)
+export const getDCA_VPD_Fundeb = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-HI', 'Anexo I-HI'], '3\\.5\\.2\\.2\\.0\\.00\\.00.*Transfer[eê]ncias ao FUNDEB');
+
+// D2_00003: Deduções FUNDEB (Anexo I-C)
+// Procuramos pela coluna "Deduções - FUNDEB" ou similar na linha de Transferências
+export const getDCA_DeducoesFundeb = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '1\\.7\\.1\\.5|1\\.7\\.5\\.1', 'Dedu[cç][oõ]es.*FUNDEB');
+
+// D2_00004: Receitas FUNDEB (Anexo I-C)
+export const getDCA_ReceitasFundeb = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '1\\.7\\.5\\.1\\.00\\.0\\.0.*FUNDEB', 'Receitas Brutas Realizadas|Receitas.*Realizadas');
+
+// D2_00005: Encargos patronais (Anexo I-D)
+// 3.1.90.13.00 ou 3.1.91.13.00
+export const getDCA_EncargosPatronais = (dca: any): number | null => {
+  const val1 = getDCAValue(dca, ['DCA-Anexo I-D', 'Anexo I-D'], '3\\.1\\.90\\.13\\.00.*Obriga[cç][oõ]es Patronais');
+  const val2 = getDCAValue(dca, ['DCA-Anexo I-D', 'Anexo I-D'], '3\\.1\\.91\\.13\\.00.*Contribui[cç][oõ]es Patronais');
+  if (val1 === null && val2 === null) return null;
+  return (val1 || 0) + (val2 || 0);
 };

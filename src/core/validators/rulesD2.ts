@@ -1,4 +1,4 @@
-import { hasValueInDCA, getDCAValue } from '../xmlExtractors';
+import { getDCAValue, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais } from '../xmlExtractors';
 import { ParsedData, ValidationResult, RuleDefinition } from '../types';
 import { sumAccounts } from './utils';
 
@@ -238,31 +238,6 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
   }
 
   
-  // D2_00001: VPA do FUNDEB no Anexo I-HI da DCA
-  const temVpaFundebMSC = msc.some(a => a.CONTA.startsWith('4524') && a.Tipo_valor === 'period_change' && a.Valor > 0);
-  if (temVpaFundebMSC && data.dca) {
-    const temFundebDCA = hasValueInDCA(data.dca, ['DCA-Anexo I-HI', 'DCA Anexo I-HI'], 'Variação Patrimonial Aumentativa.*FUNDEB|Transferências.*FUNDEB');
-    if (!temFundebDCA) {
-      results.push({
-        ruleId: 'D2_00001', dimension: 'D2', description: '', severity: 'error', impactsCapag: false,
-        message: 'A MSC possui registro de VPA do FUNDEB (classe 4524), mas essa informação não consta no Anexo I-HI da DCA.'
-      });
-    }
-  }
-
-  // D2_00002: VPD do FUNDEB no Anexo I-HI da DCA
-  const temVpdFundebMSC = msc.some(a => a.CONTA.startsWith('3524') && a.Tipo_valor === 'period_change' && a.Valor > 0);
-  if (temVpdFundebMSC && data.dca) {
-    const temFundebDCA = hasValueInDCA(data.dca, ['DCA-Anexo I-HI', 'DCA Anexo I-HI'], 'Variação Patrimonial Diminutiva.*FUNDEB');
-    if (!temFundebDCA) {
-      results.push({
-        ruleId: 'D2_00002', dimension: 'D2', description: '', severity: 'error', impactsCapag: false,
-        message: 'A MSC possui registro de VPD do FUNDEB (classe 3524), mas essa informação não consta no Anexo I-HI da DCA.'
-      });
-    }
-  }
-
-  
   // D2_00044: Igualdade das receitas arrecadadas na MSC e Anexo I-C da DCA
   const vlReceitasMSC = sumAccounts(msc, ['6212'], 'ending_balance', 'C');
   if (data.dca) {
@@ -285,6 +260,57 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
         message: `Despesas empenhadas divergem. MSC (62213): R$ ${vlEmpenhadasMSC.toFixed(2)} | DCA Anexo I-D: R$ ${vlEmpenhadasDCA.toFixed(2)}.`
       });
     }
+  }
+
+  return results;
+}
+
+export function validateD2_DCA(dca: any, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+  const results: ValidationResult[] = [];
+
+  // D2_00001: FUNDEB VPA no Anexo I-HI
+  const vpaFundeb = getDCA_VPA_Fundeb(dca);
+  if (vpaFundeb === null || vpaFundeb === 0) {
+    results.push({
+      ruleId: 'D2_00001', dimension: 'D2', description: '', severity: 'error', impactsCapag: false,
+      message: 'Não há registro de Variação Patrimonial Aumentativa (VPA) do FUNDEB no Anexo I-HI da DCA.'
+    });
+  }
+
+  // D2_00002: FUNDEB VPD no Anexo I-HI
+  const vpdFundeb = getDCA_VPD_Fundeb(dca);
+  if (vpdFundeb === null || vpdFundeb === 0) {
+    results.push({
+      ruleId: 'D2_00002', dimension: 'D2', description: '', severity: 'error', impactsCapag: false,
+      message: 'Não há registro de Variação Patrimonial Diminutiva (VPD) do FUNDEB no Anexo I-HI da DCA.'
+    });
+  }
+
+  // D2_00003: Deduções FUNDEB no Anexo I-C
+  const deducoesFundeb = getDCA_DeducoesFundeb(dca);
+  if (deducoesFundeb === null || deducoesFundeb === 0) {
+    results.push({
+      ruleId: 'D2_00003', dimension: 'D2', description: '', severity: 'error', impactsCapag: false,
+      message: 'Não há informação de deduções de receitas para formação do FUNDEB no Anexo I-C da DCA.'
+    });
+  }
+
+  // D2_00004: Receitas FUNDEB no Anexo I-C
+  const receitasFundeb = getDCA_ReceitasFundeb(dca);
+  if (receitasFundeb === null || receitasFundeb === 0) {
+    results.push({
+      ruleId: 'D2_00004', dimension: 'D2', description: '', severity: 'error', impactsCapag: false,
+      message: 'Não há informação das receitas orçamentárias do FUNDEB no Anexo I-C da DCA.'
+    });
+  }
+
+  // D2_00005: Encargos patronais no Anexo I-D
+  const encargosPatronais = getDCA_EncargosPatronais(dca);
+  if (encargosPatronais === null || encargosPatronais === 0) {
+    results.push({
+      ruleId: 'D2_00005', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
+      message: 'Não há informação das despesas orçamentárias com encargos patronais no Anexo I-D da DCA.'
+    });
   }
 
   return results;

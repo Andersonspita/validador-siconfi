@@ -1,6 +1,6 @@
 import { ParsedData, ValidationResult, RuleDefinition } from '../types';
 import { validateD1_Entrega, validateD1_MSC, validateMultiMonth, validateD1_Encerramento } from './rulesD1';
-import { validateD2_MSC } from './rulesD2';
+import { validateD2_MSC, validateD2_DCA } from './rulesD2';
 import { validateD3_RREO, validateD3_Fiscal, validateMSC_CAPAG } from './rulesD3';
 import { validateD4_Cruzamentos } from './rulesD4';
 
@@ -21,6 +21,10 @@ export const runValidations = async (data: ParsedData, rulesMap: Map<string, Rul
 
   if (data.mscByPeriod && Object.keys(data.mscByPeriod).length >= 2) {
     results.push(...validateMultiMonth(data.mscByPeriod, rulesMap));
+  }
+
+  if (data.dca) {
+    results.push(...validateD2_DCA(data.dca, rulesMap));
   }
 
   if (data.rreo) {
