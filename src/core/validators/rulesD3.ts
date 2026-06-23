@@ -15,7 +15,11 @@ import {
   getReceitasRealizadasTotal_A06, getDotacaoAtualizada_A01, getDespesasEmpenhadas_A01,
   getDespesasLiquidadas_A01, getDotacaoAtualizada_A06, getDespesasEmpenhadas_A06,
   getDespesasLiquidadas_A06, getRPNP_inscricoes_A01, getTotalRPPagos_A06, getTotalRPPagos_A07,
-  getRPNP_A05_RGF, getRPP_A05_RGF, getTotalRPSaldo_A07
+  getTotalRPSaldo_A07,
+  getDespesasAnexo06, getReceitasAnexo06, getInvestimentos_A09, getInversoesFinanceiras_A09, 
+  getAmortizacaoDivida_A09, getOperacoesCredito_A09, getInvestimentos_A01, getInversoesFinanceiras_A01,
+  getAmortizacaoDivida_A01, getOperacoesCredito_A01, getCaixaTotal_A05_RGF, getCaixaTotalNaoVinculado_A05_RGF,
+  getRPNP_A05_RGF_Total, getRPP_A05_RGF_Total
 } from '../xmlExtractors';
 
 export function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
@@ -179,6 +183,64 @@ export function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition
     });
   }
 
+  // ===========================================================================
+  // Lote 4: Cruzamentos Intra-RREO
+  // ===========================================================================
+
+  // D3_00003: Despesas Orçamentárias (RREO Anexo 01 vs Anexo 06)
+  results.push(...validatePairEquality(
+    'D3_00003', 'D3',
+    { label: 'RREO Anexo 01 (Despesas Orçamentárias)', val: despA01 },
+    { label: 'RREO Anexo 06 (Despesas Orçamentárias)', val: getDespesasAnexo06(rreo) },
+    'Divergência na totalização de Despesas Orçamentárias entre o Anexo 01 e Anexo 06 do RREO.',
+    false
+  ));
+
+  // D3_00007: Receitas Realizadas (RREO Anexo 01 vs Anexo 06)
+  results.push(...validatePairEquality(
+    'D3_00007', 'D3',
+    { label: 'RREO Anexo 01 (Receitas Realizadas)', val: getReceitasRealizadasTotal_A01(rreo) },
+    { label: 'RREO Anexo 06 (Receitas Realizadas)', val: getReceitasAnexo06(rreo) },
+    'Divergência nas Receitas Realizadas entre o Anexo 01 e Anexo 06 do RREO.',
+    false
+  ));
+
+  // D3_00037: Investimentos (RREO Anexo 01 vs Anexo 09)
+  results.push(...validatePairEquality(
+    'D3_00037', 'D3',
+    { label: 'RREO Anexo 01 (Investimentos)', val: getInvestimentos_A01(rreo) },
+    { label: 'RREO Anexo 09 (Investimentos)', val: getInvestimentos_A09(rreo) },
+    'Divergência em Investimentos entre o Anexo 01 e Anexo 09 do RREO.',
+    false
+  ));
+
+  // D3_00038: Inversões Financeiras (RREO Anexo 01 vs Anexo 09)
+  results.push(...validatePairEquality(
+    'D3_00038', 'D3',
+    { label: 'RREO Anexo 01 (Inversões Financeiras)', val: getInversoesFinanceiras_A01(rreo) },
+    { label: 'RREO Anexo 09 (Inversões Financeiras)', val: getInversoesFinanceiras_A09(rreo) },
+    'Divergência em Inversões Financeiras entre o Anexo 01 e Anexo 09 do RREO.',
+    false
+  ));
+
+  // D3_00039: Amortização da Dívida (RREO Anexo 01 vs Anexo 09)
+  results.push(...validatePairEquality(
+    'D3_00039', 'D3',
+    { label: 'RREO Anexo 01 (Amortização da Dívida)', val: getAmortizacaoDivida_A01(rreo) },
+    { label: 'RREO Anexo 09 (Amortização da Dívida)', val: getAmortizacaoDivida_A09(rreo) },
+    'Divergência na Amortização da Dívida entre o Anexo 01 e Anexo 09 do RREO.',
+    false
+  ));
+
+  // D3_00040: Receitas de Operações de Crédito (RREO Anexo 01 vs Anexo 09)
+  results.push(...validatePairEquality(
+    'D3_00040', 'D3',
+    { label: 'RREO Anexo 01 (Operações de Crédito)', val: getOperacoesCredito_A01(rreo) },
+    { label: 'RREO Anexo 09 (Operações de Crédito)', val: getOperacoesCredito_A09(rreo) },
+    'Divergência nas Receitas de Operações de Crédito entre o Anexo 01 e Anexo 09 do RREO.',
+    false
+  ));
+
   return results;
 }
 
@@ -308,10 +370,9 @@ export function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, Ru
     true
   ));
 
-  
   // D3_00008: Restos a pagar não processados RREO A01 x RGF A05
   const rreoA01_rpnp = getRPNP_inscricoes_A01(rreo); 
-  const rgfA05_rpnp = getRPNP_A05_RGF(rgf); 
+  const rgfA05_rpnp = getRPNP_A05_RGF_Total(rgf); 
   if (rreoA01_rpnp !== null && rgfA05_rpnp !== null && Math.abs(rreoA01_rpnp - rgfA05_rpnp) > 0.01) {
       results.push({
         ruleId: 'D3_00008',
@@ -325,7 +386,7 @@ export function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, Ru
 
   // D3_00009: Restos a pagar processados + não processados RREO A07 x RGF A05
   const rreoA07_rpTotal = getTotalRPSaldo_A07(rreo);
-  const rgfA05_rpp = getRPP_A05_RGF(rgf);
+  const rgfA05_rpp = getRPP_A05_RGF_Total(rgf);
   if (rreoA07_rpTotal !== null && rgfA05_rpp !== null && rgfA05_rpnp !== null) {
       const rgfA05_rpTotal = rgfA05_rpp + rgfA05_rpnp;
       if (Math.abs(rreoA07_rpTotal - rgfA05_rpTotal) > 0.01) {
@@ -343,7 +404,28 @@ export function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, Ru
   // D3_00010: RCL do RGF deve ser igual à calculada internamente ou entre poderes
   if (rclRGF !== null) {
       // Como a validação de RCL já foi feita em D3_00005, D3_00010 foca em relatórios de outros poderes.
-      // Aqui só deixaremos a marcação.
+      results.push({
+        ruleId: 'D3_00010',
+        dimension: 'D3',
+        description: '',
+        severity: 'info',
+        impactsCapag: false,
+        message: 'Para validar a igualdade da RCL entre todos os Poderes/Órgãos (D3_00010), é necessário carregar os RGFs do Legislativo e Judiciário.'
+      });
+  }
+
+  // D3_00026: Valores de Caixa e Equivalentes de Caixa por Fontes de Recursos (RGF Anexo 05)
+  const caixaVinculado = getCaixaTotal_A05_RGF(rgf);
+  const caixaNaoVinculado = getCaixaTotalNaoVinculado_A05_RGF(rgf);
+  if (caixaVinculado === null && caixaNaoVinculado === null) {
+    results.push({
+      ruleId: 'D3_00026',
+      dimension: 'D3',
+      description: '',
+      severity: 'warning',
+      impactsCapag: false,
+      message: 'Não foi possível extrair os valores totais de Caixa e Equivalentes de Caixa no Anexo 05 do RGF para conferência.'
+    });
   }
 
   return results;

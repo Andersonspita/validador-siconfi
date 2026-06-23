@@ -710,3 +710,58 @@ export const getDCA_Estoques = (dca: any): number | null =>
 
 export const getDCA_AjustePerdasEstoques = (dca: any): number | null =>
   getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], 'Ajuste de Perdas de Estoques');
+// =============================================================================
+// Lote 4: Cruzamentos D3 (RREO e RGF)
+// =============================================================================
+
+// RREO Anexo 06
+export const getDespesasAnexo06 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Despesas Orçamentárias', 'Despesas Liquidadas Até o Bimestre');
+
+export const getReceitasAnexo06 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Receitas Orçamentárias', 'Receitas Realizadas Até o Bimestre');
+
+// RREO Anexo 09
+export const getInvestimentos_A09 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 09', 'RREO Anexo 09'], 'Investimentos', 'Despesas Liquidadas Até o Bimestre');
+
+export const getInversoesFinanceiras_A09 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 09', 'RREO Anexo 09'], 'Inversões Financeiras', 'Despesas Liquidadas Até o Bimestre');
+
+export const getAmortizacaoDivida_A09 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 09', 'RREO Anexo 09'], 'Amortização da Dívida', 'Despesas Liquidadas Até o Bimestre');
+
+export const getOperacoesCredito_A09 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 09', 'RREO Anexo 09'], 'Operações de Crédito', 'Receitas Realizadas Até o Bimestre');
+
+// RREO Anexo 01 Despesas de Capital (para bater com Anexo 09)
+export const getInvestimentos_A01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'Investimentos', 'Despesas Liquidadas Até o Bimestre');
+
+export const getInversoesFinanceiras_A01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'Inversões Financeiras', 'Despesas Liquidadas Até o Bimestre');
+
+export const getAmortizacaoDivida_A01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'Amortização da Dívida', 'Despesas Liquidadas Até o Bimestre');
+
+export const getOperacoesCredito_A01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'Operações de Crédito', 'Receitas Realizadas Até o Bimestre');
+
+// RGF Anexo 05
+export const getCaixaTotal_A05_RGF = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 05', 'RGF Anexo 05'], 'TOTAL DOS RECURSOS VINCULADOS \\(I\\)');
+
+export const getCaixaTotalNaoVinculado_A05_RGF = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 05', 'RGF Anexo 05'], 'TOTAL DOS RECURSOS NÃO VINCULADOS \\(II\\)');
+
+export const getRPNP_A05_RGF_Total = (rgf: any): number | null => {
+  const v1 = extractFromReport(rgf, ['RGF-Anexo 05', 'RGF Anexo 05'], 'Restos a Pagar Empenhados e Não Liquidados do Exercício');
+  if (v1 === null) return null;
+  return v1; // Simplificado temporariamente
+};
+
+export const getRPP_A05_RGF_Total = (rgf: any): number | null => {
+  const v1 = extractFromReport(rgf, ['RGF-Anexo 05', 'RGF Anexo 05'], 'Restos a Pagar Liquidados e Não Pagos');
+  if (v1 === null) return null;
+  return v1; // Simplificado temporariamente
+};
