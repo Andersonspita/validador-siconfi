@@ -82,8 +82,49 @@ const getSheet = (report: any, candidates: string[]): any[][] | null => {
   return null;
 };
 
-// Busca o valor em uma linha da planilha pelo texto + índice absoluto de coluna.
-// Necessário quando a planilha tem múltiplas colunas (ex: col[5] = "Receitas Realizadas Até o Bimestre").
+// Busca o valor em uma linha usando o nome do cabeçalho da coluna em vez de um índice rígido numérico.
+export const findValueInSheetByColumnName = (
+  sheet: any[][],
+  rowTerm: string,
+  colHeaderTerm: string
+): number | null => {
+  if (!Array.isArray(sheet)) return null;
+
+  const headerRegex = new RegExp(colHeaderTerm, 'i');
+  let targetColIndex = -1;
+
+  // 1. Vasculhar as primeiras linhas para encontrar o cabeçalho alvo e determinar seu índice de coluna
+  for (const row of sheet) {
+    if (!Array.isArray(row)) continue;
+    const matchIndex = row.findIndex(c => typeof c === 'string' && headerRegex.test(c));
+    if (matchIndex !== -1) {
+      targetColIndex = matchIndex;
+      break;
+    }
+  }
+
+  // Se não encontrar a coluna, aborta
+  if (targetColIndex === -1) return null;
+
+  // 2. Procurar a linha desejada
+  const rowRegex = new RegExp(rowTerm, 'i');
+  for (const row of sheet) {
+    if (!Array.isArray(row)) continue;
+    const matchIndex = row.findIndex((c, i) => i < 4 && typeof c === 'string' && rowRegex.test(c));
+    if (matchIndex === -1) continue;
+
+    // 3. Obter a célula que está no cruzamento
+    const cell = row[targetColIndex];
+    if (typeof cell === 'number') return cell;
+    if (typeof cell === 'string') {
+      const parsed = parseFloat(cell.replace(/\./g, '').replace(',', '.'));
+      if (!isNaN(parsed)) return parsed;
+    }
+  }
+  return null;
+};
+
+// Antiga busca rígida (mantida temporariamente caso algum legacy dependa)
 export const findValueByColumnIndex = (sheet: any[][], rowTerm: string, colIndex: number): number | null => {
   if (!Array.isArray(sheet)) return null;
   const rx = new RegExp(rowTerm, 'i');
@@ -101,11 +142,19 @@ export const findValueByColumnIndex = (sheet: any[][], rowTerm: string, colIndex
   return null;
 };
 
+// Export que aceita tanto colIndex estático ou colHeader string
 export const extractByColumnFromReport = (
-  report: any, sheetCandidates: string[], rowTerm: string, colIndex: number
+  report: any,
+  sheetCandidates: string[],
+  rowTerm: string,
+  colQuery: number | string
 ): number | null => {
   const sheet = getSheet(report, sheetCandidates);
-  return sheet ? findValueByColumnIndex(sheet, rowTerm, colIndex) : null;
+  if (!sheet) return null;
+  if (typeof colQuery === 'number') {
+    return findValueByColumnIndex(sheet, rowTerm, colQuery);
+  }
+  return findValueInSheetByColumnName(sheet, rowTerm, colQuery);
 };
 
 // Extrator genérico: dado o report, os candidatos de aba e o termo de busca
@@ -218,60 +267,54 @@ export const getReservaContingencia_A06 = (rreo: any): number | null =>
   extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RESERVA DE CONTING[EÊ]NCIA.*\\(XXIX\\)|RESERVA DE CONTING[EÊ]NCIA');
 
 // D3_00028: Receitas Realizadas Até o Bimestre
-// A01: "SUBTOTAL DAS RECEITAS (III)" col[5] = Receitas Realizadas Até o Bimestre
 export const getReceitasRealizadasTotal_A01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS RECEITAS.*\\(III\\)', 5);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS RECEITAS.*\\(III\\)', 'Até o Bimestre|Bimestre');
 
-// A06: "RECEITA PRIMÁRIA TOTAL (XVI)" col[2] = Receitas Realizadas
-// Nota: A06 exclui fontes RPPS; para municípios com RPPS, os valores podem diferir levemente.
 export const getReceitasRealizadasTotal_A06 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RECEITA PRIMÁRIA TOTAL.*\\(XVI\\)', 2);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RECEITA PRIMÁRIA TOTAL.*\\(XVI\\)', 'Até o Bimestre|Bimestre');
 
 // D3_00027: Dotação atualizada e Despesas Empenhadas/Liquidadas — para comparação A01 × A06
-// A01 col indices: [2]=DotAtual, [4]=EmpenhAté, [7]=LiquidAté
 export const getDotacaoAtualizada_A01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 2);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 'Dotação Atualizada|Dotação.*Atualizada');
 export const getDespesasEmpenhadas_A01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 4);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 'Despesas Empenhadas.*Bimestre|Empenhadas.*Bimestre');
 export const getDespesasLiquidadas_A01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 7);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 'Despesas Liquidadas.*Bimestre|Liquidadas.*Bimestre');
 
-// A06 col indices: [1]=DotAtual, [2]=EmpenhAté, [3]=LiquidAté
 export const getDotacaoAtualizada_A06 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'DESPESA PRIMÁRIA TOTAL.*\\(XXXII\\)', 1);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'DESPESA PRIMÁRIA TOTAL.*\\(XXXII\\)', 'Dotação Atualizada|Dotação.*Atualizada');
 export const getDespesasEmpenhadas_A06 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'DESPESA PRIMÁRIA TOTAL.*\\(XXXII\\)', 2);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'DESPESA PRIMÁRIA TOTAL.*\\(XXXII\\)', 'Despesas Empenhadas.*Bimestre|Empenhadas.*Bimestre|Até o Bimestre');
 export const getDespesasLiquidadas_A06 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'DESPESA PRIMÁRIA TOTAL.*\\(XXXII\\)', 3);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'DESPESA PRIMÁRIA TOTAL.*\\(XXXII\\)', 'Despesas Liquidadas.*Bimestre|Liquidadas.*Bimestre|Até o Bimestre');
 
-// D3_00022: Receitas Correntes (exceto intra) — col[5] = Realizadas Até o Bimestre
+// D3_00022: Receitas Correntes (exceto intra)
 export const getReceitasCorrentes_A01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'RECEITAS CORRENTES\\s*$|^\\s+RECEITAS CORRENTES\\s+$', 5);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'RECEITAS CORRENTES\\s*$|^\\s+RECEITAS CORRENTES\\s+$', 'Até o Bimestre|Bimestre');
 
-// D3_00023: Receitas de Capital (exceto intra) — col[5]
+// D3_00023: Receitas de Capital (exceto intra)
 export const getReceitasCapital_A01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'RECEITAS DE CAPITAL', 5);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'RECEITAS DE CAPITAL', 'Até o Bimestre|Bimestre');
 
-// D3_00024: Despesas Correntes (exceto intra) — col[7] = Liquidadas Até o Bimestre
+// D3_00024: Despesas Correntes (exceto intra)
 export const getDespesasCorrentes_A01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'DESPESAS CORRENTES\\s*$|^\\s+DESPESAS CORRENTES\\s+$', 7);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'DESPESAS CORRENTES\\s*$|^\\s+DESPESAS CORRENTES\\s+$', 'Despesas Liquidadas.*Bimestre|Liquidadas.*Bimestre');
 
-// D3_00025: Despesas de Capital (exceto intra) — col[7]
+// D3_00025: Despesas de Capital (exceto intra)
 export const getDespesasCapital_A01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'DESPESAS DE CAPITAL', 7);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'DESPESAS DE CAPITAL', 'Despesas Liquidadas.*Bimestre|Liquidadas.*Bimestre');
 
-// D4_00025: Despesas empenhadas/liquidadas/pagas — col[4]=emp, col[7]=liq, col[9]=pagas
+// D4_00025: Despesas empenhadas/liquidadas/pagas
 export const getDespesasEmpenhadas_SubtotalA01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 4);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 'Despesas Empenhadas.*Bimestre|Empenhadas.*Bimestre');
 export const getDespesasLiquidadas_SubtotalA01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 7);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 'Despesas Liquidadas.*Bimestre|Liquidadas.*Bimestre');
 export const getDespesasPagas_SubtotalA01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 9);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 'Despesas Pagas.*Bimestre|Pagas.*Bimestre');
 
-// D4_00025/026: valores para cruzamento MSC × RREO (A01)
-// A01: Inscrições em RPNP (col[10] do subtotal de despesas)
+// A01: Inscrições em RPNP
 export const getRPNP_inscricoes_A01 = (rreo: any): number | null =>
-  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 10);
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'SUBTOTAL DAS DESPESAS.*\\(X\\)', 'Inscritas.*Não Processados|RPNP|Restos a Pagar Não Processados');
 
 // ─── RREO Anexo 07 (Restos a Pagar) ─────────────────────────────────────────
 
@@ -295,9 +338,12 @@ export const findNegativosRP_A07 = (rreo: any): { label: string; value: number }
 };
 
 // D3_00017: Total RP (exceto intra + intra) — Anexo 07 coluna "Pagos no Exercício"
-// Nota: Anexo 07 tem múltiplas colunas; "TOTAL (III)" retorna a primeira, que pode não ser "Pagos".
-// Implementação completa pendente de mapeamento de colunas.
-// export const getTotalRPPagos_A07 = ...
+export const getTotalRPPagos_A07 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'TOTAL\\s*\\(III\\)\\s*=\\s*\\(I\\s*\\+\\s*II\\)', 'Pagos|Pagos no Exerc[ií]cio');
+
+// D3_00017: Total RP Pagos (Anexo 06)
+export const getTotalRPPagos_A06 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RESTOS A PAGAR PROCESSADOS E NÃO PROCESSADOS LIQUIDADOS PAGOS', 'Até o Bimestre|Bimestre|Pagos');
 
 // ─── RGF Anexo 01 ────────────────────────────────────────────────────────────
 

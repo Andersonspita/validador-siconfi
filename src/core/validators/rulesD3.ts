@@ -14,7 +14,7 @@ import {
   getDedInativos_RGF_A01, getTotalInativos_RGF_A01, getReceitasRealizadasTotal_A01,
   getReceitasRealizadasTotal_A06, getDotacaoAtualizada_A01, getDespesasEmpenhadas_A01,
   getDespesasLiquidadas_A01, getDotacaoAtualizada_A06, getDespesasEmpenhadas_A06,
-  getDespesasLiquidadas_A06, getRPNP_inscricoes_A01
+  getDespesasLiquidadas_A06, getRPNP_inscricoes_A01, getTotalRPPagos_A06, getTotalRPPagos_A07
 } from '../xmlExtractors';
 
 export function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
@@ -116,7 +116,7 @@ export function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition
     false
   ));
 
-  // D3_00027: Dotação Atualizada, Empenhadas Até, Liquidadas Até — Anexo 01 = Anexo 06
+  // D3_00003 e D3_00027: Despesas (Dotação Atualizada, Empenhadas Até, Liquidadas Até) — Anexo 01 = Anexo 06
   // Nota: A06 mostra "despesas primárias exceto RPPS"; municípios com RPPS terão diferença.
   for (const [, a01val, a06val, label] of [
     ['dot', getDotacaoAtualizada_A01(rreo), getDotacaoAtualizada_A06(rreo), 'Dotação Atualizada'],
@@ -128,10 +128,14 @@ export function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition
         ruleId: 'D3_00027', dimension: 'D3', description: '', severity: 'warning', impactsCapag: false,
         message: `${label} diverge entre Anexo 01 (R$ ${a01val.toLocaleString('pt-BR', {minimumFractionDigits:2})}) e Anexo 06 (R$ ${a06val.toLocaleString('pt-BR', {minimumFractionDigits:2})}). (Diferença pode ser esperada em municípios com RPPS.)`,
       });
+      results.push({
+        ruleId: 'D3_00003', dimension: 'D3', description: '', severity: 'warning', impactsCapag: false,
+        message: `${label} diverge entre Anexo 01 (R$ ${a01val.toLocaleString('pt-BR', {minimumFractionDigits:2})}) e Anexo 06 (R$ ${a06val.toLocaleString('pt-BR', {minimumFractionDigits:2})}). (Diferença pode ser esperada em municípios com RPPS.)`,
+      });
     }
   }
 
-  // D3_00028: Receitas Realizadas Até o Bimestre — Anexo 01 = Anexo 06 (CAPAG)
+  // D3_00007 e D3_00028: Receitas Realizadas Até o Bimestre — Anexo 01 = Anexo 06 (CAPAG)
   // A01 col[5] vs A06 col[2] (A06 exclui RPPS; pequena diferença pode ser esperada)
   results.push(...validatePairEquality(
     'D3_00028', 'D3',
@@ -139,6 +143,22 @@ export function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition
     { label: 'RREO Anexo 06 (Receita Primária Total XVI)',         val: getReceitasRealizadasTotal_A06(rreo) },
     'Receitas Realizadas Até o Bimestre divergem entre o Anexo 01 e o Anexo 06 do RREO.',
     true
+  ));
+  results.push(...validatePairEquality(
+    'D3_00007', 'D3',
+    { label: 'RREO Anexo 01 (Subtotal III, col Realizadas Até)', val: getReceitasRealizadasTotal_A01(rreo) },
+    { label: 'RREO Anexo 06 (Receita Primária Total XVI)',         val: getReceitasRealizadasTotal_A06(rreo) },
+    'Receitas Realizadas Até o Bimestre divergem entre o Anexo 01 e o Anexo 06 do RREO.',
+    false
+  ));
+
+  // D3_00017: Total de RP Pagos — Anexo 06 = Anexo 07
+  results.push(...validatePairEquality(
+    'D3_00017', 'D3',
+    { label: 'RREO Anexo 06 (RP Pagos)', val: getTotalRPPagos_A06(rreo) },
+    { label: 'RREO Anexo 07 (RP Pagos)', val: getTotalRPPagos_A07(rreo) },
+    'Restos a Pagar Pagos divergem entre o Anexo 06 e o Anexo 07 do RREO.',
+    false
   ));
 
   // D3_00045: Valores negativos em Restos a Pagar (Anexo 07)
