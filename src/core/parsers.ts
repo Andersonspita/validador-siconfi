@@ -110,36 +110,45 @@ const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; p
             return v === '' ? undefined : v;
           };
 
-          // IC2 pode ser FP (atributo superávit financeiro) ou FS (função/subfunção, contas 622xxx).
-          // Prioridade: coluna TIPO2 da linha → fallback pelo prefixo da conta → fallback por nome de coluna legado.
           const conta = getVal('CONTA') ?? '';
-          const tipo2 = getVal('TIPO2');
-          const ic2   = getVal('IC2');
           const isDespOrcamentaria = conta.startsWith('622');
-          const fp = tipo2 === 'FP' ? ic2
-                   : tipo2 === 'FS' ? undefined
-                   : !tipo2 && !isDespOrcamentaria ? ic2    // sem TIPO2: infere pelo prefixo
-                   : undefined;
-          const fs = tipo2 === 'FS' ? ic2
-                   : tipo2 === 'FP' ? undefined
-                   : !tipo2 && isDespOrcamentaria ? ic2     // sem TIPO2: infere pelo prefixo
-                   : undefined;
 
-          // IC5 é ND (natureza da despesa) para contas 622xxx.
-          const tipo5 = getVal('TIPO5');
-          const ic5   = getVal('IC5');
-          const nd = tipo5 === 'ND' ? ic5
-                   : !tipo5 && isDespOrcamentaria ? ic5     // sem TIPO5: infere pelo prefixo
-                   : undefined;
+          const findIcByTipo = (tipoName: string): string | undefined => {
+            for (let i = 1; i <= 6; i++) {
+              if (getVal(`TIPO${i}`) === tipoName) {
+                return getVal(`IC${i}`);
+              }
+            }
+            return undefined;
+          };
+
+          let po = findIcByTipo('PO') ?? getVal('PO');
+          let fp = findIcByTipo('FP') ?? getVal('FP');
+          let fs = findIcByTipo('FS') ?? getVal('FS');
+          let fr = findIcByTipo('FR') ?? getVal('FR');
+          let co = findIcByTipo('CO') ?? getVal('CO');
+          let nd = findIcByTipo('ND') ?? getVal('ND');
+
+          // Fallbacks heurísticos caso a planilha NÃO possua colunas TIPO e seja baseada nos índices legados
+          const hasTipoCols = Object.keys(row).some(k => k.toUpperCase().startsWith('TIPO') && k.toUpperCase() !== 'TIPO_VALOR');
+          
+          if (!hasTipoCols) {
+            if (!po) po = getVal('IC1');
+            if (!fp && !isDespOrcamentaria) fp = getVal('IC2');
+            if (!fs && isDespOrcamentaria) fs = getVal('IC2');
+            if (!fr) fr = getVal('IC3');
+            if (!co) co = getVal('IC4');
+            if (!nd && isDespOrcamentaria) nd = getVal('IC5');
+          }
 
           return {
             CONTA: getVal('CONTA') ?? '',
-            PO: getVal('IC1') || getVal('PO'),
-            FP: fp || getVal('FP'),
-            FS: fs || getVal('FS'),
-            FR: getVal('IC3') || getVal('FR'),
-            CO: getVal('IC4') || getVal('CO'),
-            ND: nd || getVal('ND'),
+            PO: po,
+            FP: fp,
+            FS: fs,
+            FR: fr,
+            CO: co,
+            ND: nd,
             Valor: parseFloat(String(getVal('Valor') || '0').replace(',', '.')),
             Tipo_valor: getVal('Tipo_valor') as MSCAccount['Tipo_valor'],
             Natureza_valor: getVal('Natureza_valor') as MSCAccount['Natureza_valor'],
