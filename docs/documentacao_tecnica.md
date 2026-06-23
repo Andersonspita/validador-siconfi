@@ -419,3 +419,12 @@ npm run deploy       # publicar no GitHub Pages (requer gh-pages configurado)
 | `findValueInSheet` retorna 1ª coluna numérica | Regras que precisam de coluna específica (ex: "Até o Bimestre") ficam imprecisas | Adicionar extrator por índice de coluna |
 | RREO/RGF em formato XML | Validações XLS não se aplicam; usuário recebe aviso info | Implementar extratores XML |
 | D3_00021: passivo financeiro com FP='F' | Requer FP corretamente preenchido no CSV da MSC | Já corrigido — depende de dados do cliente |
+
+
+## Atualização Arquitetural (23/06/2026)
+O código-fonte `validatorEngine.ts` agora delega as chamadas para arquivos específicos:
+- `rulesD1.ts`: Aciona o `siconfiApi.ts` via `fetch` para verificar remessas (DCA, MSC, RREO, RGF) no data lake (apidatalake.tesouro.gov.br). Utiliza um proxy (`corsproxy.io`) para uso em ambientes sem backend.
+- `rulesD2.ts`: Mantém a lógica assíncrona/síncrona de limites e subtotais.
+- `rulesD3.ts` e `rulesD4.ts`: Importam helpers de `xmlExtractors.ts` para realizar cruzamentos pesados (ex: Receita Corrente Líquida, Dívida Consolidada) e `utils.ts` para soma contábil.
+
+A extração de metadados das planilhas (Ente IBGE e Ano) está acoplada no `parsers.ts`, garantindo a checagem cruzada da regra D3_00005 (arquivos de Entes misturados).

@@ -16,3 +16,12 @@ Neste arquivo constam as decisões e o progresso do desenvolvimento do Validador
 - **Próximos Passos (Evolução Contínua)**:
   - Validar contra mais de 100 regras listadas no arquivo `descricao_ranking.csv`.
   - Melhorar a tipagem do XML lido com o `fast-xml-parser` para mapear com exatidão as tags do Siconfi (STN_XBRL).
+
+
+### Fases 1 a 5 Concluídas (23/06/2026)
+- Refatoração completa da engine.
+- Extração avançada de células e headers XML (RREO, RGF, DCA).
+- Integração da API do Tesouro Nacional Siconfi para checagem de prazos.
+- Cruzamento fiscal D3 (DCL, RCL, Limites de Pessoal e Educação).
+- Cruzamento Contábil x Fiscal D4 (Empenhos MSC x RREO, RP MSC x RGF).
+- Limpeza de dependências e `Build` Vite/React ok.
