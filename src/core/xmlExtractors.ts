@@ -583,3 +583,130 @@ export const getDCA_BensImoveis = (dca: any): number | null =>
 // D2_00020 / D2_00021: Depreciação acumulada Bens Imóveis (Anexo I-AB)
 export const getDCA_DepreciacaoImoveis = (dca: any): number | null =>
   getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '1\\.2\\.3\\.8\\.1\\.02\\.00.*Deprecia[cç][ãa]o Acumulada.*Bens Im[oó]veis');
+// =============================================================================
+// Lote 3: DCA (Regras D2)
+// =============================================================================
+
+export const checkDCA_SaldosNegativosNivel = (dca: any, sheetNames: string[], nivelRegex: RegExp): { row: string; value: number }[] => {
+  const results: { row: string; value: number }[] = [];
+  const sheet = getSheet(dca, sheetNames);
+  if (!sheet) return results;
+
+  for (const row of sheet) {
+    if (Array.isArray(row) && typeof row[0] === 'string') {
+      const desc = row[0].trim();
+      // O padrão típico PCASP: "X.X.X.0.0.00.00"
+      if (nivelRegex.test(desc)) {
+        for (let i = 1; i < row.length; i++) {
+          if (typeof row[i] === 'number' && row[i] < 0) {
+            results.push({ row: desc, value: row[i] });
+            break;
+          }
+        }
+      }
+    }
+  }
+  return results;
+};
+
+// I-D Despesas Totais
+export const getDCA_DespesasTotais = (dca: any): { empenhadas: number, liquidadas: number, pagas: number, rpnp: number, rpp: number } | null => {
+  const sheet = getSheet(dca, ['DCA-Anexo I-D', 'Anexo I-D']);
+  if (!sheet) return null;
+  const headerIdx = sheet.findIndex((r: any[]) => r.some(c => typeof c === 'string' && c.includes('Despesas Empenhadas')));
+  if (headerIdx === -1) return null;
+  const header = sheet[headerIdx];
+  const colEmp = header.findIndex((c: any) => typeof c === 'string' && c.includes('Empenhadas'));
+  const colLiq = header.findIndex((c: any) => typeof c === 'string' && c.includes('Liquidadas'));
+  const colPag = header.findIndex((c: any) => typeof c === 'string' && c.includes('Pagas'));
+  // Fallback para as colunas se não achar perfeitamente por string
+  let idxEmp = colEmp !== -1 ? colEmp : 1;
+  let idxLiq = colLiq !== -1 ? colLiq : 2;
+  let idxPag = colPag !== -1 ? colPag : 3;
+  let idxRpnp = 4; // Posição padrão
+  let idxRpp = 5; // Posição padrão
+
+  for (const row of sheet) {
+    if (Array.isArray(row) && typeof row[0] === 'string' && row[0].includes('Total Geral da Despesa')) {
+      return {
+        empenhadas: typeof row[idxEmp] === 'number' ? row[idxEmp] : 0,
+        liquidadas: typeof row[idxLiq] === 'number' ? row[idxLiq] : 0,
+        pagas: typeof row[idxPag] === 'number' ? row[idxPag] : 0,
+        rpnp: typeof row[idxRpnp] === 'number' ? row[idxRpnp] : 0,
+        rpp: typeof row[idxRpp] === 'number' ? row[idxRpp] : 0
+      };
+    }
+  }
+  return null;
+};
+
+// I-AB: Créditos a Curto e Longo Prazos
+export const getDCA_CreditosCurtoLongoPrazo = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '^1\\.1\\.2\\.1|^1\\.1\\.2\\.2|^1\\.2\\.1\\.1');
+
+export const getDCA_AjustePerdasCreditos = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], 'Ajuste de Perdas de Cr[ée]ditos a Curto Prazo|Ajuste de Perdas de Cr[ée]ditos a Longo Prazo');
+
+// I-AB: Demais Créditos
+export const getDCA_DemaisCreditos = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '^1\\.1\\.2\\.3|^1\\.1\\.2\\.4|^1\\.1\\.2\\.5|^1\\.2\\.1\\.2');
+
+export const getDCA_AjustePerdasDemaisCreditos = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], 'Ajuste de Perdas de Demais Cr[ée]ditos');
+
+// I-HI: VPD Depreciação
+export const getDCA_VPD_Depreciacao = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-HI', 'Anexo I-HI'], '3\\.3\\.1\\.1\\.1\\.00\\.00.*Deprecia[cç][ãa]o');
+
+// I-AB: Passivos
+export const getDCA_PassivoCirculanteFinanceiro = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '^2\\.1\\.0\\.0\\.0\\.00\\.00.*Financeiro');
+
+export const getDCA_PassivoCirculante = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '^2\\.1\\.0\\.0\\.0\\.00\\.00.*Passivo Circulante$');
+
+// I-AB: Dívida Ativa
+export const getDCA_AjusteDividaAtiva = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], 'Ajuste de Perdas de D[ií]vida Ativa');
+
+// I-C: Deduções negativas
+export const checkDCA_DeducoesNegativas = (dca: any): { row: string; value: number }[] => {
+  const results: { row: string; value: number }[] = [];
+  const sheet = getSheet(dca, ['DCA-Anexo I-C', 'Anexo I-C']);
+  if (!sheet) return results;
+  const headerIdx = sheet.findIndex((r: any[]) => r.some(c => typeof c === 'string' && c.includes('Receitas Brutas Realizadas')));
+  if (headerIdx === -1) return results;
+  const colsDeducao = sheet[headerIdx].map((c: any, i: number) => typeof c === 'string' && c.toLowerCase().includes('dedu') ? i : -1).filter((i: number) => i !== -1);
+  if (colsDeducao.length === 0) return results;
+
+  for (let i = headerIdx + 1; i < sheet.length; i++) {
+    const row = sheet[i];
+    if (Array.isArray(row) && typeof row[0] === 'string') {
+      for (const colIdx of colsDeducao) {
+        if (typeof row[colIdx] === 'number' && row[colIdx] < 0) {
+          results.push({ row: row[0].trim(), value: row[colIdx] });
+          break;
+        }
+      }
+    }
+  }
+  return results;
+};
+
+// I-AB: Créditos Previdenciários
+export const getDCA_CreditosPrevidenciarios = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], 'Cr[ée]ditos Previdenci[áa]rios');
+
+// I-AB: Intangível
+export const getDCA_AtivoIntangivel = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '^1\\.2\\.4\\.0\\.0\\.00\\.00|^1\\.2\\.4\\..*Intang[íi]vel');
+
+export const getDCA_AmortizacaoIntangivel = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], 'Amortiza[cç][ãa]o Acumulada.*Intang[íi]vel');
+
+// I-AB: Estoques
+export const getDCA_Estoques = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '^1\\.1\\.3\\.0\\.0\\.00\\.00|^1\\.1\\.3\\..*Estoques');
+
+export const getDCA_AjustePerdasEstoques = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], 'Ajuste de Perdas de Estoques');

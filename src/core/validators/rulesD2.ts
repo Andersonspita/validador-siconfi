@@ -1,4 +1,4 @@
-import { getDCAValue, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais, getDCA_DespesasPessoal, getDCA_DespesasCusteio, hasDCA_DespesasFuncao, getDCA_ReceitasTransferencias, getDCA_ReceitasTributarias, checkDCA_ReceitasMenoresDeducoes, getDCA_BensMoveis, getDCA_DepreciacaoMoveis, getDCA_BensImoveis, getDCA_DepreciacaoImoveis } from '../xmlExtractors';
+import { getDCAValue, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais, getDCA_DespesasPessoal, getDCA_DespesasCusteio, hasDCA_DespesasFuncao, getDCA_ReceitasTransferencias, getDCA_ReceitasTributarias, checkDCA_ReceitasMenoresDeducoes, getDCA_BensMoveis, getDCA_DepreciacaoMoveis, getDCA_BensImoveis, getDCA_DepreciacaoImoveis, checkDCA_SaldosNegativosNivel, getDCA_DespesasTotais, getDCA_CreditosCurtoLongoPrazo, getDCA_AjustePerdasCreditos, getDCA_DemaisCreditos, getDCA_AjustePerdasDemaisCreditos, getDCA_VPD_Depreciacao, getDCA_PassivoCirculanteFinanceiro, getDCA_PassivoCirculante, getDCA_AjusteDividaAtiva, checkDCA_DeducoesNegativas, getDCA_CreditosPrevidenciarios, getDCA_AtivoIntangivel, getDCA_AmortizacaoIntangivel, getDCA_Estoques, getDCA_AjustePerdasEstoques } from '../xmlExtractors';
 import { ParsedData, ValidationResult, RuleDefinition } from '../types';
 import { sumAccounts } from './utils';
 
@@ -386,6 +386,106 @@ export function validateD2_DCA(dca: any, _rulesMap: Map<string, RuleDefinition>)
     if (Math.abs(deprImoveis) > bensImoveis + 0.01) {
       results.push({ ruleId: 'D2_00021', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A depreciação acumulada de Bens Imóveis (R$ ${Math.abs(deprImoveis).toFixed(2)}) é maior que o valor bruto dos Bens Imóveis (R$ ${bensImoveis.toFixed(2)}) no Anexo I-AB da DCA.` });
     }
+  }
+
+  // Lote 3 - Dimensão 2 (DCA)
+
+  // D2_00013: Créditos a curto e longo prazos vs Ajustes para perdas (Anexo I-AB)
+  const creditos = getDCA_CreditosCurtoLongoPrazo(dca);
+  const perdasCreditos = getDCA_AjustePerdasCreditos(dca);
+  if (creditos !== null && perdasCreditos !== null && Math.abs(perdasCreditos) > creditos + 0.01) {
+    results.push({ ruleId: 'D2_00013', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `Ajuste para perdas (R$ ${Math.abs(perdasCreditos).toFixed(2)}) é maior que o saldo bruto de Créditos a Curto e Longo Prazos (R$ ${creditos.toFixed(2)}) no Anexo I-AB da DCA.` });
+  }
+
+  // D2_00014: Demais créditos vs Ajustes para perdas (Anexo I-AB)
+  const demaisCreditos = getDCA_DemaisCreditos(dca);
+  const perdasDemaisCreditos = getDCA_AjustePerdasDemaisCreditos(dca);
+  if (demaisCreditos !== null && perdasDemaisCreditos !== null && Math.abs(perdasDemaisCreditos) > demaisCreditos + 0.01) {
+    results.push({ ruleId: 'D2_00014', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `Ajuste para perdas (R$ ${Math.abs(perdasDemaisCreditos).toFixed(2)}) é maior que o saldo bruto de Demais Créditos a Curto e Longo Prazo (R$ ${demaisCreditos.toFixed(2)}) no Anexo I-AB da DCA.` });
+  }
+
+  // D2_00017: VPD de depreciação (Anexo I-HI)
+  const vpdDepreciacao = getDCA_VPD_Depreciacao(dca);
+  if (vpdDepreciacao === null || vpdDepreciacao === 0) {
+    results.push({ ruleId: 'D2_00017', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false, message: 'Não há informação de Variação Patrimonial Diminutiva de depreciação de bens móveis e imóveis no Anexo I-HI da DCA.' });
+  }
+
+  // D2_00023 e D2_00024: Restos a Pagar no Anexo I-D
+  const despTotais = getDCA_DespesasTotais(dca);
+  if (despTotais) {
+    // D2_00023: RPNP <= Empenhadas - Liquidadas
+    const diffRPNP = despTotais.empenhadas - despTotais.liquidadas;
+    if (despTotais.rpnp > diffRPNP + 0.01) {
+      results.push({ ruleId: 'D2_00023', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `O valor de inscrição de RPNP (R$ ${despTotais.rpnp.toFixed(2)}) no Anexo I-D é maior que a diferença entre despesas empenhadas e liquidadas (R$ ${diffRPNP.toFixed(2)}).` });
+    }
+    // D2_00024: RPP <= Liquidadas - Pagas
+    const diffRPP = despTotais.liquidadas - despTotais.pagas;
+    if (despTotais.rpp > diffRPP + 0.01) {
+      results.push({ ruleId: 'D2_00024', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `O valor de inscrição de RPP (R$ ${despTotais.rpp.toFixed(2)}) no Anexo I-D é maior que a diferença entre despesas liquidadas e pagas (R$ ${diffRPP.toFixed(2)}).` });
+    }
+  }
+
+  // D2_00028: Passivo Financeiro <= Passivo Circulante
+  const passivoFin = getDCA_PassivoCirculanteFinanceiro(dca);
+  const passivoCirc = getDCA_PassivoCirculante(dca);
+  if (passivoFin !== null && passivoCirc !== null && passivoFin > passivoCirc + 0.01) {
+    results.push({ ruleId: 'D2_00028', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `O Passivo Circulante Financeiro (R$ ${passivoFin.toFixed(2)}) é maior que o Passivo Circulante total (R$ ${passivoCirc.toFixed(2)}) no Anexo I-AB.` });
+  }
+
+  // D2_00030: Saldos negativos 3º nível (Anexo I-AB)
+  const negativos3_AB = checkDCA_SaldosNegativosNivel(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], /^\d\.\d\.\d\.0\.0\.00\.00/);
+  for (const item of negativos3_AB) {
+    results.push({ ruleId: 'D2_00030', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A conta de terceiro nível "${item.row}" apresenta saldo negativo (R$ ${item.value.toFixed(2)}) no Anexo I-AB da DCA.` });
+  }
+
+  // D2_00031: Saldos negativos 3º nível (Anexo I-HI)
+  const negativos3_HI = checkDCA_SaldosNegativosNivel(dca, ['DCA-Anexo I-HI', 'Anexo I-HI'], /^\d\.\d\.\d\.0\.0\.00\.00/);
+  for (const item of negativos3_HI) {
+    results.push({ ruleId: 'D2_00031', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A conta de terceiro nível "${item.row}" apresenta saldo negativo (R$ ${item.value.toFixed(2)}) no Anexo I-HI da DCA.` });
+  }
+
+  // D2_00032: Ajuste de Dívida Ativa (Anexo I-AB)
+  const ajusteDividaAtiva = getDCA_AjusteDividaAtiva(dca);
+  if (ajusteDividaAtiva === null || ajusteDividaAtiva === 0) {
+    results.push({ ruleId: 'D2_00032', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false, message: 'Não há informação de Ajuste de Perdas de Dívida Ativa no Anexo I-AB da DCA.' });
+  }
+
+  // D2_00034: Saldos negativos 5º nível (Anexo I-HI)
+  const negativos5_HI = checkDCA_SaldosNegativosNivel(dca, ['DCA-Anexo I-HI', 'Anexo I-HI'], /^\d\.\d\.\d\.\d\.\d\.00\.00/);
+  for (const item of negativos5_HI) {
+    results.push({ ruleId: 'D2_00034', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A conta de quinto nível "${item.row}" apresenta saldo negativo (R$ ${item.value.toFixed(2)}) no Anexo I-HI da DCA.` });
+  }
+
+  // D2_00035: Deduções de Receitas com sinal negativo (Anexo I-C)
+  const deducoesNegativas = checkDCA_DeducoesNegativas(dca);
+  for (const item of deducoesNegativas) {
+    results.push({ ruleId: 'D2_00035', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A dedução de receita em "${item.row.slice(0, 50)}..." possui sinal negativo (R$ ${item.value.toFixed(2)}) no Anexo I-C. Deduções já são subtrativas, devem ser informadas com sinal positivo.` });
+  }
+
+  // D2_00038: Créditos previdenciários (Anexo I-AB)
+  const creditosPrev = getDCA_CreditosPrevidenciarios(dca);
+  if (creditosPrev === null || creditosPrev === 0) {
+    results.push({ ruleId: 'D2_00038', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false, message: 'Não há informação de créditos previdenciários no Anexo I-AB da DCA.' });
+  }
+
+  // D2_00040: Saldos negativos 5º nível (Anexo I-AB)
+  const negativos5_AB = checkDCA_SaldosNegativosNivel(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], /^\d\.\d\.\d\.\d\.\d\.00\.00/);
+  for (const item of negativos5_AB) {
+    results.push({ ruleId: 'D2_00040', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A conta de quinto nível "${item.row}" apresenta saldo negativo (R$ ${item.value.toFixed(2)}) no Anexo I-AB da DCA.` });
+  }
+
+  // D2_00043: Ativo Intangível e Amortização (Anexo I-AB)
+  const ativoIntangivel = getDCA_AtivoIntangivel(dca);
+  const amortizacaoIntangivel = getDCA_AmortizacaoIntangivel(dca);
+  if (ativoIntangivel !== null && amortizacaoIntangivel !== null && Math.abs(amortizacaoIntangivel) > ativoIntangivel + 0.01) {
+    results.push({ ruleId: 'D2_00043', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A amortização acumulada (R$ ${Math.abs(amortizacaoIntangivel).toFixed(2)}) é maior que o valor bruto do Ativo Intangível (R$ ${ativoIntangivel.toFixed(2)}) no Anexo I-AB da DCA.` });
+  }
+
+  // D2_00051: Ajustes para perdas de estoques (Anexo I-AB)
+  const estoques = getDCA_Estoques(dca);
+  const perdasEstoques = getDCA_AjustePerdasEstoques(dca);
+  if (estoques !== null && perdasEstoques !== null && Math.abs(perdasEstoques) > estoques + 0.01) {
+    results.push({ ruleId: 'D2_00051', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `O ajuste para perdas (R$ ${Math.abs(perdasEstoques).toFixed(2)}) é maior que o saldo bruto de Estoques (R$ ${estoques.toFixed(2)}) no Anexo I-AB da DCA.` });
   }
 
   return results;
