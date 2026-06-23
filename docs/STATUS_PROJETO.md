@@ -56,15 +56,16 @@ python3 -c "
 import csv
 impl = {
   'D1_00001','D1_00016','D1_00017','D1_00018','D1_00019','D1_00020','D1_00021',
-  'D1_00023','D1_00024','D1_00025','D1_00026','D1_00027','D1_00028','D1_00029',
-  'D1_00030','D1_00031','D1_00032','D1_00033','D1_00034','D1_00035','D1_00036',
-  'D1_00037','D1_00038',
-  'D2_00054','D2_00055','D2_00067','D2_00068','D2_00076','D2_00077','D2_00079',
-  'D2_00080','D2_00081','D2_00082','D2_00083','D2_00086','D2_00087','D2_00088',
-  'D2_00093','D2_00094','D2_00095',
-  'D3_00001','D3_00002','D3_00005','D3_00006','D3_00011','D3_00012','D3_00013',
-  'D3_00014','D3_00015','D3_00016','D3_00021','D3_00027','D3_00028','D3_00030',
-  'D3_00032','D3_00033','D3_00034','D3_00035','D3_00044','D3_00045',
+  'D1_00022','D1_00023','D1_00024','D1_00025','D1_00026','D1_00027','D1_00028',
+  'D1_00029','D1_00030','D1_00031','D1_00032','D1_00033','D1_00034','D1_00035',
+  'D1_00036','D1_00037','D1_00038',
+  'D2_00053','D2_00054','D2_00055','D2_00059','D2_00060','D2_00067','D2_00068',
+  'D2_00076','D2_00077','D2_00079','D2_00080','D2_00081','D2_00082','D2_00083',
+  'D2_00086','D2_00087','D2_00088','D2_00093','D2_00094','D2_00095',
+  'D3_00001','D3_00002','D3_00003','D3_00005','D3_00006','D3_00007','D3_00008',
+  'D3_00009','D3_00011','D3_00012','D3_00013','D3_00014','D3_00015','D3_00016',
+  'D3_00017','D3_00021','D3_00027','D3_00028','D3_00030','D3_00032','D3_00033',
+  'D3_00034','D3_00035','D3_00044','D3_00045',
   'D4_00020','D4_00026'
 }
 with open('public/data/Descricao_verificacoes.csv', encoding='utf-8-sig') as f:
@@ -79,15 +80,10 @@ print(f'{len(impl)} de {len(rows)} ({len(impl)*100//len(rows)}%)')
 
 ### 4.1 Implementáveis na próxima sessão (sem novos arquivos/dependências)
 
-#### SÓ_RREO — 10 regras (precisam apenas do RREO XLS)
+#### SÓ_RREO — 4 regras (precisam apenas do RREO XLS com Anexo 09)
 
 | Regra | Descrição | CAPAG | Dificuldade |
 |---|---|---|---|
-| D3_00003 | Despesas Anexo 01 = Anexo 06 | — | Média — Anexo 06 tem despesas "primárias", não totais |
-| D3_00007 | Receitas realizadas Anexo 01 = Anexo 06 | — | Alta — precisa coluna "Até o Bimestre" específica |
-| D3_00017 | RP pagos Anexo 06 = Anexo 07 | — | Média — precisa coluna "Pagos" do A07 |
-| D3_00027 | Dotação/empenhos A01 = A06 | — | Alta — múltiplas colunas a comparar |
-| D3_00028 | Receitas realizadas totais A01 = A06 | ✓ | Alta — coluna específica |
 | D3_00037 | Investimentos Anexo 01 = Anexo 09 | — | Alta — Anexo 09 ausente no arquivo de teste |
 | D3_00038 | Inversões Financeiras A01 = A09 | — | Alta — Anexo 09 ausente |
 | D3_00039 | Amortização Dívida A01 = A09 | — | Alta — Anexo 09 ausente |
@@ -95,26 +91,18 @@ print(f'{len(impl)} de {len(rows)} ({len(impl)*100//len(rows)}%)')
 
 > **Nota D3_00037–040:** O RREO do município de Jaborandi (arquivo de teste) não possui Anexo 09. Precisará de um arquivo real com Anexo 09 para testar e implementar.
 
-#### RREO+RGF — 3 regras (CAPAG!)
+#### RREO+RGF — 1 regra (CAPAG!)
 
 | Regra | Descrição | Dificuldade |
 |---|---|---|
-| D3_00008 | RPNP: RREO Anexo 01 = RGF Anexo 05 | Média — RGF do teste não tem Anexo 05 |
-| D3_00009 | RP processados+não-proc: RREO A07 = RGF A05 | Média — idem |
 | D3_00010 | RCL igual entre todos os poderes no RGF A01 | Alta — requer múltiplos RGFs |
 
 > **Nota D3_00008/009:** Precisam do RGF Anexo 05 (Disponibilidade de Caixa). O arquivo de teste de Correntina não tem Anexo 05.
 
-#### SÓ_MSC — 9 regras
+#### SÓ_MSC — 1 regra
 
 | Regra | Descrição | Dificuldade |
 |---|---|---|
-| D1_00019 | Códigos PO incorretos | Alta — precisa tabela de POs válidos |
-| D1_00022 | Todos os POs presentes | Alta — idem |
-| D2_00053 | Ajuste perdas estoques > estoques | Média — precisa identificar conta de ajuste (115619900?) |
-| D2_00059 | Perdas créditos CP/LP > créditos CP/LP | Média — precisa identificar contas de ajuste de crédito |
-| D2_00060 | Perdas demais créditos > demais créditos | Média — idem |
-| D2_00076 | Créditos previdenciários parcelados sem ativo | Baixa — conta 442522 vs 112171/121112 |
 | D2_00097 | Transferências especiais emendas individuais | Alta — CAPAG, precisa dados externos |
 
 ### 4.2 Implementáveis quando tivermos arquivo DCA (44 regras SÓ_DCA + 36 DCA+OUTRO)

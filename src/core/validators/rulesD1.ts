@@ -125,10 +125,10 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   const results: ValidationResult[] = [];
 
   // D1_00019: PO (Poder/Órgão) com formato inválido
-  // O PO deve ser um código de exatamente 5 dígitos numéricos
+  // O PO deve ser um código de 5 dígitos numéricos e iniciar com 1 (Legislativo), 2 (Executivo), 3 (Judiciário), 4 (MP), 5 (Defensoria) ou 6 (Outros).
   const poInvalidos = msc.filter(acc => {
     const po = acc.PO?.trim();
-    return po && !/^\d{5}$/.test(po);
+    return po && !/^[123456]\d{4}$/.test(po);
   });
   if (poInvalidos.length > 0) {
     const posUnicas = Array.from(new Set(poInvalidos.map(a => a.PO ?? '')));
@@ -141,9 +141,23 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
       affectedAccounts: posUnicas.slice(0, 20),
       detailedItems: poInvalidos.slice(0, 30).map(a => ({
         conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor,
-        detalhe: `PO "${a.PO}" deve ter exatamente 5 dígitos numéricos`,
+        detalhe: `PO "${a.PO}" inválido. Deve ter 5 dígitos numéricos iniciando por 1 a 6.`,
       })),
-      message: `${poInvalidos.length} lançamento(s) com código de Poder/Órgão inválido (deve ter 5 dígitos): ${posUnicas.slice(0, 5).join(', ')}${posUnicas.length > 5 ? '...' : ''}.`,
+      message: `${poInvalidos.length} lançamento(s) com código de Poder/Órgão inválido ou inexistente no Siconfi: ${posUnicas.slice(0, 5).join(', ')}${posUnicas.length > 5 ? '...' : ''}.`,
+    });
+  }
+
+  // D1_00022: Envio de MSCs com todos os códigos de poder/órgão
+  // Verifica se pelo menos o Poder Executivo (PO iniciado em 2) está presente na MSC
+  const temExecutivo = msc.some(acc => acc.PO?.trim().startsWith('2'));
+  if (!temExecutivo) {
+    results.push({
+      ruleId: 'D1_00022',
+      dimension: 'D1',
+      description: 'Envio de MSCs com todos os códigos de poder/órgão',
+      severity: 'error',
+      impactsCapag: true,
+      message: `O código de Poder/Órgão relativo ao Poder Executivo (iniciado em '2') não foi encontrado nesta MSC. O envio de dados do Executivo é obrigatório.`,
     });
   }
 

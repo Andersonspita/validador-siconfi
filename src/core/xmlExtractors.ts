@@ -341,6 +341,10 @@ export const findNegativosRP_A07 = (rreo: any): { label: string; value: number }
 export const getTotalRPPagos_A07 = (rreo: any): number | null =>
   extractByColumnFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'TOTAL\\s*\\(III\\)\\s*=\\s*\\(I\\s*\\+\\s*II\\)', 'Pagos|Pagos no Exerc[ií]cio');
 
+// D3_00009: Total RP (Saldo/Inscritos) — Anexo 07
+export const getTotalRPSaldo_A07 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'TOTAL\\s*\\(III\\)\\s*=\\s*\\(I\\s*\\+\\s*II\\)', 'Saldo|Inscritos');
+
 // D3_00017: Total RP Pagos (Anexo 06)
 export const getTotalRPPagos_A06 = (rreo: any): number | null =>
   extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RESTOS A PAGAR PROCESSADOS E NÃO PROCESSADOS LIQUIDADOS PAGOS', 'Até o Bimestre|Bimestre|Pagos');
@@ -400,6 +404,18 @@ export const getTransfAgentesSaude_RREO_A03 = (rreo: any): number | null =>
 export const getTransfAgentesSaude_RGF_A01 = (rgf: any): number | null =>
   extractFromReport(rgf, ['RGF-Anexo 01', 'RGF Anexo 01'],
     'agentes comunit[aá]rios|198.*§.*11');
+
+// ─── RGF Anexo 05 ────────────────────────────────────────────────────────────
+
+// D3_00008: Restos a pagar não processados inscritos (RGF Anexo 05)
+export const getRPNP_A05_RGF = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 05', 'RGF Anexo 05'],
+    'RESTOS A PAGAR EMPENHADOS E NÃO LIQUIDADOS|RPNP');
+
+// D3_00009: Restos a pagar processados (RGF Anexo 05)
+export const getRPP_A05_RGF = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 05', 'RGF Anexo 05'],
+    'RESTOS A PAGAR LIQUIDADOS E NÃO PAGOS|RPP');
 
 // ─── Utilitários ─────────────────────────────────────────────────────────────
 

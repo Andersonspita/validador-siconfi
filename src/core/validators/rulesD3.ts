@@ -14,7 +14,8 @@ import {
   getDedInativos_RGF_A01, getTotalInativos_RGF_A01, getReceitasRealizadasTotal_A01,
   getReceitasRealizadasTotal_A06, getDotacaoAtualizada_A01, getDespesasEmpenhadas_A01,
   getDespesasLiquidadas_A01, getDotacaoAtualizada_A06, getDespesasEmpenhadas_A06,
-  getDespesasLiquidadas_A06, getRPNP_inscricoes_A01, getTotalRPPagos_A06, getTotalRPPagos_A07
+  getDespesasLiquidadas_A06, getRPNP_inscricoes_A01, getTotalRPPagos_A06, getTotalRPPagos_A07,
+  getRPNP_A05_RGF, getRPP_A05_RGF, getTotalRPSaldo_A07
 } from '../xmlExtractors';
 
 export function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
@@ -309,10 +310,8 @@ export function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, Ru
 
   
   // D3_00008: Restos a pagar não processados RREO A01 x RGF A05
-  // (Simplificado: verificamos presença ou igualdade se extraídos)
-  const rreoA01_rpnp = getRPNP_inscricoes_A01(rreo); // já importado
-  // RGF A05 (RPNP) não tem extrator implementado ainda, mas preparamos o stub:
-  const rgfA05_rpnp = null; 
+  const rreoA01_rpnp = getRPNP_inscricoes_A01(rreo); 
+  const rgfA05_rpnp = getRPNP_A05_RGF(rgf); 
   if (rreoA01_rpnp !== null && rgfA05_rpnp !== null && Math.abs(rreoA01_rpnp - rgfA05_rpnp) > 0.01) {
       results.push({
         ruleId: 'D3_00008',
@@ -320,8 +319,25 @@ export function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, Ru
         description: '',
         severity: 'error',
         impactsCapag: false,
-        message: `Restos a pagar não processados divergem entre RREO Anexo 01 (R$ ${rreoA01_rpnp}) e RGF Anexo 05 (R$ ${rgfA05_rpnp}).`
+        message: `Restos a pagar não processados divergem entre RREO Anexo 01 (R$ ${rreoA01_rpnp.toLocaleString('pt-BR', {minimumFractionDigits:2})}) e RGF Anexo 05 (R$ ${rgfA05_rpnp.toLocaleString('pt-BR', {minimumFractionDigits:2})}).`
       });
+  }
+
+  // D3_00009: Restos a pagar processados + não processados RREO A07 x RGF A05
+  const rreoA07_rpTotal = getTotalRPSaldo_A07(rreo);
+  const rgfA05_rpp = getRPP_A05_RGF(rgf);
+  if (rreoA07_rpTotal !== null && rgfA05_rpp !== null && rgfA05_rpnp !== null) {
+      const rgfA05_rpTotal = rgfA05_rpp + rgfA05_rpnp;
+      if (Math.abs(rreoA07_rpTotal - rgfA05_rpTotal) > 0.01) {
+          results.push({
+            ruleId: 'D3_00009',
+            dimension: 'D3',
+            description: '',
+            severity: 'error',
+            impactsCapag: false,
+            message: `Total de Restos a pagar (Processados e Não Processados) diverge entre RREO Anexo 07 (R$ ${rreoA07_rpTotal.toLocaleString('pt-BR', {minimumFractionDigits:2})}) e RGF Anexo 05 (R$ ${rgfA05_rpTotal.toLocaleString('pt-BR', {minimumFractionDigits:2})}).`
+          });
+      }
   }
 
   // D3_00010: RCL do RGF deve ser igual à calculada internamente ou entre poderes
