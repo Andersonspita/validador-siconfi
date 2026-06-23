@@ -38,9 +38,11 @@ D1: D1_00001(info), D1_00016, D1_00017, D1_00018, D1_00019, D1_00020, D1_00021,
     D1_00030, D1_00031, D1_00032, D1_00033, D1_00034, D1_00035, D1_00036,
     D1_00037, D1_00038
 
-D2: D2_00001, D2_00002, D2_00003, D2_00004, D2_00005, D2_00054, D2_00055, D2_00067, D2_00068, D2_00076, D2_00077, D2_00079,
-    D2_00080, D2_00081, D2_00082, D2_00083, D2_00086, D2_00087, D2_00088,
-    D2_00093, D2_00094, D2_00095
+D2: D2_00001, D2_00002, D2_00003, D2_00004, D2_00005, D2_00006, D2_00007,
+    D2_00008, D2_00010, D2_00011, D2_00012, D2_00015, D2_00016, D2_00018,
+    D2_00019, D2_00020, D2_00021, D2_00054, D2_00055, D2_00067, D2_00068,
+    D2_00076, D2_00077, D2_00079, D2_00080, D2_00081, D2_00082, D2_00083,
+    D2_00086, D2_00087, D2_00088, D2_00093, D2_00094, D2_00095
 
 D3: D3_00001, D3_00002, D3_00005, D3_00006, D3_00011, D3_00012, D3_00013,
     D3_00014, D3_00015, D3_00016, D3_00021, D3_00027, D3_00028, D3_00030,
@@ -59,8 +61,10 @@ impl = {
   'D1_00022','D1_00023','D1_00024','D1_00025','D1_00026','D1_00027','D1_00028',
   'D1_00029','D1_00030','D1_00031','D1_00032','D1_00033','D1_00034','D1_00035',
   'D1_00036','D1_00037','D1_00038',
-  'D2_00001','D2_00002','D2_00003','D2_00004','D2_00005','D2_00053','D2_00054','D2_00055','D2_00059','D2_00060','D2_00067','D2_00068',
-  'D2_00076','D2_00077','D2_00079','D2_00080','D2_00081','D2_00082','D2_00083',
+  'D2_00001','D2_00002','D2_00003','D2_00004','D2_00005','D2_00006','D2_00007',
+  'D2_00008','D2_00010','D2_00011','D2_00012','D2_00015','D2_00016','D2_00018',
+  'D2_00019','D2_00020','D2_00021','D2_00053','D2_00054','D2_00055','D2_00059',
+  'D2_00060','D2_00067','D2_00068','D2_00076','D2_00077','D2_00079','D2_00080',
   'D2_00086','D2_00087','D2_00088','D2_00093','D2_00094','D2_00095',
   'D3_00001','D3_00002','D3_00003','D3_00005','D3_00006','D3_00007','D3_00008',
   'D3_00009','D3_00011','D3_00012','D3_00013','D3_00014','D3_00015','D3_00016',
@@ -114,6 +118,18 @@ print(f'{len(impl)} de {len(rows)} ({len(impl)*100//len(rows)}%)')
 | **D2_00003** | 🟢 Implementada | Deduções FUNDEB no Anexo I-C da DCA |
 | **D2_00004** | 🟢 Implementada | Receitas FUNDEB no Anexo I-C da DCA |
 | **D2_00005** | 🟢 Implementada | Encargos patronais no Anexo I-D da DCA |
+| **D2_00006** | 🟢 Implementada | Despesas de Pessoal no Anexo I-D da DCA |
+| **D2_00007** | 🟢 Implementada | Despesas de Custeio no Anexo I-D da DCA |
+| **D2_00008** | 🟢 Implementada | Despesas por Função no Anexo I-E da DCA |
+| **D2_00010** | 🟢 Implementada | Receitas transferências intergovernamentais em I-C |
+| **D2_00011** | 🟢 Implementada | Receitas orçamentárias tributárias em I-C |
+| **D2_00012** | 🟢 Implementada | Receitas menores que as deduções em I-C |
+| **D2_00015** | 🟢 Implementada | Bens Móveis em I-AB |
+| **D2_00016** | 🟢 Implementada | Depreciação de Bens Móveis em I-AB |
+| **D2_00018** | 🟢 Implementada | Bens Móveis > Depreciação acumulada em I-AB |
+| **D2_00019** | 🟢 Implementada | Bens Imóveis em I-AB |
+| **D2_00020** | 🟢 Implementada | Depreciação de Bens Imóveis em I-AB |
+| **D2_00021** | 🟢 Implementada | Bens Imóveis > Depreciação acumulada em I-AB |
 
 ### 4.2 Implementáveis quando tivermos arquivo DCA (44 regras SÓ_DCA + 36 DCA+OUTRO)
 

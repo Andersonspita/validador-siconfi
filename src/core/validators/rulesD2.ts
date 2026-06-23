@@ -1,4 +1,4 @@
-import { getDCAValue, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais } from '../xmlExtractors';
+import { getDCAValue, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais, getDCA_DespesasPessoal, getDCA_DespesasCusteio, hasDCA_DespesasFuncao, getDCA_ReceitasTransferencias, getDCA_ReceitasTributarias, checkDCA_ReceitasMenoresDeducoes, getDCA_BensMoveis, getDCA_DepreciacaoMoveis, getDCA_BensImoveis, getDCA_DepreciacaoImoveis } from '../xmlExtractors';
 import { ParsedData, ValidationResult, RuleDefinition } from '../types';
 import { sumAccounts } from './utils';
 
@@ -311,6 +311,81 @@ export function validateD2_DCA(dca: any, _rulesMap: Map<string, RuleDefinition>)
       ruleId: 'D2_00005', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false,
       message: 'Não há informação das despesas orçamentárias com encargos patronais no Anexo I-D da DCA.'
     });
+  }
+
+  // D2_00006: Despesas orçamentárias com pessoal (Anexo I-D)
+  const despPessoal = getDCA_DespesasPessoal(dca);
+  if (despPessoal === null || despPessoal === 0) {
+    results.push({ ruleId: 'D2_00006', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: 'Não há informação de despesas orçamentárias com Pessoal e Encargos Sociais no Anexo I-D da DCA.' });
+  }
+
+  // D2_00007: Despesas orçamentárias de custeio (Anexo I-D)
+  const despCusteio = getDCA_DespesasCusteio(dca);
+  if (despCusteio === null || despCusteio === 0) {
+    results.push({ ruleId: 'D2_00007', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: 'Não há informação de Outras Despesas Correntes no Anexo I-D da DCA.' });
+  }
+
+  // D2_00008: Despesas por função (Anexo I-E)
+  if (!hasDCA_DespesasFuncao(dca)) {
+    results.push({ ruleId: 'D2_00008', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: 'Não há informação das despesas orçamentárias detalhadas por função no Anexo I-E da DCA.' });
+  }
+
+  // D2_00010: Receitas de transferências intergovernamentais (Anexo I-C)
+  const recTransf = getDCA_ReceitasTransferencias(dca);
+  if (recTransf === null || recTransf === 0) {
+    results.push({ ruleId: 'D2_00010', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: 'Não há informação das receitas de transferências intergovernamentais no Anexo I-C da DCA.' });
+  }
+
+  // D2_00011: Receitas tributárias (Anexo I-C)
+  const recTrib = getDCA_ReceitasTributarias(dca);
+  if (recTrib === null || recTrib === 0) {
+    results.push({ ruleId: 'D2_00011', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false, message: 'Não há informação de receitas orçamentárias tributárias (Impostos, Taxas e Contribuições de Melhoria) no Anexo I-C da DCA. Verifique a competência tributária do ente.' });
+  }
+
+  // D2_00012: Receitas orçamentárias menores que suas deduções (Anexo I-C)
+  const recMenorDeducao = checkDCA_ReceitasMenoresDeducoes(dca);
+  if (recMenorDeducao.length > 0) {
+    for (const item of recMenorDeducao) {
+      results.push({ ruleId: 'D2_00012', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A receita orçamentária para "${item.row.slice(0, 60)}..." (R$ ${item.receita.toFixed(2)}) é menor que o total de suas deduções (R$ ${item.deducao.toFixed(2)}) no Anexo I-C da DCA.` });
+    }
+  }
+
+  // D2_00015: Valor patrimonial de bens móveis (Anexo I-AB)
+  const bensMoveis = getDCA_BensMoveis(dca);
+  if (bensMoveis === null || bensMoveis === 0) {
+    results.push({ ruleId: 'D2_00015', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: 'Não há informação do valor patrimonial de Bens Móveis no Anexo I-AB da DCA.' });
+  }
+
+  // D2_00016: Depreciação acumulada de bens móveis (Anexo I-AB)
+  const deprMoveis = getDCA_DepreciacaoMoveis(dca);
+  if (deprMoveis === null || deprMoveis === 0) {
+    results.push({ ruleId: 'D2_00016', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false, message: 'Não há informação de depreciação acumulada de Bens Móveis no Anexo I-AB da DCA.' });
+  }
+
+  // D2_00018: Valor bens móveis > depreciação acumulada
+  if (bensMoveis !== null && deprMoveis !== null) {
+    if (Math.abs(deprMoveis) > bensMoveis + 0.01) {
+      results.push({ ruleId: 'D2_00018', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A depreciação acumulada de Bens Móveis (R$ ${Math.abs(deprMoveis).toFixed(2)}) é maior que o valor bruto dos Bens Móveis (R$ ${bensMoveis.toFixed(2)}) no Anexo I-AB da DCA.` });
+    }
+  }
+
+  // D2_00019: Valor patrimonial de bens imóveis (Anexo I-AB)
+  const bensImoveis = getDCA_BensImoveis(dca);
+  if (bensImoveis === null || bensImoveis === 0) {
+    results.push({ ruleId: 'D2_00019', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: 'Não há informação do valor patrimonial de Bens Imóveis no Anexo I-AB da DCA.' });
+  }
+
+  // D2_00020: Depreciação acumulada de bens imóveis (Anexo I-AB)
+  const deprImoveis = getDCA_DepreciacaoImoveis(dca);
+  if (deprImoveis === null || deprImoveis === 0) {
+    results.push({ ruleId: 'D2_00020', dimension: 'D2', description: '', severity: 'warning', impactsCapag: false, message: 'Não há informação de depreciação acumulada de Bens Imóveis no Anexo I-AB da DCA.' });
+  }
+
+  // D2_00021: Valor bens imóveis > depreciação acumulada
+  if (bensImoveis !== null && deprImoveis !== null) {
+    if (Math.abs(deprImoveis) > bensImoveis + 0.01) {
+      results.push({ ruleId: 'D2_00021', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `A depreciação acumulada de Bens Imóveis (R$ ${Math.abs(deprImoveis).toFixed(2)}) é maior que o valor bruto dos Bens Imóveis (R$ ${bensImoveis.toFixed(2)}) no Anexo I-AB da DCA.` });
+    }
   }
 
   return results;

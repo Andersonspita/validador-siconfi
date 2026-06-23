@@ -508,3 +508,78 @@ export const getDCA_EncargosPatronais = (dca: any): number | null => {
   if (val1 === null && val2 === null) return null;
   return (val1 || 0) + (val2 || 0);
 };
+// D2_00006: Despesas com Pessoal (Anexo I-D)
+export const getDCA_DespesasPessoal = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-D', 'Anexo I-D'], '3\\.1\\.00\\.00\\.00.*Pessoal e Encargos');
+
+// D2_00007: Despesas de Custeio (Anexo I-D)
+export const getDCA_DespesasCusteio = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-D', 'Anexo I-D'], '3\\.3\\.00\\.00\\.00.*Outras Despesas Correntes');
+
+// D2_00008: Despesas por função (Anexo I-E)
+export const hasDCA_DespesasFuncao = (dca: any): boolean => {
+  const sheet = getSheet(dca, ['DCA-Anexo I-E', 'Anexo I-E']);
+  if (!sheet) return false;
+  // Verifica se alguma linha que começa com número (ex: "01 - Legislativa") tem valor > 0
+  for (const row of sheet) {
+    if (Array.isArray(row) && typeof row[0] === 'string' && /^\d{2}\s*-/.test(row[0].trim())) {
+      for (let i = 1; i < row.length; i++) {
+        if (typeof row[i] === 'number' && row[i] > 0) return true;
+      }
+    }
+  }
+  return false;
+};
+
+// D2_00010: Receitas de Transferências Intergovernamentais (Anexo I-C)
+export const getDCA_ReceitasTransferencias = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '1\\.7\\.1.*Transfer[eê]ncias|1\\.7\\.2.*Transfer[eê]ncias', 'Receitas Brutas Realizadas|Receitas.*Realizadas');
+
+// D2_00011: Receitas Tributárias (Anexo I-C)
+export const getDCA_ReceitasTributarias = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '1\\.1\\.0.*Impostos.*Taxas', 'Receitas Brutas Realizadas|Receitas.*Realizadas');
+
+// D2_00012: Receitas orçamentárias menores que suas deduções (Anexo I-C)
+export const checkDCA_ReceitasMenoresDeducoes = (dca: any): { row: string; receita: number; deducao: number }[] => {
+  const results: { row: string; receita: number; deducao: number }[] = [];
+  const sheet = getSheet(dca, ['DCA-Anexo I-C', 'Anexo I-C']);
+  if (!sheet) return results;
+
+  const headerRowIdx = sheet.findIndex((r: any[]) => r.some(c => typeof c === 'string' && c.includes('Receitas Brutas Realizadas')));
+  if (headerRowIdx === -1) return results;
+  const header = sheet[headerRowIdx];
+  
+  const colReceita = header.findIndex((c: any) => typeof c === 'string' && c.includes('Receitas Brutas Realizadas'));
+  const colsDeducao = header.map((c: any, i: number) => typeof c === 'string' && c.toLowerCase().includes('dedu') ? i : -1).filter((i: number) => i !== -1);
+  
+  if (colReceita === -1 || colsDeducao.length === 0) return results;
+
+  for (let i = headerRowIdx + 1; i < sheet.length; i++) {
+    const row = sheet[i];
+    if (!Array.isArray(row) || typeof row[0] !== 'string') continue;
+    const desc = row[0];
+    const rec = typeof row[colReceita] === 'number' ? row[colReceita] : 0;
+    const deducao = colsDeducao.reduce((acc: number, colIdx: number) => acc + (typeof row[colIdx] === 'number' ? row[colIdx] : 0), 0);
+    
+    if (rec > 0 && rec < deducao) {
+      results.push({ row: desc, receita: rec, deducao });
+    }
+  }
+  return results;
+};
+
+// D2_00015 / D2_00018: Bens Móveis (Anexo I-AB)
+export const getDCA_BensMoveis = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '1\\.2\\.3\\.1\\.1\\.00\\.00.*Bens M[oó]veis');
+
+// D2_00016 / D2_00018: Depreciação acumulada Bens Móveis (Anexo I-AB)
+export const getDCA_DepreciacaoMoveis = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '1\\.2\\.3\\.8\\.1\\.01\\.00.*Deprecia[cç][ãa]o Acumulada.*Bens M[oó]veis');
+
+// D2_00019 / D2_00021: Bens Imóveis (Anexo I-AB)
+export const getDCA_BensImoveis = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '1\\.2\\.3\\.2\\.1\\.00\\.00.*Bens Im[oó]veis');
+
+// D2_00020 / D2_00021: Depreciação acumulada Bens Imóveis (Anexo I-AB)
+export const getDCA_DepreciacaoImoveis = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '1\\.2\\.3\\.8\\.1\\.02\\.00.*Deprecia[cç][ãa]o Acumulada.*Bens Im[oó]veis');
