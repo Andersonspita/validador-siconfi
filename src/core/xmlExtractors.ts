@@ -803,3 +803,49 @@ export const getRPP_A05_RGF_Total = (rgf: any): number | null => {
   if (v1 === null) return null;
   return v1; // Simplificado temporariamente
 };
+
+// ─── DCA Cruzamentos RREO ────────────────────────────────────────────────────
+
+export const getDCA_ReceitasAlienacao = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '2\\.2\\.0.*Aliena[cç][ãa]o de Bens|Aliena[cç][ãa]o de Ativos', 'Receitas Brutas Realizadas|Receitas.*Realizadas');
+
+export const getDCA_TransferenciasMunicipais = (dca: any): number | null => {
+  const fpm = extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '1\\.7\\.1\\.8\\.01.*Cota-Parte do FPM|Cota-Parte do FPM', 'Receitas Brutas Realizadas|Receitas.*Realizadas') || 0;
+  const icms = extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '1\\.7\\.2\\.8\\.01.*Cota-Parte do ICMS|Cota-Parte do ICMS', 'Receitas Brutas Realizadas|Receitas.*Realizadas') || 0;
+  const ipva = extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '1\\.7\\.2\\.8\\.01.*Cota-Parte do IPVA|Cota-Parte do IPVA', 'Receitas Brutas Realizadas|Receitas.*Realizadas') || 0;
+  const itr = extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '1\\.7\\.1\\.8\\.06.*Cota-Parte do ITR|Cota-Parte do ITR', 'Receitas Brutas Realizadas|Receitas.*Realizadas') || 0;
+  const fundeb = getDCA_ReceitasFundeb(dca) || 0;
+  const total = fpm + icms + ipva + itr + fundeb;
+  return total > 0 ? total : null;
+};
+
+export const getDCA_ContribuicoesServidores = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], '1\\.2\\.1.*Contribui[cç][õo]es.*Servidor|Contribui[cç][õo]es dos Servidores', 'Receitas Brutas Realizadas|Receitas.*Realizadas');
+
+export const getDCA_DespesasCapital = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-D', 'Anexo I-D'], '4\\.0\\.00\\.00\\.00\\.00.*Despesas de Capital');
+
+export const getReceitasAlienacao_A11 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 11', 'RREO Anexo 11'], 'RECEITAS DE ALIENAÇÃO DE ATIVOS.*\\(I\\)|ALIENAÇÃO DE ATIVOS');
+
+export const getTributosMunicipais_A06 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RECEITA DE IMPOSTOS.*TAXAS E CONTRIBUIÇÕES DE MELHORIA|Impostos, Taxas e Contribuições de Melhoria', 'Até o Bimestre|Bimestre');
+
+export const getTransferenciasMunicipais_A06 = (rreo: any): number | null => {
+  const fpm = extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Cota-Parte.*FPM', 'Até o Bimestre|Bimestre') || 0;
+  const icms = extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Cota-Parte.*ICMS', 'Até o Bimestre|Bimestre') || 0;
+  const ipva = extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Cota-Parte.*IPVA', 'Até o Bimestre|Bimestre') || 0;
+  const itr = extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Cota-Parte.*ITR', 'Até o Bimestre|Bimestre') || 0;
+  const fundeb = extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Transfer[êe]ncias.*FUNDEB', 'Até o Bimestre|Bimestre') || 0;
+  const lc87 = extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Transfer[êe]ncias.*LC.*87', 'Até o Bimestre|Bimestre') || 0;
+  const lc61 = extractByColumnFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'Transfer[êe]ncias.*LC.*61', 'Até o Bimestre|Bimestre') || 0;
+  
+  const total = fpm + icms + ipva + itr + fundeb + lc87 + lc61;
+  return total > 0 ? total : null;
+};
+
+export const getContribuicoesServidores_A03 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'], 'Contribui[cç][õo]es', 'Até o Bimestre|Bimestre');
+
+export const getDespesasCapital_A09 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 09', 'RREO Anexo 09'], 'DESPESAS DE CAPITAL', 'Despesas Empenhadas');

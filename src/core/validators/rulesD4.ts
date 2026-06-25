@@ -6,7 +6,12 @@ import {
   getDespesasPagas_SubtotalA01, getRPNP_inscricoes_A01, getReceitasArrecadadasRREO,
   getDespesasPrevSocial_A02, getDespesasSaude_A02, getDespesasEducacao_A02,
   getDespesasExcetoIntra_A02_Empenhadas, getDespesasIntra_A02_Empenhadas,
-  getTributosMunicipais_A03, getTransferenciasMunicipais_A03
+  getTributosMunicipais_A03, getTransferenciasMunicipais_A03,
+  getDCA_ReceitasAlienacao, getDCA_TransferenciasMunicipais,
+  getDCA_ContribuicoesServidores, getDCA_DespesasCapital, getReceitasAlienacao_A11,
+  getTributosMunicipais_A06, getTransferenciasMunicipais_A06,
+  getContribuicoesServidores_A03, getDespesasCapital_A09, getDCA_DespesasTotais,
+  getDCA_ReceitasTributarias
 } from '../xmlExtractors';
 
 export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
@@ -260,6 +265,86 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
         impactsCapag: false,
         message: `Batimento Restos a Pagar RGF x MSC. Total MSC (631/632): R$ ${restosAPagarMSC.toLocaleString('pt-BR', {minimumFractionDigits:2})}. Aguardando mapeamento completo das colunas do Anexo 07 RGF para concluir.`,
     });
+  }
+
+  // ─── D4 DCA x RREO ─────────────────────────────────────────────────────────
+
+  if (data.dca && data.rreo) {
+    // D4_00003: Execução da despesa (DCA Anexo I-D vs RREO Anexo 01)
+    const despesasDCA = getDCA_DespesasTotais(data.dca);
+    if (despesasDCA) {
+      results.push(...validatePairEquality('D4_00003', 'D4',
+        { label: `DCA Anexo I-D (Empenhadas)`, val: despesasDCA.empenhadas },
+        { label: `RREO Anexo 01 (Empenhadas)`, val: getDespesasEmpenhadas_SubtotalA01(data.rreo) },
+        'Despesas Empenhadas divergem entre DCA e RREO Anexo 01.', true
+      ));
+      results.push(...validatePairEquality('D4_00003', 'D4',
+        { label: `DCA Anexo I-D (Liquidadas)`, val: despesasDCA.liquidadas },
+        { label: `RREO Anexo 01 (Liquidadas)`, val: getDespesasLiquidadas_SubtotalA01(data.rreo) },
+        'Despesas Liquidadas divergem entre DCA e RREO Anexo 01.', true
+      ));
+      results.push(...validatePairEquality('D4_00003', 'D4',
+        { label: `DCA Anexo I-D (Pagas)`, val: despesasDCA.pagas },
+        { label: `RREO Anexo 01 (Pagas)`, val: getDespesasPagas_SubtotalA01(data.rreo) },
+        'Despesas Pagas divergem entre DCA e RREO Anexo 01.', true
+      ));
+      results.push(...validatePairEquality('D4_00003', 'D4',
+        { label: `DCA Anexo I-D (RPNP Inscritos)`, val: despesasDCA.rpnp },
+        { label: `RREO Anexo 01 (RPNP Inscritos)`, val: getRPNP_inscricoes_A01(data.rreo) },
+        'Inscrição de Restos a Pagar Não Processados divergem entre DCA e RREO Anexo 01.', true
+      ));
+    }
+
+    // D4_00009: Alienação de Ativos (DCA Anexo I-C vs RREO Anexo 11)
+    results.push(...validatePairEquality('D4_00009', 'D4',
+      { label: `DCA Anexo I-C (Alienação)`, val: getDCA_ReceitasAlienacao(data.dca) },
+      { label: `RREO Anexo 11 (Alienação)`, val: getReceitasAlienacao_A11(data.rreo) },
+      'Receitas com alienação de ativos divergem entre DCA e RREO Anexo 11.', false
+    ));
+
+    // D4_00011: Tributos Municipais (DCA Anexo I-C vs RREO Anexo 03)
+    results.push(...validatePairEquality('D4_00011', 'D4',
+      { label: `DCA Anexo I-C (Tributos Municipais)`, val: getDCA_ReceitasTributarias(data.dca) },
+      { label: `RREO Anexo 03 (Tributos Municipais)`, val: getTributosMunicipais_A03(data.rreo) },
+      'Receitas de tributos municipais divergem entre DCA e RREO Anexo 03.', true
+    ));
+
+    // D4_00013: Transferências Municipais (DCA Anexo I-C vs RREO Anexo 03)
+    results.push(...validatePairEquality('D4_00013', 'D4',
+      { label: `DCA Anexo I-C (Transf. Municipais)`, val: getDCA_TransferenciasMunicipais(data.dca) },
+      { label: `RREO Anexo 03 (Transf. Municipais)`, val: getTransferenciasMunicipais_A03(data.rreo) },
+      'Receitas de transferências municipais divergem entre DCA e RREO Anexo 03.', true
+    ));
+
+    // D4_00015: Tributos Municipais (DCA Anexo I-C vs RREO Anexo 06)
+    // Usaremos a mesma rotina de tributos da DCA contra o Anexo 06 do RREO.
+    results.push(...validatePairEquality('D4_00015', 'D4',
+      { label: `DCA Anexo I-C (Tributos Municipais)`, val: getDCA_ReceitasTributarias(data.dca) },
+      { label: `RREO Anexo 06 (Tributos Municipais)`, val: getTributosMunicipais_A06(data.rreo) },
+      'Receitas de tributos municipais divergem entre DCA e RREO Anexo 06.', false
+    ));
+
+    // D4_00017: Transferências Municipais (DCA Anexo I-C vs RREO Anexo 06)
+    results.push(...validatePairEquality('D4_00017', 'D4',
+      { label: `DCA Anexo I-C (Transf. Municipais)`, val: getDCA_TransferenciasMunicipais(data.dca) },
+      { label: `RREO Anexo 06 (Transf. Municipais)`, val: getTransferenciasMunicipais_A06(data.rreo) },
+      'Receitas de transferências municipais divergem entre DCA e RREO Anexo 06.', false
+    ));
+
+    // D4_00019: Contribuições dos Servidores (DCA Anexo I-C vs RREO Anexo 03)
+    results.push(...validatePairEquality('D4_00019', 'D4',
+      { label: `DCA Anexo I-C (Contrib. Servidores)`, val: getDCA_ContribuicoesServidores(data.dca) },
+      { label: `RREO Anexo 03 (Contrib. Servidores)`, val: getContribuicoesServidores_A03(data.rreo) },
+      'Contribuições dos servidores divergem entre DCA e RREO Anexo 03.', true
+    ));
+
+    // D4_00020: Despesas de Capital (DCA Anexo I-D vs RREO Anexo 09)
+    results.push(...validatePairEquality('D4_00020', 'D4',
+      { label: `DCA Anexo I-D (Despesas de Capital)`, val: getDCA_DespesasCapital(data.dca) },
+      { label: `RREO Anexo 09 (Despesas de Capital)`, val: getDespesasCapital_A09(data.rreo) },
+      'Despesas de Capital divergem entre DCA e RREO Anexo 09.', false
+    ));
+
   }
 
   return results;

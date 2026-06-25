@@ -31,7 +31,7 @@ export const runValidations = async (data: ParsedData, rulesMap: Map<string, Rul
     results.push(...validateD3_RREO(data.rreo, rulesMap));
   }
 
-  if (data.msc && data.rreo) {
+  if ((data.msc && data.rreo) || (data.dca && data.rreo)) {
     results.push(...validateD4_Cruzamentos(data, rulesMap));
   }
 
