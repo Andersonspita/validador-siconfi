@@ -1,6 +1,7 @@
 # Manual do Usuário — Validador Siconfi
 
-> Versão 2.0 · Atualizado em 2026-06-19
+> Versão 3.0 · Atualizado em 2026-06-25  
+> **Aplicação:** https://andersonspita.github.io/validador-siconfi/
 
 ---
 
@@ -23,16 +24,17 @@ Uma parte dessas verificações (Dimensão D3/D4) afeta diretamente a nota **CAP
 
 ### Vantagens
 
-- **Sigilo total:** os arquivos são processados dentro do seu navegador. Nenhum dado financeiro é enviado para a internet.
+- **Sigilo total:** os arquivos são processados dentro do seu navegador. Nenhum dado financeiro é enviado para servidores próprios.
 - **Gratuito e acessível:** funciona em qualquer computador com browser moderno.
 - **Antecipação de erros:** corrija os problemas antes que o Siconfi penalize o município.
+- **Relatório PDF:** documento pronto para impressão com plano de ação corretiva.
 
 ---
 
 ## Acesso ao Sistema
 
 1. Abra o navegador (Chrome, Edge ou Firefox recomendados)
-2. Acesse o endereço fornecido pelo seu gestor (ex: `https://andersonspita.github.io/validador-siconfi/`)
+2. Acesse: **https://andersonspita.github.io/validador-siconfi/**
 3. Faça login com seu e-mail e senha cadastrados
 
 > **Esqueceu a senha?** Entre em contato com o administrador do sistema para redefinição via Firebase.
@@ -62,9 +64,9 @@ Exporte os seguintes arquivos do seu sistema de contabilidade pública:
 | Arquivo | Formato | Quando usar |
 |---|---|---|
 | **MSC** — Matriz de Saldos Contábeis | `.csv` (separador `;`) | Sempre (obrigatório para validações D1/D2) |
-| **RREO** — Relatório Resumido de Execução Orçamentária | `.xls` ou `.zip` | Para validações D3/D4 |
-| **RGF** — Relatório de Gestão Fiscal | `.xls` ou `.zip` | Para validações D3 (RCL, DCL) |
-| **DCA** — Declaração de Contas Anuais | `.xls` ou `.zip` | Validações D2 avançadas (em implementação) |
+| **RREO** — Relatório Resumido de Execução Orçamentária | `.xls`, `.xlsx`, `.xml` ou `.zip` | Para validações D3/D4 |
+| **RGF** — Relatório de Gestão Fiscal | `.xls`, `.xlsx`, `.xml` ou `.zip` | Para validações D3 (RCL, DCL) |
+| **DCA** — Declaração de Contas Anuais | `.xls`, `.xlsx`, `.xml` ou `.zip` | Validações D2 avançadas |
 
 > **Dica:** Para a maior cobertura de validações, envie a MSC + RREO + RGF juntos.
 >
@@ -78,16 +80,19 @@ Você pode:
 
 É possível enviar múltiplos arquivos de uma só vez (ex: MSC + RREO + RGF ao mesmo tempo).
 
-> **Para validar múltiplos meses:** envie os CSVs de vários meses juntos. O sistema detecta o período de cada MSC e verifica se o exercício está completo.
+> **Para validar múltiplos meses:** envie os CSVs de vários meses juntos. O sistema detecta o período de cada MSC (cabeçalho `YYYY-MM`) e valida **cada mês separadamente**, além de verificar a completude do exercício (regra D1_00016).
 
 ### Passo 3 — Aguardar o processamento
 
 O sistema exibe um indicador de carregamento enquanto:
-1. Lê e interpreta os arquivos
-2. Executa as 197 regras de validação
-3. Monta o painel de resultados
+1. Lê e interpreta os arquivos (com detecção automática de encoding)
+2. Consulta a API do Siconfi (quando o código IBGE e o exercício são detectados na MSC)
+3. Executa as regras de validação D1–D4
+4. Monta o painel de resultados
 
 O processamento leva alguns segundos, dependendo do tamanho dos arquivos.
+
+> **Erro de leitura:** se algum arquivo não puder ser interpretado, uma mensagem de erro aparece no topo do painel de resultados, indicando qual arquivo falhou.
 
 ---
 
@@ -95,21 +100,23 @@ O processamento leva alguns segundos, dependendo do tamanho dos arquivos.
 
 ### Painel de Resumo
 
-No topo do painel você verá três cartões:
+No topo do painel você verá cinco cartões:
 
 | Cartão | Significado |
 |---|---|
-| **Inconsistências Encontradas** | Total de regras que identificaram algum problema |
+| **Inconsistências (Erros + Avisos)** | Total de problemas que reduzem a qualidade ou impedem homologação |
 | **Erros Críticos** | Problemas graves que podem impedir o envio ou causar rejeição pelo Siconfi |
+| **Avisos** | Alertas que merecem correção antes do envio |
+| **Informativos** | Orientações e dados para conferência manual (não reduzem nota) |
 | **Riscos CAPAG** | Problemas que afetam a nota CAPAG do município |
 
 ### Tipos de resultado
 
 | Ícone | Severidade | Quando ocorre |
 |---|---|---|
-| 🔴 ✗ | **Erro** | Viola uma regra obrigatória do Siconfi (ex: valores negativos na MSC, desequilíbrio orçamentário) |
+| 🔴 ✗ | **Erro** | Viola uma regra obrigatória do Siconfi (ex: valores negativos na MSC, desequilíbrio D≠C) |
 | 🟡 ⚠ | **Aviso** | Possível problema que reduz a nota de qualidade (ex: conta do ativo com natureza credora) |
-| 🔵 ℹ | **Informação** | Não é um erro, mas merece atenção (ex: classes de contas ausentes que podem ser legítimas) |
+| 🔵 ℹ | **Informação** | Não é um erro, mas merece atenção (ex: entrega pendente no portal, classes ausentes legítimas) |
 
 ### Identificando problemas de CAPAG
 
@@ -137,6 +144,7 @@ Cada card de resultado contém:
 
 - **ID da regra** (ex: `D1_00017`) — código oficial do Siconfi
 - **Dimensão** (D1, D2, D3 ou D4)
+- **Período** — mês da MSC quando aplicável (ex: `2026-01`)
 - **Badge CAPAG** — se a regra impacta a nota
 - **Descrição** — nome oficial da regra conforme a STN
 - **Mensagem** — explicação detalhada do problema encontrado
@@ -160,7 +168,12 @@ Em muitas regras você pode clicar em **"Ver os N lançamentos detalhados"** par
 
 Você possui duas opções de exportação:
 
-1. **Gerar Relatório Oficial (PDF):** Gera um documento formatado e pronto para impressão, separando Erros Críticos de Avisos. O relatório PDF injeta automaticamente as tags `[IMPEDITIVO]` e `[RISCO CAPAG]` junto à descrição para facilitar a leitura do gestor, e inclui uma coluna de **Plano de Ação Corretiva** sugerindo como arrumar o problema.
+1. **Gerar Relatório Oficial (PDF):** Gera um documento formatado e pronto para impressão, separando Erros Críticos de Avisos. O relatório PDF inclui:
+   - Tags `[IMPEDITIVO]` e `[RISCO CAPAG]` junto à descrição
+   - Coluna de **Plano de Ação Corretiva** sugerindo como corrigir o problema
+   - Metadados do ente (código IBGE) e período no nome do arquivo
+   - Versão do Manual de Demonstrações Fiscais (MDF) utilizada
+
 2. **Exportar CSV:** Baixa um arquivo `.csv` bruto que pode ser aberto no Excel para análise mais granular. Contém as colunas:
 
 ```
@@ -183,9 +196,10 @@ Para validar um novo conjunto de arquivos, clique no botão **"← Voltar e Envi
 
 | Regra | Problema | Como corrigir |
 |---|---|---|
-| D1_00017 | Valores negativos na MSC | O Siconfi não aceita valores negativos. Verifique os lançamentos com valores negativos e corrija no sistema contábil |
+| D1_00001 | RREO/RGF/DCA não entregues no Siconfi | Envie os demonstrativos pendentes no portal Siconfi |
+| D1_00017 | Valores negativos na MSC | O Siconfi não aceita valores negativos. Verifique os lançamentos e corrija no sistema contábil |
 | D1_00018 | SI + MOV ≠ SF | O saldo inicial mais a movimentação do período não resulta no saldo final. Revise os lançamentos da conta indicada |
-| D1_00021 | Contas do ativo com natureza credora | Contas dos grupos 1111, 1121, 1125, 1231 e 1232 devem ter natureza Devedora (D). Verifique os lançamentos |
+| D1_00021 | Contas do ativo com natureza credora | Contas dos grupos 1111, 1121, 1125, 1231 e 1232 devem ter natureza Devedora (D). Depreciação acumulada (1238101/1238102) é exceção legítima |
 | D1_00025 | Contas do passivo com natureza devedora | Contas de passivo circulante e não-circulante devem ter natureza Credora (C) |
 | D1_00027 | Atributo F sem Fonte de Recurso | Toda conta com atributo de superávit financeiro (FP=F) deve ter a fonte de recurso (FR) preenchida |
 | D1_00028 | Classes de contas ausentes | A MSC deve conter lançamentos em todas as 8 classes do PCASP |
@@ -199,11 +213,12 @@ Para validar um novo conjunto de arquivos, clique no botão **"← Voltar e Envi
 
 | Regra | Problema | Como corrigir |
 |---|---|---|
+| D2_MSC_EQUILIBRIO | Desequilíbrio D≠C na MSC | A soma dos débitos deve ser igual à soma dos créditos em cada tipo de saldo (SI, movimentação, SF) |
 | D2_00067 | Depreciação bens móveis > valor dos bens | A depreciação acumulada não pode superar o valor bruto do ativo |
 | D2_00068 | Depreciação bens imóveis > valor dos bens | Idem para bens imóveis |
 | D2_00080 | Estoques zerados | Verifique se o almoxarifado foi devidamente registrado |
-| D2_00081 | Sem provisão de férias/13º salário | A competência exige provisão mensal desses encargos |
-| D2_00083 | DDR desequilibrado | Os saldos das contas de controle 721 e 821 devem ser iguais |
+| D2_00081 | Sem provisão de férias/13º salário | A competência exige provisão mensal (contas 211110102, 211110103, 211110104) |
+| D2_00083 | DDR desequilibrado | Os saldos finais das contas de controle **7211** (devedora) e **8211** (credora) devem ser iguais |
 | D2_00094 | RPPS sem encargo patronal | Se há despesa com pessoal RPPS, deve haver contribuição patronal registrada |
 
 ### D3 — Igualdade entre Demonstrativos
@@ -214,6 +229,12 @@ Para validar um novo conjunto de arquivos, clique no botão **"← Voltar e Envi
 | D3_00006 | DCL diverge entre RREO e RGF | A Dívida Consolidada Líquida deve ser igual no RREO Anexo 06 e no RGF Anexo 02 |
 | D3_00021 | Passivo financeiro < Restos a Pagar | O passivo financeiro (contas 21/22 com atributo F) não pode ser menor que os Restos a Pagar inscritos |
 | D3_00012/013 | Valores negativos no RREO/RGF | Os demonstrativos fiscais não devem ter valores negativos (exceto linhas de resultado) |
+
+### D4 — Cruzamentos MSC × Demonstrativos
+
+| Regra | Problema | Como corrigir |
+|---|---|---|
+| D4_00020 | Receita arrecadada MSC ≠ RREO | O total de receitas arrecadadas na MSC (6212, natureza CO) deve coincidir com o RREO Anexo 01 |
 
 ---
 
@@ -243,12 +264,16 @@ O sistema pode exibir uma mensagem `info` informando que não conseguiu extrair 
 - O arquivo está em formato XML (não XLS) — algumas regras só funcionam com XLS
 - O arquivo é uma versão muito antiga do template Siconfi
 
+### Caracteres estranhos na MSC (acentos corrompidos)
+
+O sistema tenta automaticamente UTF-8, Windows-1252 e ISO-8859-1. Se ainda houver problemas, reexporte a MSC em UTF-8 pelo sistema contábil.
+
 ---
 
 ## Perguntas Frequentes
 
 **Meus dados estão seguros?**
-Sim. Todo o processamento acontece no seu navegador. Nenhum dado financeiro é enviado para a internet ou armazenado em servidores.
+Sim. Todo o processamento acontece no seu navegador. Nenhum dado financeiro é enviado para servidores próprios. A única consulta externa é à API pública do Siconfi (extrato de entregas), que não envia o conteúdo dos seus arquivos.
 
 **Posso usar o validador para qualquer município?**
 Sim. O validador é compatível com qualquer município brasileiro que use o SICONFI.
@@ -257,13 +282,13 @@ Sim. O validador é compatível com qualquer município brasileiro que use o SIC
 Não. O validador é uma ferramenta de pré-validação. O envio oficial deve ser feito pelo portal do Siconfi (siconfi.tesouro.gov.br).
 
 **Por que algumas regras aparecem como "info" e não como "aviso"?**
-A regra D1_00028 (classes 7 e 8 ausentes) é classificada como `info` porque municípios sem RPPS podem legitimamente não ter essas classes. Um `info` não reduz pontuação — é apenas uma verificação de atenção.
+Regras como D1_00028 (classes 7 e 8 ausentes) são classificadas como `info` porque municípios sem RPPS podem legitimamente não ter essas classes. Um `info` não reduz pontuação — é apenas uma verificação de atenção.
 
 **Quantas regras o sistema valida?**
-Atualmente **197 regras oficiais do Siconfi** (100% da base passível de validação offline baseada no arquivo público do Siconfi).
+O catálogo oficial STN lista ~197 verificações. O validador implementa a maior parte das regras passíveis de execução offline com os arquivos disponíveis. Regras que exigem metadados exclusivos do servidor Siconfi aparecem como orientação (`info`).
 
 **O arquivo ZIP do Siconfi funciona?**
 Sim. O sistema abre ZIPs automaticamente e extrai os arquivos CSV e XML internos.
 
 **Posso enviar vários meses de MSC de uma vez?**
-Sim. O sistema detecta o período de cada MSC pelo cabeçalho e verifica a completude do exercício (regra D1_00016).
+Sim. O sistema detecta o período de cada MSC pelo cabeçalho e valida cada mês separadamente, além de verificar a completude do exercício (regra D1_00016).

@@ -1,6 +1,7 @@
 # Documentação Técnica — Validador Siconfi
 
-> **Versão:** 2.0 · **Data:** 2026-06-19 · **Repositório:** https://github.com/Andersonspita/validador-siconfi
+> **Versão:** 3.0 · **Data:** 2026-06-25 · **Repositório:** https://github.com/Andersonspita/validador-siconfi  
+> **GitHub Pages:** https://andersonspita.github.io/validador-siconfi/
 
 ---
 
@@ -12,7 +13,7 @@ O Validador Siconfi é uma **Single Page Application (SPA)** que executa valida�
 
 | Critério | Decisão |
 |---|---|
-| Privacidade dos dados fiscais | Nenhum dado trafega em rede |
+| Privacidade dos dados fiscais | Nenhum dado trafega em rede (exceto consulta opcional à API STN de entregas) |
 | Custo de infraestrutura | Hospedagem estática gratuita (GitHub Pages) |
 | Desempenho em volumes típicos | Parsing e validação são rápidos no browser para arquivos municipais |
 | Segurança | Sem backend = sem vetor de ataque server-side |
@@ -30,8 +31,10 @@ O Validador Siconfi é uma **Single Page Application (SPA)** que executa valida�
 | Parser XLS/XLSX | SheetJS (xlsx) | 0.18.x |
 | Parser XML | fast-xml-parser | 5.x |
 | Parser ZIP | JSZip | 3.x |
+| PDF | jsPDF + jspdf-autotable | 4.x / 5.x |
 | Ícones | lucide-react | 1.x |
 | Autenticação | Firebase Auth | 12.x |
+| Testes | Vitest | 3.x |
 | Deploy | gh-pages | — |
 
 ---
@@ -41,27 +44,42 @@ O Validador Siconfi é uma **Single Page Application (SPA)** que executa valida�
 ```
 validador-siconfi/
 ├── src/
-│   ├── core/                    ← Lógica de negócio (sem dependência de React)
-│   │   ├── types.ts             ← Interfaces TypeScript
-│   │   ├── parsers.ts           ← Leitura e conversão de arquivos
-│   │   ├── validatorEngine.ts   ← Motor de validação: 48 regras D1–D4
-│   │   ├── xmlExtractors.ts     ← Extratores de valores dos demonstrativos XLS/XML
-│   │   └── rulesMetadata.ts     ← Carrega metadados das regras do CSV público
+│   ├── core/                         ← Lógica de negócio (sem dependência de React)
+│   │   ├── types.ts                  ← Interfaces TypeScript
+│   │   ├── parsers.ts                ← Leitura e conversão de arquivos
+│   │   ├── pcaspRules.ts             ← Constantes PCASP externalizadas (MDF 15ª ed.)
+│   │   ├── pdfGenerator.ts           ← Exportação de relatório PDF
+│   │   ├── validatorEngine.ts        ← Re-export de runValidations (compatibilidade)
+│   │   ├── xmlExtractors.ts          ← Extratores de valores dos demonstrativos XLS/XML
+│   │   ├── rulesMetadata.ts          ← Carrega metadados das regras do CSV público
+│   │   ├── parsers.test.ts           ← Testes unitários do parser
+│   │   └── validators/
+│   │       ├── index.ts              ← Orquestrador runValidations()
+│   │       ├── rulesD1.ts            ← D1: qualidade MSC, entrega, encerramento
+│   │       ├── rulesD2.ts            ← D2: consistência patrimonial, DCA
+│   │       ├── rulesD3.ts            ← D3: RREO, RGF, CAPAG
+│   │       ├── rulesD4.ts            ← D4: cruzamentos MSC × demonstrativos
+│   │       ├── utils.ts              ← Helpers: equilíbrio D=C, somas, comparações
+│   │       └── utils.test.ts         ← Testes unitários dos helpers
 │   ├── components/
-│   │   ├── Dropzone.tsx         ← Upload de arquivos (drag-and-drop)
-│   │   ├── ReportDashboard.tsx  ← Painel de resultados, filtros e exportação
-│   │   ├── Login.tsx            ← Tela de autenticação Firebase
+│   │   ├── Dropzone.tsx              ← Upload de arquivos (drag-and-drop)
+│   │   ├── ReportDashboard.tsx       ← Painel de resultados, filtros e exportação
+│   │   ├── Login.tsx                 ← Tela de autenticação Firebase
 │   │   └── ChangePasswordModal.tsx
+│   ├── services/
+│   │   └── siconfiApi.ts             ← API STN (extrato de entregas)
 │   ├── styles/index.css
-│   ├── firebase.ts              ← Configuração Firebase (via env vars)
-│   ├── App.tsx                  ← Root component, roteamento de estados
+│   ├── firebase.ts                   ← Configuração Firebase (via env vars)
+│   ├── App.tsx                       ← Root component, roteamento de estados
 │   └── main.tsx
+├── scripts/
+│   └── run-local-validation.mts      ← Validação local via CLI (ZIP/MSC)
 ├── public/
 │   └── data/
-│       ├── Descricao_verificacoes.csv    ← 201 regras oficiais (STN)
+│       ├── Descricao_verificacoes.csv    ← ~197 regras oficiais (STN)
 │       └── Aplicabilidade_verificacoes.csv
-├── docs/                        ← Esta documentação
-└── dist/                        ← Build de produção (gerado)
+├── docs/                             ← Documentação
+└── dist/                             ← Build de produção (gerado)
 ```
 
 ---
@@ -72,27 +90,31 @@ validador-siconfi/
 Usuário faz upload de arquivo(s)
         ↓
 parseFiles()  [parsers.ts]
-  ├─ .csv  → parseMSCWithMeta()   → MSCAccount[] + período YYYY-MM
+  ├─ .csv  → parseMSCWithMeta()   → MSCAccount[] + período YYYY-MM + IBGE + anoReferencia
+  │          (fallback encoding: UTF-8 → Windows-1252 → ISO-8859-1)
   ├─ .zip  → descomprime → processa cada entrada (CSV/XML)
   ├─ .xls  → SheetJS → XLSReport { nome_aba: rows[][] }
   └─ .xml  → fast-xml-parser → objeto hierárquico
         ↓
-ParsedData { msc, mscPeriods, rreo, rgf, dca }
+ParsedData { msc, mscByPeriod, mscPeriods, rreo, rgf, dca, ente, anoReferencia }
         ↓
-runValidations()  [validatorEngine.ts]
-  ├─ validateD1_Entrega()       — presença de documentos, D1_00016
-  ├─ validateD1_MSC()           — qualidade interna da MSC
-  ├─ validateD1_Encerramento()  — VPA/VPD zerados (se MSC de encerramento)
-  ├─ validateD2_MSC()           — consistência patrimonial
-  ├─ validateMSC_CAPAG()        — regras D3 aplicáveis à MSC
-  ├─ validateD3_RREO()          — verificações internas do RREO
-  ├─ validateD3_Fiscal()        — cruzamentos RREO × RGF
-  └─ validateD4_Cruzamentos()   — cruzamentos MSC × RREO
+runValidations()  [validators/index.ts]
+  ├─ validateD1_Entrega()              — API Siconfi: entregas RREO/RGF/DCA (D1_00001)
+  ├─ validateD1_MSC() × período        — qualidade interna da MSC (por mês)
+  ├─ validateD2_MSC() × período        — consistência patrimonial + D2_MSC_EQUILIBRIO
+  ├─ validateD1_Encerramento()         — VPA/VPD zerados (MSC de encerramento)
+  ├─ validateD2_MSC_Encerramento_DCA() — regras de encerramento D2
+  ├─ validateMultiMonth()              — regras multi-mês (D1_00016, D1_00020, etc.)
+  ├─ validateMSC_CAPAG()               — regras D3 aplicáveis à MSC
+  ├─ validateD2_DCA()                  — regras D2 com DCA
+  ├─ validateD3_RREO()                 — verificações internas do RREO
+  ├─ validateD3_Fiscal()               — cruzamentos RREO × RGF
+  └─ validateD4_Cruzamentos()          — cruzamentos MSC × RREO (campo CO)
         ↓
 ValidationResult[]
   → enriquece com metadados do CSV (description, impactsCapag, dimension)
         ↓
-ReportDashboard — cards, filtros, exportação CSV
+ReportDashboard — cards, filtros, exportação CSV/PDF
 ```
 
 ---
@@ -102,7 +124,7 @@ ReportDashboard — cards, filtros, exportação CSV
 ### Estrutura do CSV
 
 ```
-Codigo de Instituicao Siconfi;YYYY-MM          ← linha 1: metadados (período extraído aqui)
+2931350EX;2026-01                              ← linha 1: IBGE + exercício; período YYYY-MM
 CONTA;IC1;TIPO1;IC2;TIPO2;IC3;TIPO3;IC4;TIPO4;IC5;TIPO5;IC6;TIPO6;Valor;Tipo_valor;Natureza_valor
 111110100;01000;PO;F;FP;1500;FR;0000;CO;;;;;;;1500000.00;ending_balance;D
 ```
@@ -128,7 +150,7 @@ interface MSCAccount {
   FP?:   string;          // atributo superávit financeiro ('F', 'NF', 'P')
   FS?:   string;          // função/subfunção (apenas contas 622xxx)
   FR?:   string;          // fonte ou destinação de recurso
-  CO?:   string;          // complemento
+  CO?:   string;          // complemento / natureza da receita
   ND?:   string;          // natureza da despesa (apenas contas 622xxx)
   Valor: number;          // sempre >= 0 (negativos = erro D1_00017)
   Tipo_valor:     'beginning_balance' | 'period_change' | 'ending_balance';
@@ -136,13 +158,35 @@ interface MSCAccount {
 }
 ```
 
-### Período da MSC
+### Período e metadados
 
-O cabeçalho da linha 1 contém o período no formato `YYYY-MM`. O parser extrai esse valor e o armazena em `ParsedData.mscPeriods[]`. Período com mês > 12 (ex: `2025-13`) ou = `0` indica MSC de encerramento.
+- **Período:** extraído do cabeçalho linha 1 (`YYYY-MM`). Mês > 12 ou = `0` indica MSC de encerramento.
+- **Código IBGE:** 7 dígitos do cabeçalho (ex: `2931350EX` → `2931350`).
+- **Ano de referência:** usado na consulta à API Siconfi (`D1_00001`).
+- **mscByPeriod:** mapa `{ "2026-01": MSCAccount[], ... }` — base para validação por período.
+
+### Encoding
+
+O parser tenta, em ordem: UTF-8 → Windows-1252 → ISO-8859-1. Valores numéricos aceitam formato BR (`1.234,56`) e notação científica.
 
 ---
 
-## 6. Estrutura PCASP
+## 6. Estrutura PCASP e pcaspRules.ts
+
+Constantes externalizadas em `src/core/pcaspRules.ts` (referência: **MDF 15ª edição**):
+
+| Constante | Uso |
+|---|---|
+| `ATIVO_NATUREZA_D_PREFIXES` | D1_00021 — ativo com natureza D |
+| `ATIVO_RETIFICADORA_PREFIXES` | D1_00021 — exceção depreciação (1238101/1238102) |
+| `PASSIVO_NATUREZA_C_PREFIXES` | D1_00025 |
+| `PL_NATUREZA_C_PREFIXES` / `PL_DEDUCAO_PREFIXES` | D1_00026 |
+| `ORCAM_NATUREZA_EXCEPTION_PREFIXES` | D1_00038 — cancelamentos/estornos |
+| `DDR_DEVEDORA_PREFIXES` / `DDR_CREDORA_PREFIXES` | D2_00083 — subgrupos 7211 × 8211 |
+| `PROVISAO_FERIAS_13_CONTAS` | D2_00081 — 211110102/103/104 |
+| `TOLERANCIA_REAIS` | Tolerância de arredondamento (R$ 0,01) |
+
+### Classes PCASP
 
 | Classe | Descrição | Natureza padrão |
 |---|---|---|
@@ -155,228 +199,159 @@ O cabeçalho da linha 1 contém o período no formato `YYYY-MM`. O parser extrai
 | 7 | Controles Devedores (DDR) | Devedora (D) |
 | 8 | Controles Credores (DDR) | Credora (C) |
 
-### Grupos de contas relevantes para as validações
-
-| Grupo | Contas | Natureza |
-|---|---|---|
-| Bens Móveis | 1231xxxxx | D |
-| Bens Imóveis | 1232xxxxx | D |
-| Depreciação Móveis | 1238101xx | C (contra-ativo) |
-| Depreciação Imóveis | 1238102xx | C (contra-ativo) |
-| Intangíveis | 124xxxxxx (excl. 1248) | D |
-| Amortização Intangível | 1248xxxxx | C |
-| Estoques/Almoxarifado | 1156xxxxx | D |
-| Investimentos Permanentes | 122xxxxxx | D |
-| Restos a Pagar Processados | 212xxxxxx | C |
-| Restos a Pagar Não-Processados | 213xxxxxx | C |
-| Receita Orçamentária Arrecadada | 6212xxxxx | C |
-| Despesa Orçamentária Executada | 62213xxxx | D |
-
 ---
 
-## 7. Motor de Validação — Detalhamento
+## 7. Motor de Validação
 
-### Regras implementadas (48 de 201)
+### Orquestração (`validators/index.ts`)
 
-#### D1 — Gestão da Informação (19 regras)
+A função `runValidations(data, rulesMap)`:
 
-| Regra | Arquivo | Descrição |
+1. Executa `validateD1_Entrega` (async — API Siconfi).
+2. Itera `mscByPeriod`: para cada mês regular, roda D1 e D2 **isoladamente**.
+3. Detecta período de encerramento e roda regras específicas.
+4. Agrega MSC para regras CAPAG e multi-mês.
+5. Executa D2/D3/D4 conforme arquivos disponíveis.
+6. Enriquece resultados com metadados do CSV oficial.
+
+### Regra adicional: D2_MSC_EQUILIBRIO
+
+Implementada em `utils.ts` → `validateEquilibrioGeral()`:
+
+- Verifica `SUM(D) = SUM(C)` por `beginning_balance`, `period_change` e `ending_balance`.
+- Emite `error` se desequilibrado.
+
+### Dimensões e arquivos
+
+| Dimensão | Arquivo | Escopo |
 |---|---|---|
-| D1_00001 | — | Aviso informativo: D1_00002–15 verificáveis apenas no portal Siconfi |
-| D1_00016 | MSC (múltiplas) | Completude das MSCs do exercício (13 esperadas: jan–dez + encerramento) |
-| D1_00017 | MSC | Valores negativos (Siconfi rejeita) |
-| D1_00018 | MSC | SI + MOV ≠ SF por chave CONTA-PO-FR-CO |
-| D1_00021 | MSC | Ativo (grupos 1111/1121/1125/1231/1232) com natureza Credora (C) |
-| D1_00025 | MSC | Passivo circulante/não-circulante (grupos 2111–2126, 213–215, 221–223) com natureza D |
-| D1_00026 | MSC | Patrimônio Líquido (grupos 2311/2312, 232–236) com natureza D |
-| D1_00027 | MSC | Contas com FP='F' (superávit financeiro) sem FR preenchido |
-| D1_00028 | MSC | Classes 1–6 ausentes (warning) · Classes 7–8 ausentes (info) |
-| D1_00029 | MSC | Grupos 6211/6212/6213 sem FR |
-| D1_00030 | MSC | Grupos 6211/6212/6213 sem natureza de receita (CO/IC4) |
-| D1_00031 | MSC | Grupos 62213 sem natureza de despesa (ND/IC5) |
-| D1_00032 | MSC | Grupos 622xxx sem função/subfunção (FS/IC2) |
-| D1_00033 | MSC | Grupos 62213 sem Fonte de Recurso (FR/IC3) |
-| D1_00034 | MSC | VPD (grupos 311–363) com natureza C |
-| D1_00035 | MSC | VPA (classe 4) com natureza D |
-| D1_00036 | MSC encerramento | VPA/VPD (classes 3/4) com saldo final ≠ 0 |
-| D1_00037 | MSC | FR 001–499 (fontes da União) usado em MSC de município/estado |
-| D1_00038 | MSC | Grupos 511/621 com natureza D; grupos 512/622 com natureza C |
+| D1 | `rulesD1.ts` | Qualidade MSC, entrega (API), encerramento, multi-mês |
+| D2 | `rulesD2.ts` | Consistência patrimonial, equilíbrio D=C, DCA |
+| D3 | `rulesD3.ts` | RREO, RGF, CAPAG, cruzamentos fiscais |
+| D4 | `rulesD4.ts` | Cruzamentos MSC × RREO (receita via campo **CO**) |
 
-#### D2 — Consistência Contábil (10 regras)
+### Cobertura
 
-| Regra | O que verifica |
-|---|---|
-| D2_00054 | VPA/VPD de equivalência patrimonial (442/362) sem investimentos permanentes (122) |
-| D2_00055 | Amortização acumulada intangíveis (1248) > valor bruto (124 excl. 1248) |
-| D2_00067 | Depreciação bens móveis (1238101) > valor bruto bens móveis (1231) |
-| D2_00068 | Depreciação bens imóveis (1238102) > valor bruto bens imóveis (1232) |
-| D2_00080 | Estoques/almoxarifado (11561) com saldo zero sem justificativa |
-| D2_00081 | Pessoal sem provisão mensal de férias (211110102) ou 13º (211110103) |
-| D2_00083 | DDR: saldo final contas 721xxx ≠ saldo final contas 821xxx |
-| D2_00093 | Almoxarifado (11561) com saldo mas sem movimentação de consumo |
-| D2_00094 | Pessoal RPPS (311110101) sem contribuição patronal (312120100) |
-| D2_00095 | Pessoal RGPS (311210101) sem INSS (312210100) / FGTS (312230100) |
+O CSV oficial (`Descricao_verificacoes.csv`) lista ~197 verificações. O validador implementa a maior parte das regras **executáveis offline**. Regras que dependem exclusivamente de metadados do servidor Siconfi (D1_00002–15) são emitidas como orientação (`info`).
 
-#### D3 — Fiscal (19 regras)
-
-| Regra | Arquivos | Descrição | CAPAG |
-|---|---|---|---|
-| D3_00001 | RREO | TOTAL COM DÉFICIT (VII) = TOTAL COM SUPERÁVIT (XIV) no Anexo 01 | — |
-| D3_00002 | RREO | Despesas: Anexo 01 Subtotal X = Anexo 02 Total I | — |
-| D3_00005 | RREO+RGF | RCL: RREO Anexo 03 = RGF Anexo 01 | ✓ |
-| D3_00006 | RREO+RGF | DCL: RREO Anexo 06 = RGF Anexo 02 | ✓ |
-| D3_00011 | RGF | Dedução inativos/pensionistas ≤ total inativos no Anexo 01 | — |
-| D3_00012 | RREO | Valores negativos em qualquer célula | — |
-| D3_00013 | RGF | Valores negativos em qualquer célula | — |
-| D3_00014 | RGF | Transferências emendas individuais: A01 = A02 | ✓ |
-| D3_00015 | RREO+RGF | Transferências emendas individuais: RREO A03 = RGF A01 | ✓ |
-| D3_00016 | RREO+RGF | Transferências emendas de bancada: RREO A03 = RGF A01 | ✓ |
-| D3_00021 | MSC | Passivo financeiro (FP='F') ≥ Restos a Pagar | ✓ |
-| D3_00030 | RREO | Receitas RPPS: Anexo 04 = Anexo 06 | ✓ |
-| D3_00032 | RREO | Recursos RPPS exercícios anteriores: A01 = A04 = A06 | — |
-| D3_00033 | RREO | Superávit financeiro créditos adicionais: A01 = A06 | — |
-| D3_00034 | RREO | Reserva RPPS: A01 = A04 = A06 | — |
-| D3_00035 | RREO | Reserva de Contingência: A01 = A06 | — |
-| D3_00044 | RREO+RGF | Transferências agentes comunitários de saúde: RREO A03 = RGF A01 | ✓ |
-| D3_00045 | RREO | Valores negativos nos Restos a Pagar (Anexo 07) | ✓ |
-
-#### D4 — Cruzamentos MSC × Demonstrativos (1 regra)
-
-| Regra | Descrição | CAPAG |
-|---|---|---|
-| D4_00020 | Receitas arrecadadas MSC (6212) = RREO Anexo 01 | ✓ |
+Principais regras por dimensão — ver `docs/STATUS_PROJETO.md` para lista completa e pendências.
 
 ---
 
 ## 8. xmlExtractors.ts — API de Referência
 
-### Funções base (não exportadas)
+### Funções base
 
 ```typescript
 findValueInSheet(sheet, term, offset?)
-  // Retorna o primeiro valor numérico na linha que contém `term` (regex).
-  // Inclui zero. Retorna null se não encontrado.
-
 findValueInSection(sheet, sectionTerm, valueTerm, maxLines?)
-  // Para planilhas onde o valor está em linha separada abaixo do cabeçalho.
-  // Ex: Anexo 04 RPPS: cabeçalho "Recursos RPPS..." → linha "  VALOR"
-
 getSheet(report, candidates[])
-  // Retorna a primeira aba encontrada dentre os candidatos de nome.
+extractFromReport(report, sheetCandidates, searchTerm, colOffset?)
 ```
 
-### Extratores exportados por categoria
+### Extratores exportados (amostra)
 
 ```typescript
-// RCL
-getRCLFromRREO(rreo)        // RREO Anexo 03: "RECEITA CORRENTE LÍQUIDA (III)"
-getRCLFromRGF(rgf)          // RGF Anexo 01:  "RECEITA CORRENTE LIQUIDA - RCL (IV)"
+// RCL / DCL
+getRCLFromRREO(rreo) / getRCLFromRGF(rgf)
+getDCL_RREO_A06(rreo) / getDCL_RGF_A02(rgf)
 
 // Equilíbrio orçamentário (D3_00001)
-getEquilibrioOrcamentario(rreo)  // { comDeficit, comSuperavit }
+getEquilibrioOrcamentario(rreo)
 
 // Despesas (D3_00002)
-getTotalDespesasAnexo01(rreo)    // "SUBTOTAL DAS DESPESAS (X)"
-getDespesasAnexo02(rreo)         // "DESPESAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)"
+getTotalDespesasAnexo01(rreo) / getDespesasAnexo02(rreo)
 
-// RPPS (D3_00030/32/34)
-getTotalReceitasRPPS_A04(rreo)   // "TOTAL DAS RECEITAS DO FUNDO EM CAPITALIZAÇÃO (IV)"
-getReceitasRPPS_A06(rreo)        // "RECEITAS PRIMÁRIAS CORRENTES (COM FONTES RPPS) (V)"
-getRPPSExercAnt_A01/A04/A06(rreo)
-getReservaRPPS_A01/A04/A06(rreo)
-
-// Superávit financeiro (D3_00033)
-getSuperavitFinanceiro_A01/A06(rreo)
-
-// Reserva Contingência (D3_00035)
-getReservaContingencia_A01/A06(rreo)
-
-// DCL (D3_00006)
-getDCL_RREO_A06(rreo)           // "DÍVIDA CONSOLIDADA LÍQUIDA (XLII)"
-getDCL_RGF_A02(rgf)             // "DÍVIDA CONSOLIDADA LÍQUIDA (DCL) (III)"
-
-// Transferências
+// RPPS, transferências, valores negativos
+getTotalReceitasRPPS_A04(rreo)
 getTransfEmendasIndividuais_RREO_A03(rreo)
-getTransfEmendasIndividuais_RGF_A01/A02(rgf)
-getTransfEmendasBancada_RREO_A03(rreo)
-getTransfEmendasBancada_RGF_A01(rgf)
-getTransfAgentesSaude_RREO_A03(rreo)
-getTransfAgentesSaude_RGF_A01(rgf)
-
-// Valores negativos
-findNegativeValues(report)        // Todas as abas
-findNegativosRP_A07(rreo)         // Apenas Anexo 07
+findNegativeValues(report)
+findNegativosRP_A07(rreo)
 
 // Metadados
-extractXLSMetadata(report)        // { ente, periodo, exercicio }
-```
-
-### Extrator genérico
-
-```typescript
-extractFromReport(report, sheetCandidates, searchTerm, colOffset?)
-// Combina getSheet + findValueInSheet.
-// Exemplo:
-const val = extractFromReport(rreo, ['RREO-Anexo 01'], 'RESERVA DE CONTINGÊNCIA');
+extractXLSMetadata(report)  // { ente, periodo, exercicio }
 ```
 
 ---
 
-## 9. Helpers de Comparação
+## 9. Helpers de Comparação (`validators/utils.ts`)
 
-Em `validatorEngine.ts` há dois helpers que evitam código repetitivo:
-
-### `validatePairEquality`
-
-```typescript
-validatePairEquality(
-  ruleId: string,
-  dimension: 'D1'|'D2'|'D3'|'D4',
-  a: { label: string; val: number | null },
-  b: { label: string; val: number | null },
-  msgBase: string,
-  impactsCapag: boolean
-): ValidationResult[]
-```
-
-Retorna `[]` (sem resultado) quando `a.val === null || b.val === null` — evita falsos positivos quando o dado não estava presente no arquivo.
-
-### `validateTripleEquality`
-
-Igual ao anterior, mas com três fontes. Gera um único `ValidationResult` descrevendo todos os pares divergentes.
+| Função | Uso |
+|---|---|
+| `validateEquilibrioGeral(msc, period?)` | D2_MSC_EQUILIBRIO — SUM(D)=SUM(C) |
+| `validatePairEquality(...)` | Compara dois valores; retorna `[]` se algum for `null` |
+| `validateTripleEquality(...)` | Compara três fontes |
+| `sumByTipoValor(msc, tipo, natureza?)` | Soma contábil por tipo de saldo |
+| `isRegularMonthPeriod(period)` | Distingue mês regular de encerramento |
+| `findEncerramentoPeriod(mscByPeriod)` | Localiza chave de encerramento |
 
 ---
 
-## 10. Como Adicionar uma Nova Regra
+## 10. Exportação PDF (`pdfGenerator.ts`)
+
+Gera relatório via jsPDF com:
+
+- Separação Erros / Avisos / Informativos
+- Tags `[IMPEDITIVO]` e `[RISCO CAPAG]`
+- Coluna **Plano de Ação Corretiva**
+- `detailedItems` expandidos quando disponíveis
+- Nome do arquivo: `relatorio_{IBGE}_{periodo}_{timestamp}.pdf`
+- Rodapé com `MDF_VERSION` de `pcaspRules.ts`
+
+---
+
+## 11. API Siconfi (`services/siconfiApi.ts`)
+
+Usada por `validateD1_Entrega` (D1_00001):
+
+- Endpoint: `apidatalake.tesouro.gov.br` (extrato de entregas)
+- Proxy CORS: `corsproxy.io` (necessário em ambiente client-side)
+- Entrada: código IBGE (7 dígitos) + exercício (`anoReferencia` da MSC)
+- Saída: verificação de entrega de RREO, RGF, DCA, MSC
+
+---
+
+## 12. Como Adicionar uma Nova Regra
 
 1. **Identifique** o ID em `public/data/Descricao_verificacoes.csv`
 2. **Verifique** o campo `no_declaracao` para saber quais arquivos são necessários
-3. **Se precisar extrair valor de XLS**, adicione extrator em `xmlExtractors.ts`:
-   ```typescript
-   export const getMeuValor = (rreo: any): number | null =>
-     extractFromReport(rreo, ['RREO-Anexo XX'], 'Texto exato da linha');
-   ```
-4. **Implemente a regra** na função de validação correta em `validatorEngine.ts`:
-   - MSC pura → `validateD1_MSC()` ou `validateD2_MSC()`
-   - MSC encerramento → `validateD1_Encerramento()`
-   - Apenas RREO → `validateD3_RREO()`
-   - RREO + RGF → `validateD3_Fiscal()`
-   - MSC + RREO → `validateD4_Cruzamentos()`
-5. **Use os helpers** `validatePairEquality` / `validateTripleEquality` para comparações
-6. **Atualize** o conjunto `implementadas` no script de contagem e em `docs/STATUS_PROJETO.md`
-7. **Compile**: `npx tsc --noEmit`
+3. **Se precisar extrair valor de XLS**, adicione extrator em `xmlExtractors.ts`
+4. **Implemente a regra** no arquivo correto:
+   - MSC pura → `rulesD1.ts` ou `rulesD2.ts`
+   - MSC encerramento → `validateD1_Encerramento()` / `validateD2_MSC_Encerramento_DCA()`
+   - Apenas RREO → `rulesD3.ts`
+   - RREO + RGF → `validateD3_Fiscal()` em `rulesD3.ts`
+   - MSC + RREO → `rulesD4.ts`
+5. **Constantes PCASP** → preferir `pcaspRules.ts` em vez de hardcode
+6. **Use helpers** de `utils.ts` para comparações e equilíbrio
+7. **Adicione teste** em `utils.test.ts` ou `parsers.test.ts` se aplicável
+8. **Atualize** `docs/STATUS_PROJETO.md`
+9. **Verifique tipos**: `npx tsc --noEmit` · **Testes**: `npm test`
 
 ### Severidades
 
 | Valor | Quando usar |
 |---|---|
-| `'error'` | Viola critério obrigatório do Siconfi — impede envio ou causa rejeição |
+| `'error'` | Viola critério obrigatório — impede envio ou causa rejeição |
 | `'warning'` | Possível problema que reduz a nota de qualidade |
-| `'info'` | Informação relevante, sem impacto direto na nota |
+| `'info'` | Orientação ou informação sem impacto direto na nota |
 
 ---
 
-## 11. Firebase — Autenticação
+## 13. Testes
+
+```bash
+npm test                    # Vitest — parsers.test.ts + utils.test.ts
+npx tsx scripts/run-local-validation.mts "arquivo.zip"   # validação E2E local
+```
+
+Cobertura atual:
+- Parser MSC: encoding, IBGE, período, formatos numéricos
+- Utils: equilíbrio D=C, helpers de comparação
+
+---
+
+## 14. Firebase — Autenticação
 
 Credenciais lidas exclusivamente de variáveis de ambiente Vite (nunca hardcoded):
 
@@ -390,41 +365,56 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 ```
 
-O `.gitignore` já exclui `.env` e `.env.*`.
+Para GitHub Pages, as variáveis precisam estar disponíveis no momento do `npm run build`.
 
 ---
 
-## 12. Build e Deploy
+## 15. Build e Deploy
 
 ```bash
 npm install          # instalar dependências
 npm run dev          # servidor dev → http://localhost:5173
-npx tsc --noEmit     # verificar tipos sem gerar arquivos
+npm test             # testes unitários
+npx tsc --noEmit     # verificar tipos
 npm run build        # build produção → /dist
-npm run deploy       # publicar no GitHub Pages (requer gh-pages configurado)
+npm run deploy       # publicar no GitHub Pages
 ```
 
-> **Nota WSL:** O build pode falhar com `EPERM` ao copiar para `dist/`.
+> **Nota WSL:** O build pode falhar com `EPERM` ao copiar para `dist`.
 > Solução: `rm -rf dist && npm run build`.
 
 ---
 
-## 13. Limitações Conhecidas
+## 16. Limitações Conhecidas
 
 | Limitação | Impacto | Próximo passo |
 |---|---|---|
-| D1_00002–D1_00015 (homologação/tempestividade) | Só verificável via API Siconfi | Integração futura com API STN |
-| Regras multi-mês (D1_00020/23/24, D2_00077/79/82/86–88) | Requerem as 13 MSCs do exercício com rastreamento por período | Indexar contas por período |
-| 44 regras D2 que requerem DCA | Aguardam parser e extratores específicos para DCA XLS | Implementar suporte a DCA |
-| `findValueInSheet` retorna 1ª coluna numérica | Regras que precisam de coluna específica (ex: "Até o Bimestre") ficam imprecisas | Adicionar extrator por índice de coluna |
-| RREO/RGF em formato XML | Validações XLS não se aplicam; usuário recebe aviso info | Implementar extratores XML |
-| D3_00021: passivo financeiro com FP='F' | Requer FP corretamente preenchido no CSV da MSC | Já corrigido — depende de dados do cliente |
+| D1_00002–D1_00015 (tempestividade exata) | Parcial — API retorna homologação, não prazo legal | Expandir lógica de prazos LRF |
+| Regras D2 de encerramento MSC×DCA (ex.: D2_00069–74) | Não implementadas | Extratores DCA + MSC encerramento |
+| Regras multi-mês avançadas | Parcial — D1_00016/20 implementadas | D2_00077/79/82/86–88 |
+| `findValueInSheet` retorna 1ª coluna numérica | Regras com coluna específica ficam imprecisas | Extrator por índice de coluna |
+| RREO/RGF em formato XML | Validações XLS não se aplicam | Extratores XML |
+| MSC > 50k linhas | Pode degradar performance no browser | Web Workers / chunking |
+| Firebase no GitHub Pages | Login depende de env vars no build | Configurar secrets no CI |
 
+---
 
-## Atualização Arquitetural (23/06/2026)
-O código-fonte `validatorEngine.ts` agora delega as chamadas para arquivos específicos:
-- `rulesD1.ts`: Aciona o `siconfiApi.ts` via `fetch` para verificar remessas (DCA, MSC, RREO, RGF) no data lake (apidatalake.tesouro.gov.br). Utiliza um proxy (`corsproxy.io`) para uso em ambientes sem backend.
-- `rulesD2.ts`: Mantém a lógica assíncrona/síncrona de limites e subtotais.
-- `rulesD3.ts` e `rulesD4.ts`: Importam helpers de `xmlExtractors.ts` para realizar cruzamentos pesados (ex: Receita Corrente Líquida, Dívida Consolidada) e `utils.ts` para soma contábil.
+## 17. Histórico de mudanças arquiteturais
 
-A extração de metadados das planilhas (Ente IBGE e Ano) está acoplada no `parsers.ts`, garantindo a checagem cruzada da regra D3_00005 (arquivos de Entes misturados).
+### Jun/2026 — Auditoria QA e refatoração
+
+- Validação **por período** via `mscByPeriod` (evita duplicatas e falsos positivos)
+- `validateEquilibrioGeral()` — regra `D2_MSC_EQUILIBRIO`
+- DDR corrigido: subgrupos **7211 × 8211** (não 721/821)
+- D4: cruzamentos de receita usam campo **CO**, não `Natureza_valor`
+- Constantes PCASP externalizadas em `pcaspRules.ts`
+- `pdfGenerator.ts` — export PDF com metadados e plano de ação
+- Testes Vitest + script CLI `run-local-validation.mts`
+- Removidas regras D2 fictícias que marcavam validação sem lógica real
+- Integração API Siconfi em `rulesD1.ts` via `siconfiApi.ts`
+
+### Jun/2026 (inicial) — Modularização
+
+- `validatorEngine.ts` delegado para `validators/rulesD1–4.ts`
+- Extratores centralizados em `xmlExtractors.ts`
+- Metadados IBGE/ano acoplados em `parsers.ts`
