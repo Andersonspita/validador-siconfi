@@ -11,7 +11,7 @@ import {
   getDCA_ContribuicoesServidores, getDCA_DespesasCapital, getReceitasAlienacao_A11,
   getTributosMunicipais_A06, getTransferenciasMunicipais_A06,
   getContribuicoesServidores_A03, getDespesasCapital_A09, getDCA_DespesasTotais,
-  getDCA_ReceitasTributarias
+  getDCA_ReceitasTributarias, getTotalRPPagos_A07
 } from '../xmlExtractors';
 
 export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
@@ -188,6 +188,59 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
       'Receitas de Transferências Constitucionais Municipais divergem entre MSC e RREO Anexo 03.', false
     ));
 
+    // D4_00021: Receitas arrecadadas MSC Dez vs RREO A01 (contas 6212 e 6213)
+    let mscReceitasArrecadadas = 0;
+    decMSC.forEach(a => {
+      if ((a.CONTA.startsWith('6212') || a.CONTA.startsWith('6213')) && a.Tipo_valor === 'ending_balance' && a.Natureza_valor) {
+        mscReceitasArrecadadas += a.Valor;
+      }
+    });
+    results.push(...validatePairEquality('D4_00021', 'D4',
+      { label: `MSC Dezembro (6212 e 6213)`, val: mscReceitasArrecadadas || null },
+      { label: `RREO Anexo 01 Receitas Arrecadadas`, val: getReceitasArrecadadasRREO(data.rreo) },
+      'Receitas Arrecadadas totais divergem entre MSC de Dezembro e RREO Anexo 01.', true
+    ));
+
+    // D4_00027: RPNP Inscritos MSC Dez vs RREO A01 (contas 6221305 e 6221306)
+    let mscRPNPInscritos = 0;
+    decMSC.forEach(a => {
+      if ((a.CONTA.startsWith('6221305') || a.CONTA.startsWith('6221306')) && a.Tipo_valor === 'ending_balance' && a.ND) {
+        mscRPNPInscritos += a.Valor;
+      }
+    });
+    results.push(...validatePairEquality('D4_00027', 'D4',
+      { label: `MSC Dezembro RPNP (6221305, 6221306)`, val: mscRPNPInscritos || null },
+      { label: `RREO Anexo 01 RPNP Inscritos`, val: getRPNP_inscricoes_A01(data.rreo) },
+      'Restos a Pagar Não Processados inscritos divergem entre MSC e RREO Anexo 01.', false
+    ));
+
+    // D4_00035: RP Pagos MSC Dez vs RREO A07 (contas 6314 e 6322)
+    let mscRPPagos = 0;
+    decMSC.forEach(a => {
+      if ((a.CONTA.startsWith('6314') || a.CONTA.startsWith('6322')) && a.Tipo_valor === 'ending_balance') {
+        mscRPPagos += a.Valor;
+      }
+    });
+    results.push(...validatePairEquality('D4_00035', 'D4',
+      { label: `MSC Dezembro RP Pagos (6314, 6322)`, val: mscRPPagos || null },
+      { label: `RREO Anexo 07 Total RP Pagos`, val: getTotalRPPagos_A07(data.rreo) },
+      'Saldos de Restos a Pagar Pagos divergem entre MSC e RREO Anexo 07.', false
+    ));
+
+    // D4_00039: Tributos Municipais MSC Dez vs RREO A06
+    results.push(...validatePairEquality('D4_00039', 'D4',
+      { label: `MSC Dezembro Tributos Municipais`, val: mscTributosMunicipais || null },
+      { label: `RREO A06 Tributos Municipais`, val: getTributosMunicipais_A06(data.rreo) },
+      'Receitas de Tributos Municipais divergem entre MSC e RREO Anexo 06.', true
+    ));
+
+    // D4_00041: Transferências Municipais MSC Dez vs RREO A06
+    results.push(...validatePairEquality('D4_00041', 'D4',
+      { label: `MSC Dezembro Transf. Municipais (Constitucionais)`, val: mscTransfMunicipais || null },
+      { label: `RREO A06 Transf. Constitucionais Municipais`, val: getTransferenciasMunicipais_A06(data.rreo) },
+      'Receitas de Transferências Constitucionais Municipais divergem entre MSC e RREO Anexo 06.', true
+    ));
+
   }
 
   // D4_00026: Restos a Pagar Não Processados — MSC dezembro (213xxx) vs RREO Anexo 01 col[10]
@@ -208,31 +261,7 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
     }
   }
 
-  // D4_00020: Receitas arrecadadas na MSC (6212) vs Anexo 01 do RREO
-  if (data.msc && data.rreo) {
-    const receitasMSC  = sumAccounts(data.msc, ['6212'], 'period_change');
-    const receitasRREO = getReceitasArrecadadasRREO(data.rreo);
 
-    if (receitasRREO === null) {
-      results.push({
-        ruleId: 'D4_00020',
-        dimension: 'D4',
-        description: '',
-        severity: 'info',
-        impactsCapag: true,
-        message: `Não foi possível extrair o total de receitas arrecadadas do RREO Anexo 01. A regra D4_00020 não pôde ser verificada.`,
-      });
-    } else if (Math.abs(receitasMSC - receitasRREO) > 0.01) {
-      results.push({
-        ruleId: 'D4_00020',
-        dimension: 'D4',
-        description: '',
-        severity: 'error',
-        impactsCapag: true,
-        message: `Receitas Arrecadadas divergentes. MSC (6212): R$ ${receitasMSC.toLocaleString('pt-BR', {minimumFractionDigits:2})} | RREO Anexo 01: R$ ${receitasRREO.toLocaleString('pt-BR', {minimumFractionDigits:2})}.`,
-      });
-    }
-  }
 
   
   // D4_00001: Validação das Despesas Empenhadas RREO Anexo 1 x MSC Contas 62292 (Empenhos a Liquidar, Liquidados e Pagos)
