@@ -11,7 +11,7 @@
 
 O **Validador Siconfi** é uma SPA React/TypeScript que replica localmente as 201 regras de validação do SICONFI (sistema do Tesouro Nacional), permitindo que municípios antecipem erros antes do envio oficial. Tudo roda no browser — nenhum dado sai da máquina do usuário.
 
-**Estado atual:** 105 de 201 regras implementadas (52%).
+**Estado atual:** 110 de 201 regras implementadas (55%).
 
 ---
 

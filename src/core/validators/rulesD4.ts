@@ -3,7 +3,9 @@ import { sumAccounts, validatePairEquality } from './utils';
 import {
   getReceitasCorrentes_A01, getReceitasCapital_A01, getDespesasCorrentes_A01,
   getDespesasCapital_A01, getDespesasEmpenhadas_SubtotalA01, getDespesasLiquidadas_SubtotalA01,
-  getDespesasPagas_SubtotalA01, getRPNP_inscricoes_A01, getReceitasArrecadadasRREO
+  getDespesasPagas_SubtotalA01, getRPNP_inscricoes_A01, getReceitasArrecadadasRREO,
+  getDespesasPrevSocial_A02, getDespesasSaude_A02, getDespesasEducacao_A02,
+  getDespesasExcetoIntra_A02_Empenhadas, getDespesasIntra_A02_Empenhadas
 } from '../xmlExtractors';
 
 export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
@@ -81,6 +83,67 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
         });
       }
     }
+    // D4_00029 a D4_00034: Cruzamentos de Despesas por Função (MSC de dezembro vs RREO Anexo 02)
+    // A regra foca no grupo 62213 (Crédito Empenhado).
+    // A modalidade de aplicação 91 (intraorçamentária) fica no 3º e 4º dígito de ND (quando tem 6) ou 5º e 6º (quando tem 8).
+    // Para simplificar, verificaremos o atributo 'ND'. No PCASP, '91' na modalidade é intra.
+    const isIntra = (nd?: string) => {
+      if (!nd || nd.length < 4) return false;
+      // Geralmente GND+Mod = 3390... então a modalidade é o 3º e 4º caractere de uma ND de 6 dígitos.
+      // Se tiver 8 dígitos (incluindo desdobramentos), a modalidade ainda é os caracteres 2 e 3 (0-indexed).
+      return nd.substring(2, 4) === '91';
+    };
+
+    let mscIntra = 0, mscPrev = 0, mscSaude = 0, mscEducacao = 0, mscDemais = 0;
+    
+    decMSC.forEach(a => {
+      if (a.CONTA.startsWith('62213') && a.Tipo_valor === 'ending_balance') {
+        if (isIntra(a.ND)) {
+          mscIntra += a.Valor;
+        } else {
+          if (a.FS?.startsWith('09')) mscPrev += a.Valor;
+          else if (a.FS?.startsWith('10')) mscSaude += a.Valor;
+          else if (a.FS?.startsWith('12')) mscEducacao += a.Valor;
+          else mscDemais += a.Valor;
+        }
+      }
+    });
+
+    results.push(...validatePairEquality('D4_00029', 'D4',
+      { label: `MSC Dezembro Função 09 (Previdência)`, val: mscPrev || null },
+      { label: `RREO A02 Previdência (Empenhadas)`, val: getDespesasPrevSocial_A02(data.rreo) },
+      'Despesas com Previdência Social divergem entre MSC e RREO Anexo 02.', false
+    ));
+
+    results.push(...validatePairEquality('D4_00030', 'D4',
+      { label: `MSC Dezembro Função 10 (Saúde)`, val: mscSaude || null },
+      { label: `RREO A02 Saúde (Empenhadas)`, val: getDespesasSaude_A02(data.rreo) },
+      'Despesas com Saúde divergem entre MSC e RREO Anexo 02.', false
+    ));
+
+    results.push(...validatePairEquality('D4_00031', 'D4',
+      { label: `MSC Dezembro Função 12 (Educação)`, val: mscEducacao || null },
+      { label: `RREO A02 Educação (Empenhadas)`, val: getDespesasEducacao_A02(data.rreo) },
+      'Despesas com Educação divergem entre MSC e RREO Anexo 02.', false
+    ));
+
+    const rreoExcetoIntraTotal = getDespesasExcetoIntra_A02_Empenhadas(data.rreo);
+    const rreoDemais = rreoExcetoIntraTotal !== null
+      ? rreoExcetoIntraTotal - (getDespesasPrevSocial_A02(data.rreo) || 0) - (getDespesasSaude_A02(data.rreo) || 0) - (getDespesasEducacao_A02(data.rreo) || 0)
+      : null;
+
+    results.push(...validatePairEquality('D4_00032', 'D4',
+      { label: `MSC Dezembro Demais Funções`, val: mscDemais || null },
+      { label: `RREO A02 Demais Funções (Estimado)`, val: rreoDemais },
+      'Despesas com Demais Funções divergem entre MSC e RREO Anexo 02.', false
+    ));
+
+    results.push(...validatePairEquality('D4_00033', 'D4',
+      { label: `MSC Dezembro Intraorçamentárias (Mod 91)`, val: mscIntra || null },
+      { label: `RREO A02 Intraorçamentárias (Empenhadas)`, val: getDespesasIntra_A02_Empenhadas(data.rreo) },
+      'Despesas Intraorçamentárias divergem entre MSC e RREO Anexo 02.', false
+    ));
+
   }
 
   // D4_00026: Restos a Pagar Não Processados — MSC dezembro (213xxx) vs RREO Anexo 01 col[10]

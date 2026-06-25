@@ -221,6 +221,22 @@ export const getReservaContingencia_A01 = (rreo: any): number | null =>
 export const getDespesasAnexo02 = (rreo: any): number | null =>
   extractFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], 'DESPESAS.*EXCETO INTRA.*\\(I\\)');
 
+// D4_00030 a D4_00034: Extraindo Despesas Empenhadas (coluna 'Até o Bimestre') do Anexo 02
+export const getDespesasPrevSocial_A02 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], '09.*Previdência|09.*Previdencia', 'Até o Bimestre');
+
+export const getDespesasSaude_A02 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], '10.*Saúde|10.*Saude', 'Até o Bimestre');
+
+export const getDespesasEducacao_A02 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], '12.*Educação|12.*Educacao', 'Até o Bimestre');
+
+export const getDespesasExcetoIntra_A02_Empenhadas = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], 'DESPESAS.*EXCETO INTRA.*\\(I\\)', 'Até o Bimestre');
+
+export const getDespesasIntra_A02_Empenhadas = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], 'DESPESAS.*INTRA.*\\(II\\)', 'Até o Bimestre');
+
 // ─── RREO Anexo 04 (RPPS) ────────────────────────────────────────────────────
 
 // D3_00030: Total receitas do RPPS (Fundo em Capitalização) — Anexo 04
