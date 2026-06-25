@@ -5,7 +5,8 @@ import {
   getDespesasCapital_A01, getDespesasEmpenhadas_SubtotalA01, getDespesasLiquidadas_SubtotalA01,
   getDespesasPagas_SubtotalA01, getRPNP_inscricoes_A01, getReceitasArrecadadasRREO,
   getDespesasPrevSocial_A02, getDespesasSaude_A02, getDespesasEducacao_A02,
-  getDespesasExcetoIntra_A02_Empenhadas, getDespesasIntra_A02_Empenhadas
+  getDespesasExcetoIntra_A02_Empenhadas, getDespesasIntra_A02_Empenhadas,
+  getTributosMunicipais_A03, getTransferenciasMunicipais_A03
 } from '../xmlExtractors';
 
 export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
@@ -142,6 +143,44 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
       { label: `MSC Dezembro Intraorçamentárias (Mod 91)`, val: mscIntra || null },
       { label: `RREO A02 Intraorçamentárias (Empenhadas)`, val: getDespesasIntra_A02_Empenhadas(data.rreo) },
       'Despesas Intraorçamentárias divergem entre MSC e RREO Anexo 02.', false
+    ));
+
+    // D4_00023 e D4_00025: Receitas de Tributos e Transferências Municipais (MSC de dezembro vs RREO Anexo 03)
+    // Tributos Municipais (Impostos, Taxas e Contribuições de Melhoria) = Natureza da Receita iniciando em '11'
+    let mscTributosMunicipais = 0;
+    // Transferências Municipais Constitucionais (FPM, ICMS, IPVA, ITR, FUNDEB) = Natureza iniciando nas categorias de transf
+    let mscTransfMunicipais = 0;
+
+    decMSC.forEach(a => {
+      // Considera apenas as contas de receita arrecadada (6212, 62132, 62139) e Saldo Final
+      if ((a.CONTA.startsWith('6212') || a.CONTA.startsWith('62132') || a.CONTA.startsWith('62139')) && a.Tipo_valor === 'ending_balance') {
+        const nr = a.Natureza_valor || '';
+        // '11' corresponde a Impostos, Taxas e Contribuições de Melhoria
+        if (nr.startsWith('11')) {
+          mscTributosMunicipais += a.Valor;
+        }
+        // Transferências Municipais
+        else if (
+          nr.startsWith('171801') || // FPM
+          nr.startsWith('171806') || // ITR
+          nr.startsWith('172801') || // ICMS / IPVA
+          nr.startsWith('175')       // FUNDEB
+        ) {
+          mscTransfMunicipais += a.Valor;
+        }
+      }
+    });
+
+    results.push(...validatePairEquality('D4_00023', 'D4',
+      { label: `MSC Dezembro Tributos Municipais`, val: mscTributosMunicipais || null },
+      { label: `RREO A03 Tributos Municipais`, val: getTributosMunicipais_A03(data.rreo) },
+      'Receitas de Tributos Municipais divergem entre MSC e RREO Anexo 03.', false
+    ));
+
+    results.push(...validatePairEquality('D4_00025', 'D4',
+      { label: `MSC Dezembro Transf. Municipais (Constitucionais)`, val: mscTransfMunicipais || null },
+      { label: `RREO A03 Transf. Constitucionais Municipais`, val: getTransferenciasMunicipais_A03(data.rreo) },
+      'Receitas de Transferências Constitucionais Municipais divergem entre MSC e RREO Anexo 03.', false
     ));
 
   }

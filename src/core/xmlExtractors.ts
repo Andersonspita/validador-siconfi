@@ -421,7 +421,29 @@ export const getTransfAgentesSaude_RGF_A01 = (rgf: any): number | null =>
   extractFromReport(rgf, ['RGF-Anexo 01', 'RGF Anexo 01'],
     'agentes comunit[aá]rios|198.*§.*11');
 
-// ─── RGF Anexo 05 ────────────────────────────────────────────────────────────
+// D4_00023: Tributos Municipais — RREO Anexo 03
+export const getTributosMunicipais_A03 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'], 'Impostos.*Taxas.*Contribui[çc][õo]es.*Melhoria', 'Até o Bimestre');
+
+// D4_00025: Transferências Constitucionais Municipais — RREO Anexo 03
+export const getTransferenciasMunicipais_A03 = (rreo: any): number | null => {
+  const fpm = extractByColumnFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'], 'Cota-Parte.*FPM', 'Até o Bimestre') || 0;
+  const icms = extractByColumnFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'], 'Cota-Parte.*ICMS', 'Até o Bimestre') || 0;
+  const ipva = extractByColumnFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'], 'Cota-Parte.*IPVA', 'Até o Bimestre') || 0;
+  const itr = extractByColumnFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'], 'Cota-Parte.*ITR', 'Até o Bimestre') || 0;
+  const fundeb = extractByColumnFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'], 'Transfer[êe]ncias.*FUNDEB', 'Até o Bimestre') || 0;
+  const lc87 = extractByColumnFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'], 'Transfer[êe]ncias.*LC.*87', 'Até o Bimestre') || 0;
+  const lc61 = extractByColumnFromReport(rreo, ['RREO-Anexo 03', 'RREO Anexo 03'], 'Transfer[êe]ncias.*LC.*61', 'Até o Bimestre') || 0;
+  
+  const total = fpm + icms + ipva + itr + fundeb + lc87 + lc61;
+  return total > 0 ? total : null;
+};
+
+// ─── RREO Anexo 04 ───────────────────────────────────────────────────────────
+
+// D3_00030: Receitas Previdenciárias no Anexo 04
+export const getReceitasPrevidenciarias_A04 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 04', 'RREO Anexo 04'], 'TOTAL.*RECEITAS.*PREVIDENCI[AÁ]RIAS');
 
 // D3_00008: Restos a pagar não processados inscritos (RGF Anexo 05)
 export const getRPNP_A05_RGF = (rgf: any): number | null =>
