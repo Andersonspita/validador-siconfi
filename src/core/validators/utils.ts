@@ -56,6 +56,19 @@ export const sumAccounts = (
     )
     .reduce((sum, acc) => sum + acc.Valor, 0);
 
+// Calcula o saldo líquido considerando a natureza esperada (D ou C)
+export const getNetBalance = (
+  msc: MSCAccount[],
+  prefixes: string[],
+  tipo: MSCAccount['Tipo_valor'],
+  expectedNature: 'D' | 'C',
+  excludePrefixes: string[] = []
+): number => {
+  const sumD = sumAccounts(msc, prefixes, tipo, 'D', excludePrefixes);
+  const sumC = sumAccounts(msc, prefixes, tipo, 'C', excludePrefixes);
+  return expectedNature === 'D' ? sumD - sumC : sumC - sumD;
+};
+
 // Retorna registros de contas que violam uma natureza esperada no saldo final
 export const findInvertedAccounts = (
   msc: MSCAccount[],

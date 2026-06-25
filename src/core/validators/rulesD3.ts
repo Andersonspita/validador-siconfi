@@ -1,4 +1,4 @@
-import { ValidationResult, RuleDefinition, MSCAccount } from '../types';
+import { ValidationResult, RuleDefinition, ParsedData } from '../types';
 import { validatePairEquality, validateTripleEquality } from './utils';
 import {
   getRCLFromRREO, getRCLFromRGF, extractXLSMetadata, findNegativeValues,
@@ -431,8 +431,17 @@ export function validateD3_Fiscal(rreo: any, rgf: any, _rulesMap: Map<string, Ru
   return results;
 }
 
-export function validateMSC_CAPAG(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+export function validateMSC_CAPAG(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
   const results: ValidationResult[] = [];
+
+  // Encontra a MSC de dezembro (ex: 2024-12, 2025-12)
+  const mscDezembroKey = data.mscPeriods?.find(p => p.endsWith('-12'));
+  const mscDez = mscDezembroKey && data.mscByPeriod ? data.mscByPeriod[mscDezembroKey] : null;
+
+  if (!mscDez) {
+    // A regra D3_00021 exige a MSC de dezembro para calcular o saldo correto de restos a pagar e passivo.
+    return results;
+  }
 
   // D3_00021: Passivo financeiro >= Restos a Pagar (Executivo + RPPS)
   // Passivo financeiro: contas 21 e 22 com atributo F (FP = F)
@@ -440,7 +449,7 @@ export function validateMSC_CAPAG(msc: MSCAccount[], _rulesMap: Map<string, Rule
   let passivoFinanceiro = 0;
   let restosAPagar = 0;
 
-  msc.forEach(acc => {
+  mscDez.forEach(acc => {
     if (acc.Tipo_valor === 'ending_balance') {
       const valor = acc.Natureza_valor === 'C' ? acc.Valor : -acc.Valor;
       // Passivo financeiro = apenas contas 21/22 com atributo F (superávit financeiro)
@@ -460,7 +469,7 @@ export function validateMSC_CAPAG(msc: MSCAccount[], _rulesMap: Map<string, Rule
       description: '',
       severity: 'error',
       impactsCapag: true,
-      message: `Passivo Financeiro (R$ ${passivoFinanceiro.toFixed(2)}) é menor que os Restos a Pagar (R$ ${restosAPagar.toFixed(2)}). Impacta a nota CAPAG.`,
+      message: `Passivo Financeiro (R$ ${passivoFinanceiro.toFixed(2)}) é menor que os Restos a Pagar (R$ ${restosAPagar.toFixed(2)}). A validação (MSC de dezembro) falhou, o que impacta a nota CAPAG.`,
       affectedAccounts: ['21', '22', '212', '213'],
     });
   }

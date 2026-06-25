@@ -12,7 +12,7 @@ export const runValidations = async (data: ParsedData, rulesMap: Map<string, Rul
   if (data.msc) {
     results.push(...validateD1_MSC(data.msc, rulesMap));
     results.push(...validateD2_MSC(data, rulesMap));
-    results.push(...validateMSC_CAPAG(data.msc, rulesMap));
+    results.push(...validateMSC_CAPAG(data, rulesMap));
 
     if (data.mscPeriods?.some(p => { const m = parseInt(p.split('-')[1] ?? '0'); return m > 12 || m === 0; })) {
       results.push(...validateD1_Encerramento(data.msc, rulesMap));

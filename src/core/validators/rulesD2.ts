@@ -1,6 +1,6 @@
 import { getDCAValue, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais, getDCA_DespesasPessoal, getDCA_DespesasCusteio, hasDCA_DespesasFuncao, getDCA_ReceitasTransferencias, getDCA_ReceitasTributarias, checkDCA_ReceitasMenoresDeducoes, getDCA_BensMoveis, getDCA_DepreciacaoMoveis, getDCA_BensImoveis, getDCA_DepreciacaoImoveis, checkDCA_SaldosNegativosNivel, getDCA_DespesasTotais, getDCA_CreditosCurtoLongoPrazo, getDCA_AjustePerdasCreditos, getDCA_DemaisCreditos, getDCA_AjustePerdasDemaisCreditos, getDCA_VPD_Depreciacao, getDCA_PassivoCirculanteFinanceiro, getDCA_PassivoCirculante, getDCA_AjusteDividaAtiva, checkDCA_DeducoesNegativas, getDCA_CreditosPrevidenciarios, getDCA_AtivoIntangivel, getDCA_AmortizacaoIntangivel, getDCA_Estoques, getDCA_AjustePerdasEstoques } from '../xmlExtractors';
 import { ParsedData, ValidationResult, RuleDefinition } from '../types';
-import { sumAccounts } from './utils';
+import { sumAccounts, getNetBalance } from './utils';
 
 export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
   const results: ValidationResult[] = [];
@@ -88,8 +88,8 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
   }
 
   // D2_00083: Integridade DDR — saldo final da classe 721 deve igualar saldo final da classe 821
-  const vlDDR721 = sumAccounts(msc, ['721'], 'ending_balance', 'D');
-  const vlDDR821 = sumAccounts(msc, ['821'], 'ending_balance', 'C');
+  const vlDDR721 = getNetBalance(msc, ['721'], 'ending_balance', 'D');
+  const vlDDR821 = getNetBalance(msc, ['821'], 'ending_balance', 'C');
   if (Math.abs(vlDDR721 - vlDDR821) > 0.01 && (vlDDR721 > 0 || vlDDR821 > 0)) {
     results.push({
       ruleId: 'D2_00083',
