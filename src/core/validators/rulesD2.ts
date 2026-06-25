@@ -1,11 +1,22 @@
-import { getDCAValue, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais, getDCA_DespesasPessoal, getDCA_DespesasCusteio, hasDCA_DespesasFuncao, getDCA_ReceitasTransferencias, getDCA_ReceitasTributarias, checkDCA_ReceitasMenoresDeducoes, getDCA_BensMoveis, getDCA_DepreciacaoMoveis, getDCA_BensImoveis, getDCA_DepreciacaoImoveis, checkDCA_SaldosNegativosNivel, getDCA_DespesasTotais, getDCA_CreditosCurtoLongoPrazo, getDCA_AjustePerdasCreditos, getDCA_DemaisCreditos, getDCA_AjustePerdasDemaisCreditos, getDCA_VPD_Depreciacao, getDCA_PassivoCirculanteFinanceiro, getDCA_PassivoCirculante, getDCA_AjusteDividaAtiva, checkDCA_DeducoesNegativas, getDCA_CreditosPrevidenciarios, getDCA_AtivoIntangivel, getDCA_AmortizacaoIntangivel, getDCA_Estoques, getDCA_AjustePerdasEstoques } from '../xmlExtractors';
+import { getDCAValue, getDCA_ReceitaRealizadaTotal_IC, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais, getDCA_DespesasPessoal, getDCA_DespesasCusteio, hasDCA_DespesasFuncao, getDCA_ReceitasTransferencias, getDCA_ReceitasTributarias, checkDCA_ReceitasMenoresDeducoes, getDCA_BensMoveis, getDCA_DepreciacaoMoveis, getDCA_BensImoveis, getDCA_DepreciacaoImoveis, checkDCA_SaldosNegativosNivel, getDCA_DespesasTotais, getDCA_CreditosCurtoLongoPrazo, getDCA_AjustePerdasCreditos, getDCA_DemaisCreditos, getDCA_AjustePerdasDemaisCreditos, getDCA_VPD_Depreciacao, getDCA_PassivoCirculanteFinanceiro, getDCA_PassivoCirculante, getDCA_AjusteDividaAtiva, checkDCA_DeducoesNegativas, getDCA_CreditosPrevidenciarios, getDCA_AtivoIntangivel, getDCA_AmortizacaoIntangivel, getDCA_Estoques, getDCA_AjustePerdasEstoques } from '../xmlExtractors';
 import { ParsedData, ValidationResult, RuleDefinition } from '../types';
-import { sumAccounts, getNetBalance } from './utils';
+import { sumAccounts, getNetBalance, validateEquilibrioGeral, getPassivoCirculanteNet, prefixMessage } from './utils';
+import {
+  DDR_DEVEDORA_PREFIXES,
+  DDR_CREDORA_PREFIXES,
+  PROVISAO_FERIAS_13_CONTAS,
+  TOLERANCIA_REAIS,
+} from '../pcaspRules';
 
-export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefinition>, periodLabel?: string): ValidationResult[] {
   const results: ValidationResult[] = [];
   const msc = data.msc;
   if (!msc) return [];
+
+  results.push(...validateEquilibrioGeral(msc, periodLabel));
+
+  const pm = (msg: string) => prefixMessage(msg, periodLabel);
+  const isDecember = !periodLabel || periodLabel.endsWith('-12');
 
   // D2_00055: Amortização acumulada de intangíveis (1248) > valor dos intangíveis (124 excl. 1248)
   const vlIntangiveis = sumAccounts(msc, ['124'], 'ending_balance', 'D', ['1248']);
@@ -69,36 +80,42 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
     }
   }
 
-  // D2_00081: Férias e 13º salário sem provisão mensal (211110102 e 211110103)
-  const temFeriasProvisao = msc.some(a => a.CONTA === '211110102' && a.Tipo_valor === 'period_change' && a.Valor > 0);
-  const tem13Provisao = msc.some(a => a.CONTA === '211110103' && a.Tipo_valor === 'period_change' && a.Valor > 0);
-  if (!temFeriasProvisao && !tem13Provisao) {
-    const temPessoal = msc.some(a => a.CONTA.startsWith('311') && a.Tipo_valor === 'period_change' && a.Valor > 0);
-    if (temPessoal) {
+  // D2_00081: Férias, 13º e 13º proporcional — provisão no ending_balance quando há despesa de pessoal
+  const temPessoal = msc.some(a => a.CONTA.startsWith('311') && a.Tipo_valor === 'period_change' && a.Valor > 0);
+  if (temPessoal) {
+    const ausentes = PROVISAO_FERIAS_13_CONTAS.filter(conta =>
+      !msc.some(a => a.CONTA === conta && a.Tipo_valor === 'ending_balance' && a.Valor > 0)
+    );
+    if (ausentes.length > 0) {
       results.push({
         ruleId: 'D2_00081',
         dimension: 'D2',
         description: 'Férias e 13º salário sem provisão registrada',
         severity: 'warning',
         impactsCapag: false,
-        affectedAccounts: ['211110102', '211110103'],
-        message: `Há despesas com pessoal (classe 311) registradas, mas sem provisão de férias (211110102) nem de 13º salário (211110103) no período. Verifique o reconhecimento por competência.`,
+        affectedAccounts: ausentes,
+        message: pm(
+          `Há despesas com pessoal (classe 311), mas sem saldo final de provisão em: ${ausentes.join(', ')}. ` +
+          `Verifique o reconhecimento por competência (MCASP).`
+        ),
       });
     }
   }
 
-  // D2_00083: Integridade DDR — saldo final da classe 721 deve igualar saldo final da classe 821
-  const vlDDR721 = getNetBalance(msc, ['721'], 'ending_balance', 'D');
-  const vlDDR821 = getNetBalance(msc, ['821'], 'ending_balance', 'C');
-  if (Math.abs(vlDDR721 - vlDDR821) > 0.01 && (vlDDR721 > 0 || vlDDR821 > 0)) {
+  // D2_00083: Integridade DDR — subgrupos 7211 (devedora) × 8211 (credora)
+  const vlDDR721 = getNetBalance(msc, DDR_DEVEDORA_PREFIXES, 'ending_balance', 'D');
+  const vlDDR821 = getNetBalance(msc, DDR_CREDORA_PREFIXES, 'ending_balance', 'C');
+  if (Math.abs(vlDDR721 - vlDDR821) > TOLERANCIA_REAIS && (vlDDR721 > 0 || vlDDR821 > 0)) {
     results.push({
       ruleId: 'D2_00083',
       dimension: 'D2',
       description: 'Integridade do DDR (saldo 721 ≠ saldo 821)',
       severity: 'error',
       impactsCapag: false,
-      affectedAccounts: ['721', '821'],
-      message: `Divergência nas contas de controle do DDR. Saldo final 721: R$ ${vlDDR721.toFixed(2)} | Saldo final 821: R$ ${vlDDR821.toFixed(2)}. Os saldos devem ser iguais.`,
+      affectedAccounts: ['7211', '8211'],
+      message: pm(
+        `Divergência nas contas de controle do DDR. Saldo final 7211: R$ ${vlDDR721.toFixed(2)} | Saldo final 8211: R$ ${vlDDR821.toFixed(2)} | Diferença: R$ ${Math.abs(vlDDR721 - vlDDR821).toFixed(2)}.`
+      ),
     });
   }
 
@@ -170,13 +187,13 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
     });
   }
 
-  // D2_00028: Passivo Circulante Financeiro <= Passivo Circulante
-  const vlPCF = msc.filter(a => a.CONTA.startsWith('21') && a.PO === 'F' && a.Tipo_valor === 'ending_balance').reduce((sum, a) => sum + a.Valor, 0);
-  const vlPC = sumAccounts(msc, ['21'], 'ending_balance');
-  if (vlPCF > vlPC + 0.01) {
+  // D2_00028: Passivo Circulante Financeiro (FP=F) <= Passivo Circulante total
+  const vlPCF = getPassivoCirculanteNet(msc, a => a.FP === 'F');
+  const vlPC = getPassivoCirculanteNet(msc);
+  if (vlPCF > vlPC + TOLERANCIA_REAIS) {
     results.push({
       ruleId: 'D2_00028', dimension: 'D2', description: '', severity: 'error', impactsCapag: false,
-      message: `O valor do Passivo Circulante Financeiro (R$ ${vlPCF.toFixed(2)}) não pode ser superior ao Passivo Circulante total (R$ ${vlPC.toFixed(2)}).`
+      message: pm(`O valor do Passivo Circulante Financeiro (R$ ${vlPCF.toFixed(2)}) não pode ser superior ao Passivo Circulante total (R$ ${vlPC.toFixed(2)}).`),
     });
   }
 
@@ -238,26 +255,23 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
   }
 
   
-  // D2_00044: Igualdade das receitas arrecadadas na MSC e Anexo I-C da DCA
-  const vlReceitasMSC = sumAccounts(msc, ['6212'], 'ending_balance', 'C');
-  if (data.dca) {
+  // D2_00044 / D2_00049: Cruzamentos MSC × DCA — apenas MSC de dezembro
+  if (isDecember && data.dca) {
+    const vlReceitasMSC = sumAccounts(msc, ['6212'], 'ending_balance', 'C');
     const vlReceitasDCA = getDCAValue(data.dca, ['DCA-Anexo I-C', 'DCA Anexo I-C'], 'TOTAL DAS RECEITAS|RECEITAS ORÇAMENTÁRIAS', 1);
-    if (vlReceitasDCA !== null && Math.abs(vlReceitasMSC - vlReceitasDCA) > 0.01) {
+    if (vlReceitasDCA !== null && Math.abs(vlReceitasMSC - vlReceitasDCA) > TOLERANCIA_REAIS) {
       results.push({
         ruleId: 'D2_00044', dimension: 'D2', description: '', severity: 'error', impactsCapag: false,
-        message: `Receitas arrecadadas divergem. MSC (6212): R$ ${vlReceitasMSC.toFixed(2)} | DCA Anexo I-C: R$ ${vlReceitasDCA.toFixed(2)}.`
+        message: pm(`Receitas arrecadadas divergem. MSC (6212): R$ ${vlReceitasMSC.toFixed(2)} | DCA Anexo I-C: R$ ${vlReceitasDCA.toFixed(2)}.`),
       });
     }
-  }
 
-  // D2_00049: Despesas empenhadas MSC x DCA Anexo I-D
-  const vlEmpenhadasMSC = sumAccounts(msc, ['62213'], 'ending_balance', 'C');
-  if (data.dca) {
+    const vlEmpenhadasMSC = sumAccounts(msc, ['62213'], 'ending_balance', 'C');
     const vlEmpenhadasDCA = getDCAValue(data.dca, ['DCA-Anexo I-D', 'DCA Anexo I-D'], 'TOTAL DAS DESPESAS', 1);
-    if (vlEmpenhadasDCA !== null && Math.abs(vlEmpenhadasMSC - vlEmpenhadasDCA) > 0.01) {
+    if (vlEmpenhadasDCA !== null && Math.abs(vlEmpenhadasMSC - vlEmpenhadasDCA) > TOLERANCIA_REAIS) {
       results.push({
         ruleId: 'D2_00049', dimension: 'D2', description: '', severity: 'error', impactsCapag: false,
-        message: `Despesas empenhadas divergem. MSC (62213): R$ ${vlEmpenhadasMSC.toFixed(2)} | DCA Anexo I-D: R$ ${vlEmpenhadasDCA.toFixed(2)}.`
+        message: pm(`Despesas empenhadas divergem. MSC (62213): R$ ${vlEmpenhadasMSC.toFixed(2)} | DCA Anexo I-D: R$ ${vlEmpenhadasDCA.toFixed(2)}.`),
       });
     }
   }
@@ -486,6 +500,45 @@ export function validateD2_DCA(dca: any, _rulesMap: Map<string, RuleDefinition>)
   const perdasEstoques = getDCA_AjustePerdasEstoques(dca);
   if (estoques !== null && perdasEstoques !== null && Math.abs(perdasEstoques) > estoques + 0.01) {
     results.push({ ruleId: 'D2_00051', dimension: 'D2', description: '', severity: 'error', impactsCapag: false, message: `O ajuste para perdas (R$ ${Math.abs(perdasEstoques).toFixed(2)}) é maior que o saldo bruto de Estoques (R$ ${estoques.toFixed(2)}) no Anexo I-AB da DCA.` });
+  }
+
+  return results;
+}
+
+export function validateD2_MSC_Encerramento_DCA(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+  const results: ValidationResult[] = [];
+  if (!data.mscByPeriod || !data.dca) return results;
+
+  const encPeriodKey = Object.keys(data.mscByPeriod).find(p => {
+    const m = parseInt(p.split('-')[1] || '0');
+    return m > 12 || m === 0;
+  });
+
+  if (!encPeriodKey) return results;
+
+  const mscEnc = data.mscByPeriod[encPeriodKey];
+
+  // D2_00045: Receitas Arrecadadas (MSC Encerramento vs DCA Anexo I-C)
+  const mscRecArrecadadas = sumAccounts(mscEnc, ['6212', '6213101', '6213102', '62132', '62139'], 'beginning_balance', 'C');
+  const dcaRecArrecadadas = getDCA_ReceitaRealizadaTotal_IC(data.dca) || 0;
+  if (Math.abs(mscRecArrecadadas - dcaRecArrecadadas) > 0.01) {
+    results.push({ ruleId: 'D2_00045', dimension: 'D2', description: '', severity: 'error', impactsCapag: true,
+      message: `Total de receitas arrecadadas diverge entre MSC de Encerramento (R$ ${mscRecArrecadadas.toFixed(2)}) e DCA Anexo I-C (R$ ${dcaRecArrecadadas.toFixed(2)}).` });
+  }
+
+  // (D2_00047 omitida por falta de extrator para Natureza_Receita na MSC)
+
+  // D2_00050: Despesas orçamentárias (MSC Encerramento vs DCA Anexo I-D)
+  // Apenas comparando o total de despesas (empenhadas)
+  const mscDespesasEmpenhadas = mscEnc
+    .filter(a => (a.CONTA.startsWith('62213.01') || a.CONTA === '62213.01.00') && a.Tipo_valor === 'beginning_balance')
+    .reduce((acc, curr) => acc + (curr.Natureza_valor === 'D' ? curr.Valor : -curr.Valor), 0);
+  const dcaDespesasTotais = getDCA_DespesasTotais(data.dca);
+
+  const dcaEmpenhadas = dcaDespesasTotais ? dcaDespesasTotais.empenhadas : 0;
+  if (Math.abs(mscDespesasEmpenhadas - dcaEmpenhadas) > 0.01) {
+    results.push({ ruleId: 'D2_00050', dimension: 'D2', description: '', severity: 'error', impactsCapag: true,
+      message: `Total de despesas empenhadas diverge entre MSC de Encerramento (R$ ${mscDespesasEmpenhadas.toFixed(2)}) e DCA Anexo I-D (R$ ${dcaEmpenhadas.toFixed(2)}).` });
   }
 
   return results;

@@ -25,6 +25,7 @@ export interface ValidationResult {
   affectedAccounts?: string[];
   detailedItems?: DetailedItem[];
   message: string;
+  actionPlan?: string;
 }
 
 export interface XLSReport {

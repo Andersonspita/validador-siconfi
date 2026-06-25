@@ -1,22 +1,35 @@
 import { ParsedData, ValidationResult, RuleDefinition } from '../types';
 import { validateD1_Entrega, validateD1_MSC, validateMultiMonth, validateD1_Encerramento } from './rulesD1';
-import { validateD2_MSC, validateD2_DCA } from './rulesD2';
+import { validateD2_MSC, validateD2_DCA, validateD2_MSC_Encerramento_DCA } from './rulesD2';
 import { validateD3_RREO, validateD3_Fiscal, validateMSC_CAPAG } from './rulesD3';
 import { validateD4_Cruzamentos } from './rulesD4';
+import { findEncerramentoPeriod, isRegularMonthPeriod } from './utils';
 
 export const runValidations = async (data: ParsedData, rulesMap: Map<string, RuleDefinition>): Promise<ValidationResult[]> => {
   const results: ValidationResult[] = [];
 
   results.push(...(await validateD1_Entrega(data, rulesMap)));
 
-  if (data.msc) {
+  if (data.mscByPeriod && Object.keys(data.mscByPeriod).length > 0) {
+    for (const [period, periodMsc] of Object.entries(data.mscByPeriod)) {
+      if (isRegularMonthPeriod(period)) {
+        results.push(...validateD1_MSC(periodMsc, rulesMap, period));
+        results.push(...validateD2_MSC({ ...data, msc: periodMsc }, rulesMap, period));
+      }
+    }
+
+    const encKey = findEncerramentoPeriod(data.mscByPeriod);
+    if (encKey) {
+      results.push(...validateD1_Encerramento(data.mscByPeriod[encKey], rulesMap, encKey));
+      results.push(...validateD2_MSC_Encerramento_DCA(data, rulesMap));
+    }
+  } else if (data.msc) {
     results.push(...validateD1_MSC(data.msc, rulesMap));
     results.push(...validateD2_MSC(data, rulesMap));
-    results.push(...validateMSC_CAPAG(data, rulesMap));
+  }
 
-    if (data.mscPeriods?.some(p => { const m = parseInt(p.split('-')[1] ?? '0'); return m > 12 || m === 0; })) {
-      results.push(...validateD1_Encerramento(data.msc, rulesMap));
-    }
+  if (data.msc) {
+    results.push(...validateMSC_CAPAG(data, rulesMap));
   }
 
   if (data.mscByPeriod && Object.keys(data.mscByPeriod).length >= 2) {
@@ -42,7 +55,7 @@ export const runValidations = async (data: ParsedData, rulesMap: Map<string, Rul
   return results.map(res => {
     const ruleDef = rulesMap.get(res.ruleId);
     if (ruleDef) {
-      res.description = ruleDef.description;
+      if (ruleDef.description) res.description = ruleDef.description;
       res.impactsCapag = ruleDef.impactsCapag;
       res.dimension = ruleDef.dimension;
     }

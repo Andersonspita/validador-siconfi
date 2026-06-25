@@ -9,13 +9,49 @@ const xmlParser = new XMLParser({
   attributeNamePrefix: "@_"
 });
 
-// Auxiliar: registra um lote de contas MSC no resultado
+/** Lê texto do arquivo tentando UTF-8, depois Windows-1252 / ISO-8859-1. */
+export async function readTextWithEncoding(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  const tryDecode = (label: string): string | null => {
+    try {
+      const text = new TextDecoder(label).decode(bytes);
+      if (text.includes('CONTA;') || text.includes('conta;')) return text.replace(/^\uFEFF/, '');
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  return (
+    tryDecode('utf-8') ??
+    tryDecode('windows-1252') ??
+    tryDecode('iso-8859-1') ??
+    new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/, '')
+  );
+}
+
+const normalizeEnteId = (raw: string): string =>
+  raw.replace(/[^0-9]/g, '').slice(0, 7);
+
 const storeMSC = (result: ParsedData, parsed: MSCAccount[], period: string | null) => {
-  result.msc = result.msc ? result.msc.concat(parsed) : parsed;
   if (period) {
-    result.mscPeriods!.push(period);
+    if (!result.mscPeriods!.includes(period)) {
+      result.mscPeriods!.push(period);
+    }
     if (!result.mscByPeriod) result.mscByPeriod = {};
     result.mscByPeriod[period] = parsed;
+    result.anoReferencia = period.split('-')[0];
+  } else {
+    result.msc = result.msc ? result.msc.concat(parsed) : parsed;
+  }
+};
+
+const rebuildAggregatedMsc = (result: ParsedData) => {
+  if (result.mscByPeriod && Object.keys(result.mscByPeriod).length > 0) {
+    result.msc = Object.values(result.mscByPeriod).flat();
+    result.mscPeriods = Object.keys(result.mscByPeriod).sort();
   }
 };
 
@@ -24,7 +60,7 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
 
   for (const file of files) {
     if (file.name.endsWith('.csv')) {
-      const text = await file.text();
+      const text = await readTextWithEncoding(file);
       const { accounts, period, enteId } = parseMSCWithMeta(text);
       if (enteId) result.enteId = enteId;
       storeMSC(result, await accounts, period);
@@ -38,14 +74,14 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
         const lname = filename.toLowerCase();
 
         if (lname.endsWith('.xml')) {
-          const xmlText = await zipEntry.async("string");
+          const xmlText = await zipEntry.async('string');
           const parsedXml = xmlParser.parse(xmlText);
           if (lname.includes('rreo')) result.rreo = parsedXml;
           else if (lname.includes('rgf')) result.rgf = parsedXml;
           else if (lname.includes('dca')) result.dca = parsedXml;
 
         } else if (lname.endsWith('.csv')) {
-          const csvText = await zipEntry.async("string");
+          const csvText = await zipEntry.async('string');
           const { accounts, period, enteId } = parseMSCWithMeta(csvText);
           if (enteId) result.enteId = enteId;
           storeMSC(result, await accounts, period);
@@ -74,21 +110,20 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
     }
   }
 
+  rebuildAggregatedMsc(result);
   return result;
 };
 
-// Extrai o período (YYYY-MM) do cabeçalho do CSV da MSC antes de parsear as contas.
-// Formato esperado da linha 1: "Codigo de Instituicao Siconfi;YYYY-MM;..."
-const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; period: string | null; enteId: string | null } => {
+export const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; period: string | null; enteId: string | null } => {
   const lines = csvText.split(/\r?\n/);
   let period: string | null = null;
   let enteId: string | null = null;
 
-  // Tenta extrair período da primeira linha antes do cabeçalho CONTA
   if (lines.length > 0) {
     const firstLineParts = lines[0].split(';');
     if (firstLineParts.length >= 2) {
-      enteId = firstLineParts[0].trim();
+      const rawEnte = firstLineParts[0].trim();
+      enteId = normalizeEnteId(rawEnte) || rawEnte;
       const candidate = firstLineParts[1].trim();
       if (/^\d{4}-\d{2}$/.test(candidate)) period = candidate;
     }
@@ -110,6 +145,18 @@ const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; p
             return v === '' ? undefined : v;
           };
 
+          const parseValor = (raw: string | undefined): number => {
+            if (!raw) return 0;
+            const s = raw.trim();
+            if (/e/i.test(s)) return parseFloat(s.replace(',', '.')) || 0;
+            // Formato BR: 1.234,56 — remove separador de milhar e troca vírgula decimal
+            if (s.includes(',')) {
+              return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+            }
+            // Formato SICONFI: 51729049.40
+            return parseFloat(s) || 0;
+          };
+
           const conta = getVal('CONTA') ?? '';
           const isDespOrcamentaria = conta.startsWith('622');
 
@@ -129,9 +176,8 @@ const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; p
           let co = findIcByTipo('CO') ?? getVal('CO');
           let nd = findIcByTipo('ND') ?? getVal('ND');
 
-          // Fallbacks heurísticos caso a planilha NÃO possua colunas TIPO e seja baseada nos índices legados
           const hasTipoCols = Object.keys(row).some(k => k.toUpperCase().startsWith('TIPO') && k.toUpperCase() !== 'TIPO_VALOR');
-          
+
           if (!hasTipoCols) {
             if (!po) po = getVal('IC1');
             if (!fp && !isDespOrcamentaria) fp = getVal('IC2');
@@ -141,17 +187,21 @@ const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccount[]>; p
             if (!nd && isDespOrcamentaria) nd = getVal('IC5');
           }
 
+          const valorRaw = getVal('VALOR') ?? getVal('Valor');
+          const tipoRaw = getVal('TIPO_VALOR') ?? getVal('Tipo_valor');
+          const naturezaRaw = getVal('NATUREZA_VALOR') ?? getVal('Natureza_valor');
+
           return {
-            CONTA: getVal('CONTA') ?? '',
+            CONTA: conta,
             PO: po,
             FP: fp,
             FS: fs,
             FR: fr,
             CO: co,
             ND: nd,
-            Valor: parseFloat(String(getVal('Valor') || '0').replace(',', '.')),
-            Tipo_valor: getVal('Tipo_valor') as MSCAccount['Tipo_valor'],
-            Natureza_valor: getVal('Natureza_valor') as MSCAccount['Natureza_valor'],
+            Valor: parseValor(valorRaw),
+            Tipo_valor: tipoRaw as MSCAccount['Tipo_valor'],
+            Natureza_valor: naturezaRaw as MSCAccount['Natureza_valor'],
           };
         });
         resolve(data);

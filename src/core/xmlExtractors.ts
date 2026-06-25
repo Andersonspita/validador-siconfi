@@ -234,6 +234,9 @@ export const getDespesasEducacao_A02 = (rreo: any): number | null =>
 export const getDespesasExcetoIntra_A02_Empenhadas = (rreo: any): number | null =>
   extractByColumnFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], 'DESPESAS.*EXCETO INTRA.*\\(I\\)', 'Até o Bimestre');
 
+export const getDespesasExcetoIntra_A02_Liquidadas = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], 'DESPESAS.*EXCETO INTRA.*\\(I\\)', 'Despesas Liquidadas.*Bimestre');
+
 export const getDespesasIntra_A02_Empenhadas = (rreo: any): number | null =>
   extractByColumnFromReport(rreo, ['RREO-Anexo 02', 'RREO Anexo 02'], 'DESPESAS.*INTRA.*\\(II\\)', 'Até o Bimestre');
 
@@ -246,6 +249,11 @@ export const getTotalReceitasRPPS_A04 = (rreo: any): number | null =>
 // D3_00030: Receitas com fontes RPPS no Anexo 06 (soma das linhas com FONTES RPPS)
 export const getReceitasRPPS_A06 = (rreo: any): number | null =>
   extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RECEITAS PRIMÁRIAS CORRENTES.*COM FONTES RPPS.*\\(V\\)|RECEITAS.*COM FONTES RPPS.*\\(V\\)');
+export const getRGF_PisoEnfermagem = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 01', 'RGF Anexo 01', 'Anexo 1'], 'Parcela dedut.vel referente ao piso salarial do Enfermeir');
+// D4_00045: Recursos Extraorçamentários (RGF Anexo 07)
+export const getRecursosExtraorcamentarios_A07_RGF = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 07', 'RGF Anexo 07', 'Anexo 07', 'Anexo 7'], 'Recursos Extraorçamentários');
 
 // D3_00032: Recursos RPPS exercícios anteriores — Anexo 04
 // O valor fica em linha "  VALOR" abaixo do cabeçalho de seção
@@ -849,3 +857,55 @@ export const getContribuicoesServidores_A03 = (rreo: any): number | null =>
 
 export const getDespesasCapital_A09 = (rreo: any): number | null =>
   extractByColumnFromReport(rreo, ['RREO-Anexo 09', 'RREO Anexo 09'], 'DESPESAS DE CAPITAL', 'Despesas Empenhadas');
+
+// ─── Lote 7: D4_00028, D4_00036, D4_00037, D4_00043 (Caixa e Consórcios RGF/DCA) ───
+export const getDCA_CaixaEquivalentes = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '^[1-9]\\.1\\.1\\.0\\.0\\.00\\.00|^1\\.1\\.1\\..*Caixa e Equivalentes');
+
+export const getDisponibilidadeCaixaBruta_A02_RGF = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 02', 'RGF Anexo 02'], 'Disponibilidade de Caixa Bruta');
+
+export const getDisponibilidadeCaixaBruta_A05_RGF = (rgf: any): number | null => {
+  let val = extractFromReport(rgf, ['RGF-Anexo 05', 'RGF Anexo 05'], 'TOTAL DA DISPONIBILIDADE DE CAIXA E EQUIVALENTES DE CAIXA');
+  if (val === null) {
+    const v1 = getCaixaTotal_A05_RGF(rgf) || 0;
+    const v2 = getCaixaTotalNaoVinculado_A05_RGF(rgf) || 0;
+    if (v1 || v2) val = v1 + v2;
+  }
+  return val;
+};
+
+export const getConsorciosPublicos_A05_RGF = (rgf: any): number | null =>
+  extractFromReport(rgf, ['RGF-Anexo 05', 'RGF Anexo 05'], 'Cons[óo]rcios P[úu]blicos|Valores vinculados a cons[óo]rcios p[úu]blicos');
+
+// ─── Lote Final: D4 DCA vs RREO ───
+export const getDCA_ReceitaRealizadaTotal_IC = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-C', 'Anexo I-C'], 'TOTAL DAS RECEITAS', 'Receitas Brutas Realizadas|Receitas.*Realizadas');
+
+export const getTotalReceitas_A01 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'TOTAL DAS RECEITAS', 'At[ée] o Bimestre|Bimestre');
+
+export const getDCA_DespesaFuncaoExcetoIntra_IE = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-E', 'Anexo I-E'], 'TOTAL.*EXCETO INTRA', 'Despesas Liquidadas');
+
+export const getDCA_RP_Pagos_IF = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-F', 'Anexo I-F'], 'TOTAL', 'Pagos');
+
+export const getDCA_RPNP_Pagos_IG = (dca: any): number | null =>
+  extractByColumnFromReport(dca, ['DCA-Anexo I-G', 'Anexo I-G'], 'TOTAL', 'Pagos');
+
+export const getTotalRPPagos_A07_RPP = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'RESTOS A PAGAR PROCESSADOS.*\(I\)', 'Pagos');
+
+export const getTotalRPPagos_A07_RPNP = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'RESTOS A PAGAR N[ÃA]O PROCESSADOS.*\(II\)', 'Pagos');
+
+export const getDCA_PassivoFinanceiro = (dca: any): number | null =>
+  getDCAValue(dca, ['DCA-Anexo I-AB', 'Anexo I-AB'], '^2\\.1\\.0\\.0\\.0\\.00\\.00.*Financeiro');
+
+export const getTotalRPInscritos_A07 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'TOTAL\\s*\\(III\\)\\s*=\\s*\\(I\\s*\\+\\s*II\\)', 'Inscritos.*Exerc[ií]cios Anteriores');
+
+export const getTotalRPInscritos31Dez_A07 = (rreo: any): number | null =>
+  extractByColumnFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'TOTAL\\s*\\(III\\)\\s*=\\s*\\(I\\s*\\+\\s*II\\)', 'Inscritos.*31 de dezembro');
+

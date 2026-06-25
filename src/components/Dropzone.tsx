@@ -22,11 +22,11 @@ export default function Dropzone({ onFilesDropped }: DropzoneProps) {
 
   const processFiles = (fileList: FileList | File[]) => {
     const validFiles = Array.from(fileList).filter(f => 
-      f.name.endsWith('.csv') || f.name.endsWith('.zip') || f.name.endsWith('.xml')
+      f.name.endsWith('.csv') || f.name.endsWith('.zip') || f.name.endsWith('.xml') || f.name.endsWith('.xls') || f.name.endsWith('.xlsx')
     );
     
     if (validFiles.length === 0) {
-      setError("Por favor, envie apenas arquivos CSV (MSC) ou ZIP/XML (RREO, RGF, DCA).");
+      setError("Por favor, envie apenas arquivos CSV (MSC), planilhas XLS/XLSX ou ZIP/XML (RREO, RGF, DCA).");
       return;
     }
     
@@ -58,12 +58,12 @@ export default function Dropzone({ onFilesDropped }: DropzoneProps) {
       >
         <UploadCloud className="upload-icon" size={64} />
         <h3>Arraste e solte seus arquivos aqui</h3>
-        <p>Ou clique para selecionar. Aceitamos arquivos da <strong>MSC (.csv)</strong>, e <strong>RREO/RGF/DCA (.zip, .xml)</strong>.</p>
+        <p>Ou clique para selecionar. Aceitamos arquivos da <strong>MSC (.csv)</strong>, e <strong>RREO/RGF/DCA (.zip, .xml, .xls)</strong>.</p>
         
         <input 
           type="file" 
           multiple 
-          accept=".csv,.zip,.xml" 
+          accept=".csv,.zip,.xml,.xls,.xlsx" 
           id="file-upload" 
           className="file-input"
           onChange={handleFileInput}

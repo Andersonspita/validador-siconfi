@@ -1,5 +1,13 @@
 import { ParsedData, ValidationResult, MSCAccount, RuleDefinition } from '../types';
-import { findInvertedAccounts, buildInvertedItems } from './utils';
+import { findInvertedAccounts, buildInvertedItems, mscAccountKey, prefixMessage } from './utils';
+import {
+  ATIVO_NATUREZA_D_PREFIXES,
+  ATIVO_RETIFICADORA_PREFIXES,
+  PASSIVO_NATUREZA_C_PREFIXES,
+  PL_NATUREZA_C_PREFIXES,
+  PL_DEDUCAO_PREFIXES,
+  ORCAM_NATUREZA_EXCEPTION_PREFIXES,
+} from '../pcaspRules';
 import { getExtratoEntregas } from '../../services/siconfiApi';
 
 export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): Promise<ValidationResult[]> {
@@ -27,9 +35,11 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
       // DCA: 30 de abril do ano seguinte
       
       const missingHomologados = ausentes.filter(rep => {
-        // Se falta localmente, vamos ver se pelo menos tá homologado na API
-        const noSiconfi = entregas.find(e => e.relatorio.includes(rep) && e.status_relatorio.toLowerCase().includes('homologado'));
-        return !noSiconfi; // se não achou no siconfi também, aí é problema
+        const noSiconfi = entregas.find(e =>
+          e.relatorio?.includes(rep) &&
+          e.status_relatorio?.toLowerCase().includes('homologado')
+        );
+        return !noSiconfi;
       });
 
       if (missingHomologados.length > 0 && (temMSC || temRREO || temRGF || temDCA)) {
@@ -90,6 +100,22 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
     }
   }
 
+  // Regras de Servidor Siconfi (Homologação, Tempestividade e Retificações)
+  const serverRules = [
+    'D1_00002', 'D1_00003', 'D1_00004', 'D1_00005', 'D1_00006', 'D1_00007', 'D1_00008',
+    'D1_00009', 'D1_00010', 'D1_00011', 'D1_00012', 'D1_00013', 'D1_00014', 'D1_00015'
+  ];
+  serverRules.forEach(ruleId => {
+    results.push({
+      ruleId,
+      dimension: 'D1',
+      description: 'Regra validada exclusivamente pelo servidor',
+      severity: 'info',
+      impactsCapag: false,
+      message: `Esta regra refere-se a metadados do servidor do Siconfi (homologação, tempestividade ou retificações) e não pode ser validada offline apenas com os arquivos. Consulte o painel oficial para o status.`,
+    });
+  });
+
   // D1_00016: verifica se todas as MSCs do exercício foram enviadas localmente
   if (temMSC && data.mscPeriods && data.mscPeriods.length > 0) {
     const periods = data.mscPeriods;
@@ -121,8 +147,9 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
   return results;
 }
 
-export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition>, periodLabel?: string): ValidationResult[] {
   const results: ValidationResult[] = [];
+  const pm = (msg: string) => prefixMessage(msg, periodLabel);
 
   // D1_00019: PO (Poder/Órgão) com formato inválido
   // O PO deve ser um código de 5 dígitos numéricos e iniciar com 1 (Legislativo), 2 (Executivo), 3 (Judiciário), 4 (MP), 5 (Defensoria) ou 6 (Outros).
@@ -182,7 +209,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   // D1_00018: SI + MOV <> SF
   const accountsMap = new Map<string, { si: number; mov: number; sf: number }>();
   msc.forEach(acc => {
-    const key = `${acc.CONTA}-${acc.PO}-${acc.FR}-${acc.CO}`;
+    const key = mscAccountKey(acc);
     if (!accountsMap.has(key)) accountsMap.set(key, { si: 0, mov: 0, sf: 0 });
     const entry = accountsMap.get(key)!;
     const signed = acc.Natureza_valor === 'C' ? -acc.Valor : acc.Valor;
@@ -196,11 +223,11 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   accountsMap.forEach((vals, key) => {
     const diff = Math.abs((vals.si + vals.mov) - vals.sf);
     if (diff > 0.01) {
-      const parts = key.split('-');
+      const parts = key.split('|');
       inconsistentAccounts.push(parts[0]);
       const fmt = (v: number) => Math.abs(v).toFixed(2) + (v < 0 ? 'C' : 'D');
       detailedInconsistencies.push({
-        conta: parts[0], po: parts[1], fr: parts[2], co: parts[3],
+        conta: parts[0], po: parts[1], fr: parts[4], co: parts[5],
         detalhe: `SI: ${fmt(vals.si)} | MOV: ${fmt(vals.mov)} | SF Esp: ${fmt(vals.si + vals.mov)} | SF Inf: ${fmt(vals.sf)} | Dif: ${diff.toFixed(2)}`,
       });
     }
@@ -214,58 +241,55 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
       impactsCapag: false,
       affectedAccounts: Array.from(new Set(inconsistentAccounts)),
       detailedItems: detailedInconsistencies,
-      message: `${inconsistentAccounts.length} conta(s) com movimentação inconsistente (SI + MOV ≠ SF).`,
+      message: pm(`${inconsistentAccounts.length} lançamento(s) com movimentação inconsistente (SI + MOV ≠ SF).`),
     });
   }
 
-  // D1_00021: Ativo com saldo invertido (grupos 1111, 1121, 1125, 1231, 1232) — natureza padrão D
-  const activePrefixes = ['1111', '1121', '1125', '1231', '1232'];
-  const activeInverted = findInvertedAccounts(msc, activePrefixes, 'D');
+  // D1_00021: Ativo com saldo invertido — exclui contas retificadoras (depreciação acumulada)
+  const activeInverted = findInvertedAccounts(msc, ATIVO_NATUREZA_D_PREFIXES, 'D', ATIVO_RETIFICADORA_PREFIXES);
   if (activeInverted.length > 0) {
+    const uniqueContas = Array.from(new Set(activeInverted.map(a => a.CONTA)));
     results.push({
       ruleId: 'D1_00021',
       dimension: 'D1',
       description: 'Contas do ativo com saldo invertido',
       severity: 'warning',
       impactsCapag: false,
-      affectedAccounts: Array.from(new Set(activeInverted.map(a => a.CONTA))),
+      affectedAccounts: uniqueContas,
       detailedItems: buildInvertedItems(activeInverted, 'D'),
-      message: `${activeInverted.length} conta(s) do ativo (grupos 1111/1121/1125/1231/1232) com natureza Credora (C). Natureza padrão: Devedora (D).`,
+      message: pm(`${activeInverted.length} registro(s) / ${uniqueContas.length} conta(s) PCASP do ativo com natureza Credora (C). Natureza padrão: Devedora (D).`),
     });
   }
 
   // D1_00025: Passivo circulante/não-circulante com saldo invertido — natureza padrão C
-  const passivoPrefixes = [
-    '2111','2112','2113','2114','2121','2122','2123','2124','2125','2126',
-    '213','214','215','221','222','223',
-  ];
-  const passivoInverted = findInvertedAccounts(msc, passivoPrefixes, 'C');
+  const passivoInverted = findInvertedAccounts(msc, PASSIVO_NATUREZA_C_PREFIXES, 'C');
   if (passivoInverted.length > 0) {
+    const uniqueContas = Array.from(new Set(passivoInverted.map(a => a.CONTA)));
     results.push({
       ruleId: 'D1_00025',
       dimension: 'D1',
       description: 'Contas do passivo com saldo invertido',
       severity: 'warning',
       impactsCapag: false,
-      affectedAccounts: Array.from(new Set(passivoInverted.map(a => a.CONTA))),
+      affectedAccounts: uniqueContas,
       detailedItems: buildInvertedItems(passivoInverted, 'C'),
-      message: `${passivoInverted.length} conta(s) do passivo com natureza Devedora (D). Natureza padrão: Credora (C).`,
+      message: pm(`${passivoInverted.length} registro(s) / ${uniqueContas.length} conta(s) do passivo com natureza Devedora (D). Natureza padrão: Credora (C).`),
     });
   }
 
-  // D1_00026: Patrimônio líquido com saldo invertido — natureza padrão C
-  const plPrefixes = ['2311','2312','232','233','234','235','236'];
-  const plInverted = findInvertedAccounts(msc, plPrefixes, 'C');
+  // D1_00026: Patrimônio líquido com saldo invertido — exclui deduções do PL (natureza D legítima)
+  const plInverted = findInvertedAccounts(msc, PL_NATUREZA_C_PREFIXES, 'C', PL_DEDUCAO_PREFIXES);
   if (plInverted.length > 0) {
+    const uniqueContas = Array.from(new Set(plInverted.map(a => a.CONTA)));
     results.push({
       ruleId: 'D1_00026',
       dimension: 'D1',
       description: 'Contas de patrimônio líquido com saldo invertido',
       severity: 'warning',
       impactsCapag: false,
-      affectedAccounts: Array.from(new Set(plInverted.map(a => a.CONTA))),
+      affectedAccounts: uniqueContas,
       detailedItems: buildInvertedItems(plInverted, 'C'),
-      message: `${plInverted.length} conta(s) do Patrimônio Líquido com natureza Devedora (D). Natureza padrão: Credora (C).`,
+      message: pm(`${plInverted.length} registro(s) / ${uniqueContas.length} conta(s) do Patrimônio Líquido com natureza Devedora (D). Natureza padrão: Credora (C).`),
     });
   }
 
@@ -302,6 +326,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   // D1_00029: Contas de receita (6211, 6212, 6213) sem FR
   const receitaSemFR = msc.filter(acc =>
     (acc.CONTA.startsWith('6211') || acc.CONTA.startsWith('6212') || acc.CONTA.startsWith('6213')) &&
+    acc.Tipo_valor === 'ending_balance' && acc.Valor > 0 &&
     (!acc.FR || acc.FR.trim() === '' || acc.FR.trim() === '0000')
   );
   if (receitaSemFR.length > 0) {
@@ -320,6 +345,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   // D1_00030: Contas de receita (6211, 6212, 6213) sem natureza de receita (CO)
   const receitaSemCO = msc.filter(acc =>
     (acc.CONTA.startsWith('6211') || acc.CONTA.startsWith('6212') || acc.CONTA.startsWith('6213')) &&
+    acc.Tipo_valor === 'ending_balance' && acc.Valor > 0 &&
     (!acc.CO || acc.CO.trim() === '' || acc.CO.trim() === '0000')
   );
   if (receitaSemCO.length > 0) {
@@ -356,6 +382,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   // D1_00031: Contas de despesa (62213) sem natureza de despesa (ND = IC5)
   const despesaSemND = msc.filter(acc =>
     acc.CONTA.startsWith('62213') &&
+    acc.Tipo_valor === 'ending_balance' && acc.Valor > 0 &&
     (!acc.ND || acc.ND.trim() === '' || acc.ND === '00000000')
   );
   if (despesaSemND.length > 0) {
@@ -374,6 +401,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   // D1_00032: Contas de despesa (622xxx) sem função/subfunção (FS = IC2)
   const despesaSemFS = msc.filter(acc =>
     acc.CONTA.startsWith('622') &&
+    acc.Tipo_valor === 'ending_balance' && acc.Valor > 0 &&
     (!acc.FS || acc.FS.trim() === '' || acc.FS.trim() === '00000')
   );
   if (despesaSemFS.length > 0) {
@@ -392,6 +420,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   // D1_00033: Contas de despesa (62213) sem fonte de recurso (FR)
   const despesaSemFR = msc.filter(acc =>
     acc.CONTA.startsWith('62213') &&
+    acc.Tipo_valor === 'ending_balance' && acc.Valor > 0 &&
     (!acc.FR || acc.FR.trim() === '' || acc.FR.trim() === '0000')
   );
   if (despesaSemFR.length > 0) {
@@ -461,10 +490,14 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
     });
   }
 
-  // D1_00038: Classe 5/6 com saldo invertido — natureza padrão por grupo
-  // 511/621 = previsão/arrecadação de receita → C; 512/622 = fixação/execução de despesa → D
-  const orcamInvertedC = findInvertedAccounts(msc, ['511', '621'], 'C');
-  const orcamInvertedD = findInvertedAccounts(msc, ['512', '622'], 'D');
+  // D1_00038: Classe 5/6 com saldo invertido — exclui contas de cancelamento/estorno legítimos
+  const isOrcamException = (conta: string) =>
+    ORCAM_NATUREZA_EXCEPTION_PREFIXES.some(p => conta.startsWith(p));
+
+  const orcamInvertedC = findInvertedAccounts(msc, ['511', '621'], 'C')
+    .filter(a => !isOrcamException(a.CONTA));
+  const orcamInvertedD = findInvertedAccounts(msc, ['512', '622'], 'D')
+    .filter(a => !isOrcamException(a.CONTA));
   const orcamInverted = [...orcamInvertedC, ...orcamInvertedD];
   if (orcamInverted.length > 0) {
     results.push({
@@ -478,15 +511,16 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
         const esperado = a.CONTA.startsWith('511') || a.CONTA.startsWith('621') ? 'C' : 'D';
         return { conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: `Natureza informada: ${a.Natureza_valor} (esperado: ${esperado})` };
       }),
-      message: `${orcamInverted.length} conta(s) orçamentária(s) (classes 5/6) com natureza diferente do padrão PCASP.`,
+      message: pm(`${orcamInverted.length} conta(s) orçamentária(s) (classes 5/6) com natureza diferente do padrão PCASP.`),
     });
   }
 
   return results;
 }
 
-export function validateD1_Encerramento(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+export function validateD1_Encerramento(msc: MSCAccount[], _rulesMap: Map<string, RuleDefinition>, periodLabel?: string): ValidationResult[] {
   const results: ValidationResult[] = [];
+  const pm = (msg: string) => prefixMessage(msg, periodLabel);
 
   // D1_00036: MSC de encerramento não pode ter saldo final nas contas de VPA (classe 4) e VPD (classe 3)
   const vpaVpdComSaldo = msc.filter(acc =>
@@ -506,7 +540,7 @@ export function validateD1_Encerramento(msc: MSCAccount[], _rulesMap: Map<string
         conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor,
         detalhe: `Natureza: ${a.Natureza_valor} | As contas de resultado (VPA/VPD) devem ser zeradas no encerramento`,
       })),
-      message: `${vpaVpdComSaldo.length} conta(s) de VPA (classe 4) ou VPD (classe 3) com saldo final diferente de zero na MSC de encerramento. O encerramento exige que essas contas sejam zeradas.`,
+      message: pm(`${vpaVpdComSaldo.length} conta(s) de VPA (classe 4) ou VPD (classe 3) com saldo final diferente de zero na MSC de encerramento. O encerramento exige que essas contas sejam zeradas.`),
     });
   }
 
@@ -551,23 +585,61 @@ export function validateMultiMonth(
     const prevMsc = mscByPeriod[prevPeriod];
     const currMsc = mscByPeriod[currPeriod];
 
-    const accsPrev = prevMsc.filter(a => a.CONTA.startsWith('1') || a.CONTA.startsWith('2'));
-    
-    // D2_00077 etc... (Simplified re-implementation for now)
-    for (const pAcc of accsPrev) {
-      const cAcc = currMsc.find(a => a.CONTA === pAcc.CONTA);
-      if (cAcc && cAcc.Tipo_valor === 'beginning_balance' && pAcc.Tipo_valor === 'ending_balance') {
-         if (Math.abs(cAcc.Valor - pAcc.Valor) > 0.01) {
-             results.push({
-               ruleId: 'D2_00077',
-               dimension: 'D2',
-               description: 'Validação de saldo inicial x final',
-               severity: 'error',
-               impactsCapag: false,
-               message: `Conta ${pAcc.CONTA}: O saldo final de ${prevPeriod} (R$ ${pAcc.Valor}) difere do saldo inicial de ${currPeriod} (R$ ${cAcc.Valor}).`
-             });
-         }
+    // D1_00023: Envio de MSCs com dados do poder executivo iguais entre meses diferentes
+    const prevExec = prevMsc.filter(a => a.PO?.startsWith('2'));
+    const currExec = currMsc.filter(a => a.PO?.startsWith('2'));
+    if (prevExec.length > 0 && currExec.length > 0 && prevExec.length === currExec.length) {
+      const same = prevExec.every((p, idx) => p.CONTA === currExec[idx].CONTA && p.Valor === currExec[idx].Valor);
+      if (same) {
+        results.push({
+          ruleId: 'D1_00023', dimension: 'D1', description: 'MSCs idênticas do Executivo', severity: 'warning', impactsCapag: false,
+          message: `Os dados do Poder Executivo nas MSCs de ${prevPeriod} e ${currPeriod} são exatamente iguais.`
+        });
       }
+    }
+
+    // D1_00024: Envio de MSCs com dados do legislativo iguais entre meses diferentes
+    const prevLeg = prevMsc.filter(a => a.PO?.startsWith('1'));
+    const currLeg = currMsc.filter(a => a.PO?.startsWith('1'));
+    if (prevLeg.length > 0 && currLeg.length > 0 && prevLeg.length === currLeg.length) {
+      const same = prevLeg.every((p, idx) => p.CONTA === currLeg[idx].CONTA && p.Valor === currLeg[idx].Valor);
+      if (same) {
+        results.push({
+          ruleId: 'D1_00024', dimension: 'D1', description: 'MSCs idênticas do Legislativo', severity: 'warning', impactsCapag: false,
+          message: `Os dados do Poder Legislativo nas MSCs de ${prevPeriod} e ${currPeriod} são exatamente iguais.`
+        });
+      }
+    }
+
+    const accsPrev = prevMsc.filter(a => a.CONTA.startsWith('1') || a.CONTA.startsWith('2'));
+    let hasDiff = false;
+
+    for (const pAcc of accsPrev) {
+      if (pAcc.Tipo_valor !== 'ending_balance') continue;
+      const cAcc = currMsc.find(a => mscAccountKey(a) === mscAccountKey(pAcc) && a.Tipo_valor === 'beginning_balance');
+      if (cAcc) {
+        const sfPrev = pAcc.Natureza_valor === 'C' ? -pAcc.Valor : pAcc.Valor;
+        const siCurr = cAcc.Natureza_valor === 'C' ? -cAcc.Valor : cAcc.Valor;
+        if (Math.abs(siCurr - sfPrev) > 0.01) {
+          hasDiff = true;
+          results.push({
+            ruleId: 'D2_00077',
+            dimension: 'D2',
+            description: 'Validação de saldo inicial x final',
+            severity: 'error',
+            impactsCapag: false,
+            message: `Conta ${pAcc.CONTA}: O saldo final de ${prevPeriod} (R$ ${Math.abs(sfPrev).toFixed(2)}${sfPrev < 0 ? 'C' : 'D'}) difere do saldo inicial de ${currPeriod} (R$ ${Math.abs(siCurr).toFixed(2)}${siCurr < 0 ? 'C' : 'D'}).`,
+          });
+        }
+      }
+    }
+
+    // D1_00020: Envio de MSCs com diferenças nos saldos entre meses diferentes
+    if (hasDiff) {
+      results.push({
+        ruleId: 'D1_00020', dimension: 'D1', description: 'Diferença de saldos entre meses', severity: 'error', impactsCapag: true,
+        message: `Foram encontradas diferenças entre os saldos finais de ${prevPeriod} e os saldos iniciais de ${currPeriod} (ver detalhes na D2_00077).`
+      });
     }
   }
 

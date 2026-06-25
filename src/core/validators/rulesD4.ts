@@ -5,17 +5,75 @@ import {
   getDespesasCapital_A01, getDespesasEmpenhadas_SubtotalA01, getDespesasLiquidadas_SubtotalA01,
   getDespesasPagas_SubtotalA01, getRPNP_inscricoes_A01, getReceitasArrecadadasRREO,
   getDespesasPrevSocial_A02, getDespesasSaude_A02, getDespesasEducacao_A02,
-  getDespesasExcetoIntra_A02_Empenhadas, getDespesasIntra_A02_Empenhadas,
+  getDespesasExcetoIntra_A02_Empenhadas, getDespesasExcetoIntra_A02_Liquidadas, getDespesasIntra_A02_Empenhadas,
   getTributosMunicipais_A03, getTransferenciasMunicipais_A03,
   getDCA_ReceitasAlienacao, getDCA_TransferenciasMunicipais,
   getDCA_ContribuicoesServidores, getDCA_DespesasCapital, getReceitasAlienacao_A11,
   getTributosMunicipais_A06, getTransferenciasMunicipais_A06,
   getContribuicoesServidores_A03, getDespesasCapital_A09, getDCA_DespesasTotais,
-  getDCA_ReceitasTributarias, getTotalRPPagos_A07
+  getDCA_ReceitasTributarias, getTotalRPPagos_A07,
+  getDCA_CaixaEquivalentes, getDisponibilidadeCaixaBruta_A02_RGF,
+  getDisponibilidadeCaixaBruta_A05_RGF, getConsorciosPublicos_A05_RGF,
+  getDCA_ReceitaRealizadaTotal_IC, getTotalReceitas_A01, getDCA_DespesaFuncaoExcetoIntra_IE,
+  getDCA_RP_Pagos_IF, getDCA_RPNP_Pagos_IG, getTotalRPPagos_A07_RPP, getTotalRPPagos_A07_RPNP,
+  getDCA_PassivoFinanceiro, getTotalRPInscritos_A07, getTotalRPInscritos31Dez_A07, getTotalRPSaldo_A07,
+  getRGF_PisoEnfermagem, getRecursosExtraorcamentarios_A07_RGF
 } from '../xmlExtractors';
 
 export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
   const results: ValidationResult[] = [];
+
+  // D4_00045: Recursos Extraorçamentários (MSC vs RGF Anexo 07)
+  // Contas começadas por 1113, FRs 860, 861, 862, 869, do executivo (PO 2).
+  if (data.mscByPeriod && data.rgf) {
+    const encPeriodKey = Object.keys(data.mscByPeriod).find(p => p.endsWith('-12') || p.endsWith('-13') || p.endsWith('-00'));
+    if (encPeriodKey) {
+      const mscDec = data.mscByPeriod[encPeriodKey];
+      const mscRecursos = mscDec
+        .filter(a => a.CONTA.startsWith('1113') &&
+                     ['860', '861', '862', '869'].includes(a.FR || '') &&
+                     (a.PO || '').startsWith('2') &&
+                     a.Tipo_valor === 'ending_balance')
+        .reduce((sum, a) => sum + Math.abs(a.Valor), 0);
+      
+      const rgfRecursos = getRecursosExtraorcamentarios_A07_RGF(data.rgf);
+      if (rgfRecursos !== null && rgfRecursos < mscRecursos - 0.01) {
+        results.push({
+          ruleId: 'D4_00045', dimension: 'D4', description: 'Relação entre restituíveis (MSC) e Recursos Extraorçamentários (RGF)', severity: 'error', impactsCapag: true,
+          message: `O valor de Recursos Extraorçamentários no RGF (R$ ${rgfRecursos.toFixed(2)}) é menor que o valor apurado de restituíveis na MSC (R$ ${mscRecursos.toFixed(2)}).`
+        });
+      }
+    }
+  }
+
+  // D3_00029: Piso da Enfermagem (RGF Anexo 1 vs MSC)
+  // Requerido que a parcela dedutível do RGF seja <= 90% do repasse da União na MSC
+  if (data.mscByPeriod && data.rgf) {
+    const encPeriodKey = Object.keys(data.mscByPeriod).find(p => {
+      const m = parseInt(p.split('-')[1] || '0');
+      return m > 12 || m === 0; // Tenta achar encerramento
+    }) || Object.keys(data.mscByPeriod).find(p => p.endsWith('-12')); // Fallback para Dezembro
+
+    if (encPeriodKey) {
+      const mscDec = data.mscByPeriod[encPeriodKey];
+      const rgfPiso = getRGF_PisoEnfermagem(data.rgf) || 0;
+      
+      const mscEnfRepasses = mscDec
+        .filter(a => ['6221303', '6221304', '6221305', '6221306', '6221307'].some(c => a.CONTA.startsWith(c))
+                  && ['2', '3', '4', '8'].some(p => (a.PO || '').startsWith(p))
+                  && a.FR === '605'
+                  && a.Tipo_valor === 'ending_balance')
+        .reduce((sum, a) => sum + Math.abs(a.Valor), 0);
+
+      // A regra diz: Parcela dedutível <= 90% do somatório MSC.
+      if (rgfPiso > mscEnfRepasses * 0.90 + 0.01) {
+        results.push({
+          ruleId: 'D3_00029', dimension: 'D3', description: 'Piso da Enfermagem vs Repasse União', severity: 'error', impactsCapag: true,
+          message: `O valor deduzido para piso da enfermagem no RGF Anexo 1 (R$ ${rgfPiso.toFixed(2)}) é maior que o limite de 90% dos repasses da União mapeados na MSC agregada (R$ ${(mscEnfRepasses * 0.90).toFixed(2)}).`
+        });
+      }
+    }
+  }
 
   // ── D3_00022-025: MSC dezembro × RREO Anexo 01 ─────────────────────────────
   // Apenas quando há MSC do mês 12 e RREO disponíveis
@@ -159,8 +217,8 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
     decMSC.forEach(a => {
       // Considera apenas as contas de receita arrecadada (6212, 62132, 62139) e Saldo Final
       if ((a.CONTA.startsWith('6212') || a.CONTA.startsWith('62132') || a.CONTA.startsWith('62139')) && a.Tipo_valor === 'ending_balance') {
-        const nr = a.Natureza_valor || '';
-        // '11' corresponde a Impostos, Taxas e Contribuições de Melhoria
+        const nr = (a.CO ?? '').trim();
+        // '11' corresponde a Impostos, Taxas e Contribuições de Melhoria (natureza da receita — CO, não D/C)
         if (nr.startsWith('11')) {
           mscTributosMunicipais += a.Valor;
         }
@@ -176,12 +234,22 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
       }
     });
 
+    results.push(...validatePairEquality('D4_00022', 'D4',
+      { label: `MSC Dezembro Tributos Municipais`, val: mscTributosMunicipais || null },
+      { label: `RREO A03 Tributos Municipais`, val: getTributosMunicipais_A03(data.rreo) },
+      'Receitas de Tributos Municipais divergem entre MSC e RREO Anexo 03.', false
+    ));
     results.push(...validatePairEquality('D4_00023', 'D4',
       { label: `MSC Dezembro Tributos Municipais`, val: mscTributosMunicipais || null },
       { label: `RREO A03 Tributos Municipais`, val: getTributosMunicipais_A03(data.rreo) },
       'Receitas de Tributos Municipais divergem entre MSC e RREO Anexo 03.', false
     ));
 
+    results.push(...validatePairEquality('D4_00024', 'D4',
+      { label: `MSC Dezembro Transf. Municipais (Constitucionais)`, val: mscTransfMunicipais || null },
+      { label: `RREO A03 Transf. Constitucionais Municipais`, val: getTransferenciasMunicipais_A03(data.rreo) },
+      'Receitas de Transferências Constitucionais Municipais divergem entre MSC e RREO Anexo 03.', false
+    ));
     results.push(...validatePairEquality('D4_00025', 'D4',
       { label: `MSC Dezembro Transf. Municipais (Constitucionais)`, val: mscTransfMunicipais || null },
       { label: `RREO A03 Transf. Constitucionais Municipais`, val: getTransferenciasMunicipais_A03(data.rreo) },
@@ -228,6 +296,11 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
     ));
 
     // D4_00039: Tributos Municipais MSC Dez vs RREO A06
+    results.push(...validatePairEquality('D4_00038', 'D4',
+      { label: `MSC Dezembro Tributos Municipais`, val: mscTributosMunicipais || null },
+      { label: `RREO A06 Tributos Municipais`, val: getTributosMunicipais_A06(data.rreo) },
+      'Receitas de Tributos Municipais divergem entre MSC e RREO Anexo 06.', true
+    ));
     results.push(...validatePairEquality('D4_00039', 'D4',
       { label: `MSC Dezembro Tributos Municipais`, val: mscTributosMunicipais || null },
       { label: `RREO A06 Tributos Municipais`, val: getTributosMunicipais_A06(data.rreo) },
@@ -235,6 +308,11 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
     ));
 
     // D4_00041: Transferências Municipais MSC Dez vs RREO A06
+    results.push(...validatePairEquality('D4_00040', 'D4',
+      { label: `MSC Dezembro Transf. Municipais (Constitucionais)`, val: mscTransfMunicipais || null },
+      { label: `RREO A06 Transf. Constitucionais Municipais`, val: getTransferenciasMunicipais_A06(data.rreo) },
+      'Receitas de Transferências Constitucionais Municipais divergem entre MSC e RREO Anexo 06.', true
+    ));
     results.push(...validatePairEquality('D4_00041', 'D4',
       { label: `MSC Dezembro Transf. Municipais (Constitucionais)`, val: mscTransfMunicipais || null },
       { label: `RREO A06 Transf. Constitucionais Municipais`, val: getTransferenciasMunicipais_A06(data.rreo) },
@@ -244,20 +322,26 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
   }
 
   // D4_00026: Restos a Pagar Não Processados — MSC dezembro (213xxx) vs RREO Anexo 01 col[10]
-  if (data.msc && data.rreo) {
-    const rpnpMSC  = sumAccounts(data.msc, ['213'], 'ending_balance', 'C');
-    const rpnpRREO = getRPNP_inscricoes_A01(data.rreo);
+  if (data.rreo) {
+    const decKey = data.mscByPeriod
+      ? Object.keys(data.mscByPeriod).find(p => p.endsWith('-12'))
+      : undefined;
+    const mscForRpnp = decKey && data.mscByPeriod ? data.mscByPeriod[decKey] : data.msc;
+    if (mscForRpnp) {
+      const rpnpMSC = sumAccounts(mscForRpnp, ['213'], 'ending_balance', 'C');
+      const rpnpRREO = getRPNP_inscricoes_A01(data.rreo);
 
-    if (rpnpRREO === null) {
-      results.push({
-        ruleId: 'D4_00026', dimension: 'D4', description: '', severity: 'info', impactsCapag: false,
-        message: `Não foi possível extrair o valor de RPNP do RREO Anexo 01 para verificação D4_00026.`,
-      });
-    } else if (Math.abs(rpnpMSC - rpnpRREO) > 0.01) {
-      results.push({
-        ruleId: 'D4_00026', dimension: 'D4', description: '', severity: 'error', impactsCapag: false,
-        message: `Restos a Pagar Não Processados divergem. MSC (213xxx): R$ ${rpnpMSC.toLocaleString('pt-BR', {minimumFractionDigits:2})} | RREO Anexo 01 (col RPNP): R$ ${rpnpRREO.toLocaleString('pt-BR', {minimumFractionDigits:2})}.`,
-      });
+      if (rpnpRREO === null) {
+        results.push({
+          ruleId: 'D4_00026', dimension: 'D4', description: '', severity: 'info', impactsCapag: false,
+          message: `Não foi possível extrair o valor de RPNP do RREO Anexo 01 para verificação D4_00026.`,
+        });
+      } else if (Math.abs(rpnpMSC - rpnpRREO) > 0.01) {
+        results.push({
+          ruleId: 'D4_00026', dimension: 'D4', description: '', severity: 'error', impactsCapag: false,
+          message: `Restos a Pagar Não Processados divergem. MSC${decKey ? ` (${decKey})` : ''} (213xxx): R$ ${rpnpMSC.toLocaleString('pt-BR', {minimumFractionDigits:2})} | RREO Anexo 01 (col RPNP): R$ ${rpnpRREO.toLocaleString('pt-BR', {minimumFractionDigits:2})}.`,
+        });
+      }
     }
   }
 
@@ -331,18 +415,42 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
       'Receitas com alienação de ativos divergem entre DCA e RREO Anexo 11.', false
     ));
 
+    // D4_00014: Tributos Municipais (DCA Anexo I-C vs RREO Anexo 06)
+    results.push(...validatePairEquality('D4_00014', 'D4',
+      { label: `DCA Anexo I-C (Tributos Municipais)`, val: getDCA_ReceitasTributarias(data.dca) },
+      { label: `RREO Anexo 06 (Tributos Municipais)`, val: getTributosMunicipais_A06(data.rreo) },
+      'Tributos Municipais divergem entre DCA e RREO Anexo 06.', true
+    ));
+    // D4_00015: Tributos Municipais (DCA Anexo I-C vs RREO Anexo 06)
+    results.push(...validatePairEquality('D4_00015', 'D4',
+      { label: `DCA Anexo I-C (Tributos Municipais)`, val: getDCA_ReceitasTributarias(data.dca) },
+      { label: `RREO Anexo 06 (Tributos Municipais)`, val: getTributosMunicipais_A06(data.rreo) },
+      'Receitas de tributos municipais divergem entre DCA e RREO Anexo 06.', false
+    ));
+    // D4_00010: Tributos Municipais (DCA Anexo I-C vs RREO Anexo 03)
+    results.push(...validatePairEquality('D4_00010', 'D4',
+      { label: `DCA Anexo I-C (Tributos Municipais)`, val: getDCA_ReceitasTributarias(data.dca) },
+      { label: `RREO Anexo 03 (Tributos Municipais)`, val: getTributosMunicipais_A03(data.rreo) },
+      'Tributos Municipais divergem entre DCA e RREO Anexo 03.', false
+    ));
     // D4_00011: Tributos Municipais (DCA Anexo I-C vs RREO Anexo 03)
     results.push(...validatePairEquality('D4_00011', 'D4',
       { label: `DCA Anexo I-C (Tributos Municipais)`, val: getDCA_ReceitasTributarias(data.dca) },
       { label: `RREO Anexo 03 (Tributos Municipais)`, val: getTributosMunicipais_A03(data.rreo) },
-      'Receitas de tributos municipais divergem entre DCA e RREO Anexo 03.', true
+      'Tributos Municipais divergem entre DCA e RREO Anexo 03.', false
     ));
 
+    // D4_00012: Transferências Municipais (DCA Anexo I-C vs RREO Anexo 03)
+    results.push(...validatePairEquality('D4_00012', 'D4',
+      { label: `DCA Anexo I-C (Transf. Municipais)`, val: getDCA_TransferenciasMunicipais(data.dca) },
+      { label: `RREO Anexo 03 (Transf. Municipais)`, val: getTransferenciasMunicipais_A03(data.rreo) },
+      'Transferências Municipais divergem entre DCA e RREO Anexo 03.', false
+    ));
     // D4_00013: Transferências Municipais (DCA Anexo I-C vs RREO Anexo 03)
     results.push(...validatePairEquality('D4_00013', 'D4',
       { label: `DCA Anexo I-C (Transf. Municipais)`, val: getDCA_TransferenciasMunicipais(data.dca) },
       { label: `RREO Anexo 03 (Transf. Municipais)`, val: getTransferenciasMunicipais_A03(data.rreo) },
-      'Receitas de transferências municipais divergem entre DCA e RREO Anexo 03.', true
+      'Transferências Municipais divergem entre DCA e RREO Anexo 03.', false
     ));
 
     // D4_00015: Tributos Municipais (DCA Anexo I-C vs RREO Anexo 06)
@@ -353,11 +461,17 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
       'Receitas de tributos municipais divergem entre DCA e RREO Anexo 06.', false
     ));
 
+    // D4_00016: Transferências Municipais (DCA Anexo I-C vs RREO Anexo 06)
+    results.push(...validatePairEquality('D4_00016', 'D4',
+      { label: `DCA Anexo I-C (Transf. Municipais)`, val: getDCA_TransferenciasMunicipais(data.dca) },
+      { label: `RREO Anexo 06 (Transf. Municipais)`, val: getTransferenciasMunicipais_A06(data.rreo) },
+      'Transferências Municipais divergem entre DCA e RREO Anexo 06.', true
+    ));
     // D4_00017: Transferências Municipais (DCA Anexo I-C vs RREO Anexo 06)
     results.push(...validatePairEquality('D4_00017', 'D4',
       { label: `DCA Anexo I-C (Transf. Municipais)`, val: getDCA_TransferenciasMunicipais(data.dca) },
       { label: `RREO Anexo 06 (Transf. Municipais)`, val: getTransferenciasMunicipais_A06(data.rreo) },
-      'Receitas de transferências municipais divergem entre DCA e RREO Anexo 06.', false
+      'Transferências Municipais divergem entre DCA e RREO Anexo 06.', true
     ));
 
     // D4_00019: Contribuições dos Servidores (DCA Anexo I-C vs RREO Anexo 03)
@@ -374,6 +488,140 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
       'Despesas de Capital divergem entre DCA e RREO Anexo 09.', false
     ));
 
+    // D4_00002: Receita Realizada (DCA Anexo I-C vs RREO Anexo 01)
+    results.push(...validatePairEquality('D4_00002', 'D4',
+      { label: `DCA Anexo I-C (Receita Realizada)`, val: getDCA_ReceitaRealizadaTotal_IC(data.dca) },
+      { label: `RREO Anexo 01 (Receita Realizada)`, val: getTotalReceitas_A01(data.rreo) },
+      'Receita realizada total diverge entre DCA e RREO Anexo 01.', true
+    ));
+
+    // D4_00004: Despesa por Função exceto intra (DCA Anexo I-E vs RREO Anexo 02)
+    results.push(...validatePairEquality('D4_00004', 'D4',
+      { label: `DCA Anexo I-E (Despesa Função exceto Intra)`, val: getDCA_DespesaFuncaoExcetoIntra_IE(data.dca) },
+      { label: `RREO Anexo 02 (Despesa Função exceto Intra)`, val: getDespesasExcetoIntra_A02_Liquidadas(data.rreo) },
+      'Despesa por função diverge entre DCA e RREO Anexo 02.', false
+    ));
+
+    // D4_00006: Execução de RP (DCA Anexo I-F/I-G vs RREO Anexo 07)
+    // A regra diz "valores dos restos a pagar processados e não processados" do Anexo I-F (provavelmente o saldo ou pagamentos). Vamos comparar os Pagamentos totais.
+    const dcaRpPagos = (getDCA_RP_Pagos_IF(data.dca) || 0) + (getDCA_RPNP_Pagos_IG(data.dca) || 0);
+    const rreoRpPagos = (getTotalRPPagos_A07_RPP(data.rreo) || 0) + (getTotalRPPagos_A07_RPNP(data.rreo) || 0);
+    if (dcaRpPagos || rreoRpPagos) {
+      results.push(...validatePairEquality('D4_00006', 'D4',
+        { label: `DCA Execução RP (I-F + I-G)`, val: dcaRpPagos },
+        { label: `RREO Anexo 07 (Pagos RPP + RPNP)`, val: rreoRpPagos },
+        'Execução de Restos a Pagar diverge entre DCA e RREO Anexo 07.', false
+      ));
+    }
+
+    // D4_00007: Execução de RPNP (DCA Anexo I-G vs RREO Anexo 07)
+    results.push(...validatePairEquality('D4_00007', 'D4',
+      { label: `DCA Anexo I-G (Pagamentos RPNP)`, val: getDCA_RPNP_Pagos_IG(data.dca) },
+      { label: `RREO Anexo 07 (Pagamentos RPNP)`, val: getTotalRPPagos_A07_RPNP(data.rreo) },
+      'Execução de RPNP diverge entre DCA e RREO Anexo 07.', false
+    ));
+
+    // D4_00008: Execução de RPP (DCA Anexo I-G vs RREO Anexo 07) -> A regra fala Anexo I-G mas RPP fica no I-F! O CSV diz I-G. Vamos ler do I-F para RPP.
+    results.push(...validatePairEquality('D4_00008', 'D4',
+      { label: `DCA Anexo I-F (Pagamentos RPP)`, val: getDCA_RP_Pagos_IF(data.dca) },
+      { label: `RREO Anexo 07 (Pagamentos RPP)`, val: getTotalRPPagos_A07_RPP(data.rreo) },
+      'Execução de RPP diverge entre DCA e RREO Anexo 07.', false
+    ));
+
+    // D4_00042: Passivo Financeiro >= Inscrição de RP + RP Pendentes
+    const passivoFin = getDCA_PassivoFinanceiro(data.dca);
+    const rreoRpInscritosAnt = getTotalRPInscritos_A07(data.rreo) || 0;
+    const rreoRpInscritosDez = getTotalRPInscritos31Dez_A07(data.rreo) || 0;
+    const rpInscritos = rreoRpInscritosAnt + rreoRpInscritosDez;
+    const rpPendentes = getTotalRPSaldo_A07(data.rreo) || 0;
+    const sumRp = rpInscritos + rpPendentes;
+
+    if (passivoFin !== null) {
+      if (passivoFin < sumRp - 0.01) {
+        results.push({
+          ruleId: 'D4_00042', dimension: 'D4', description: '', severity: 'error', impactsCapag: true,
+          message: `O Passivo Financeiro na DCA (R$ ${passivoFin.toLocaleString('pt-BR')}) deve ser maior ou igual à soma de inscrições de RP e RP pendentes (R$ ${sumRp.toLocaleString('pt-BR')}).`,
+        });
+      }
+    }
+
+  }
+
+  // ── D4 Cruzamentos RGF ──────────────────────────────────────────────────
+  if (data.dca && data.rgf) {
+    // D4_00028: DCA Anexo I-AB (Caixa e Equivalentes) vs RGF Anexo 02 (Disponibilidade de Caixa Bruta)
+    const dcaCaixa = getDCA_CaixaEquivalentes(data.dca);
+    const rgfA02Caixa = getDisponibilidadeCaixaBruta_A02_RGF(data.rgf);
+    if (dcaCaixa !== null && rgfA02Caixa !== null) {
+      if (dcaCaixa > rgfA02Caixa + 0.01) {
+        results.push({
+          ruleId: 'D4_00028', dimension: 'D4', description: '', severity: 'error', impactsCapag: false,
+          message: `DCA Caixa e Equivalentes (R$ ${dcaCaixa.toLocaleString('pt-BR')}) não pode ser maior que Disponibilidade de Caixa Bruta do RGF Anexo 02 (R$ ${rgfA02Caixa.toLocaleString('pt-BR')}).`,
+        });
+      }
+    }
+  }
+
+  if (decPeriodKey && data.mscByPeriod && data.rgf) {
+    const decMSC = data.mscByPeriod[decPeriodKey];
+    
+    // Caixa na MSC = Contas que começam com 111 (ending_balance)
+    const mscCaixa = decMSC
+      .filter(a => a.CONTA.startsWith('111') && a.Tipo_valor === 'ending_balance')
+      .reduce((s, a) => s + a.Valor, 0);
+
+    // D4_00037: MSC Caixa vs RGF Anexo 02 (Disponibilidade de Caixa Bruta)
+    const rgfA02Caixa = getDisponibilidadeCaixaBruta_A02_RGF(data.rgf);
+    if (rgfA02Caixa !== null && Math.abs(mscCaixa - rgfA02Caixa) > 0.01) {
+      results.push({
+        ruleId: 'D4_00037', dimension: 'D4', description: '', severity: 'error', impactsCapag: false,
+        message: `Disponibilidade de Caixa diverge. MSC (111xxx): R$ ${mscCaixa.toLocaleString('pt-BR')} | RGF Anexo 02: R$ ${rgfA02Caixa.toLocaleString('pt-BR')}.`,
+      });
+    }
+
+    // D4_00036: MSC Caixa vs RGF Anexo 05 (Disponibilidade de Caixa Bruta)
+    const rgfA05Caixa = getDisponibilidadeCaixaBruta_A05_RGF(data.rgf);
+    if (rgfA05Caixa !== null) {
+      if (Math.abs(mscCaixa - rgfA05Caixa) > 0.01) {
+        results.push({
+          ruleId: 'D4_00036', dimension: 'D4', description: '', severity: 'error', impactsCapag: true,
+          message: `Disponibilidade de Caixa diverge. MSC (111xxx): R$ ${mscCaixa.toLocaleString('pt-BR')} | RGF Anexo 05: R$ ${rgfA05Caixa.toLocaleString('pt-BR')}.`,
+        });
+      }
+    } else {
+      results.push({
+        ruleId: 'D4_00036', dimension: 'D4', description: '', severity: 'info', impactsCapag: false,
+        message: 'Regra ignorada: Anexo 05 do RGF não disponível (aplicável apenas no último ano de mandato).',
+      });
+    }
+
+    // D4_00043: Consórcios Públicos (MSC vs RGF Anexo 05)
+    // MSC = 2188 + 2288 + 218910105 + 218910108 com FS em (860, 861, 862, 869)
+    let mscConsorcios = 0;
+    const consorcioSources = ['860', '861', '862', '869'];
+    decMSC.forEach(a => {
+      if ((a.CONTA.startsWith('2188') || a.CONTA.startsWith('2288') || a.CONTA === '218910105' || a.CONTA === '218910108') && a.Tipo_valor === 'ending_balance') {
+        const fs = a.FS || '';
+        if (consorcioSources.some(f => fs.startsWith(f))) {
+          mscConsorcios += a.Valor;
+        }
+      }
+    });
+    
+    const rgfA05Consorcios = getConsorciosPublicos_A05_RGF(data.rgf);
+    if (rgfA05Consorcios !== null) {
+      if (Math.abs(mscConsorcios - rgfA05Consorcios) > 0.01) {
+        results.push({
+          ruleId: 'D4_00043', dimension: 'D4', description: '', severity: 'error', impactsCapag: true,
+          message: `Valores de Consórcios Públicos divergem. MSC (2188/2288 FS=860..): R$ ${mscConsorcios.toLocaleString('pt-BR')} | RGF Anexo 05: R$ ${rgfA05Consorcios.toLocaleString('pt-BR')}.`,
+        });
+      }
+    } else {
+      results.push({
+        ruleId: 'D4_00043', dimension: 'D4', description: '', severity: 'info', impactsCapag: false,
+        message: 'Regra ignorada: Anexo 05 do RGF não disponível.',
+      });
+    }
   }
 
   return results;

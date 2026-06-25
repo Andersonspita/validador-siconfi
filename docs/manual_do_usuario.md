@@ -84,7 +84,7 @@ Você pode:
 
 O sistema exibe um indicador de carregamento enquanto:
 1. Lê e interpreta os arquivos
-2. Executa as 48 regras de validação
+2. Executa as 197 regras de validação
 3. Monta o painel de resultados
 
 O processamento leva alguns segundos, dependendo do tamanho dos arquivos.
@@ -124,8 +124,9 @@ Use os botões de filtro para focar no que importa:
 | Filtro | Mostra |
 |---|---|
 | **Todas as Regras** | Todos os resultados |
-| **Erros** | Apenas erros críticos |
-| **Avisos** | Apenas avisos |
+| **Erros** | Apenas erros críticos que impedem a homologação |
+| **Avisos** | Alertas e potenciais falhas de preenchimento |
+| **Informativos** | Orientações e dados para conferência manual |
 | **🛡 Riscos CAPAG** | Apenas regras com impacto na nota CAPAG |
 
 ---
@@ -157,15 +158,16 @@ Em muitas regras você pode clicar em **"Ver os N lançamentos detalhados"** par
 
 ## Exportar o Relatório
 
-Clique no botão **"⬇ Exportar Relatório (CSV)"** para baixar um arquivo `.csv` com todos os resultados do filtro atual.
+Você possui duas opções de exportação:
 
-O arquivo pode ser aberto no Excel e contém as colunas:
+1. **Gerar Relatório Oficial (PDF):** Gera um documento formatado e pronto para impressão, separando Erros Críticos de Avisos. O relatório PDF injeta automaticamente as tags `[IMPEDITIVO]` e `[RISCO CAPAG]` junto à descrição para facilitar a leitura do gestor, e inclui uma coluna de **Plano de Ação Corretiva** sugerindo como arrumar o problema.
+2. **Exportar CSV:** Baixa um arquivo `.csv` bruto que pode ser aberto no Excel para análise mais granular. Contém as colunas:
 
 ```
 Regra | Dimensão | Severidade | Risco CAPAG | Descrição | Mensagem | Conta | PO | FR | CO | Valor | Detalhe
 ```
 
-> **Dica:** Filtre por "Riscos CAPAG" antes de exportar para gerar um relatório focado nas prioridades.
+> **Dica:** Filtre por "Riscos CAPAG" ou "Erros" na tela antes de exportar o CSV caso queira analisar apenas um tipo específico de problema.
 
 ---
 
@@ -258,7 +260,7 @@ Não. O validador é uma ferramenta de pré-validação. O envio oficial deve se
 A regra D1_00028 (classes 7 e 8 ausentes) é classificada como `info` porque municípios sem RPPS podem legitimamente não ter essas classes. Um `info` não reduz pontuação — é apenas uma verificação de atenção.
 
 **Quantas regras o sistema valida?**
-Atualmente 48 de 201 regras oficiais do Siconfi. As regras restantes requerem: (a) acesso à API do Siconfi para verificar homologação e tempestividade; (b) múltiplas MSCs do mesmo exercício; ou (c) arquivo DCA (em implementação).
+Atualmente **197 regras oficiais do Siconfi** (100% da base passível de validação offline baseada no arquivo público do Siconfi).
 
 **O arquivo ZIP do Siconfi funciona?**
 Sim. O sistema abre ZIPs automaticamente e extrai os arquivos CSV e XML internos.
