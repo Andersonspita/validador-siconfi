@@ -2,7 +2,7 @@
 
 > Documento de continuidade para retomada do desenvolvimento.
 >
-> **Última atualização:** 25 de Junho de 2026  
+> **Última atualização:** 25 de Junho de 2026 (v3.1.0 — correções auditoria QA)  
 > **Repositório:** https://github.com/Andersonspita/validador-siconfi  
 > **GitHub Pages:** https://andersonspita.github.io/validador-siconfi/
 
@@ -30,7 +30,7 @@ Após auditoria QA (jun/2026), o motor foi corrigido em pontos críticos: equil�
 | Metadados das regras (`Descricao_verificacoes.csv`) | ✅ |
 | API Siconfi — extrato de entregas (D1_00001) | ✅ parcial |
 | Relatório PDF + CSV | ✅ |
-| Testes Vitest (parser + utils) | ✅ |
+| Testes Vitest (parser + utils + rulesD1 + rulesD2) | ✅ 18 testes |
 | Deploy GitHub Pages | ✅ |
 | Autenticação Firebase | ✅ |
 
@@ -121,3 +121,23 @@ npm test          # Vitest
 npm run build     # produção
 npm run deploy    # GitHub Pages
 ```
+
+---
+
+## 7. Correções QA — v3.1.0 (2026-06-25)
+
+Auditoria conduzida com Claude Sonnet 4.6 (Lopes Consultoria). 11 achados, sendo 1 crítico.
+
+| ID | Severidade | Arquivo | Descrição |
+|----|-----------|---------|-----------|
+| QA-001 | **Crítico** | `rulesD2.ts` | D2_00050 com ponto no código de conta → falso erro impeditivo 100% do tempo |
+| QA-002 | Alto | `parsers.ts` | CSV em ZIP sem detecção de encoding (windows-1252 corrompido) |
+| QA-003 | Alto | `parsers.ts` | XLS/XLSX em ZIP silenciosamente ignorados |
+| QA-004 | Alto | `parsers.ts` | Fallback de encoding sem validação de `CONTA;` |
+| QA-005 | Médio | `rulesD1.ts` | Mensagem D1_00018 sem contexto sobre IC reclassificação |
+| QA-006 | Médio | `rulesD1.ts` | D1_00023/24 comparação order-dependent → falso negativo |
+| QA-007 | Médio | `*.test.ts` | Zero testes para rulesD1/D2/D3/D4 |
+| QA-010 | Baixo | `rulesD2.ts` | `affectedAccounts` hardcoded em D2_00083 |
+| QA-011 | Baixo | `parsers.ts` | `XLSX.read` sem `cellDates` → datas viram número serial |
+
+Todos corrigidos neste commit. Ver `CHANGELOG.md` para detalhes.

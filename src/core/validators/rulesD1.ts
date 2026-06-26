@@ -241,7 +241,14 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
       impactsCapag: false,
       affectedAccounts: Array.from(new Set(inconsistentAccounts)),
       detailedItems: detailedInconsistencies,
-      message: pm(`${inconsistentAccounts.length} lançamento(s) com movimentação inconsistente (SI + MOV ≠ SF).`),
+      message: pm(
+        `${inconsistentAccounts.length} combinação(ões) de conta+IC com movimentação inconsistente (SI + MOV ≠ SF). ` +
+        `Reclassificações de Indicador de Conta (FR, CO, ND) entre períodos podem gerar esta diferença de forma legítima — ` +
+        `verifique prioritariamente registros com diferença acima de R$ 1.000.`
+      ),
+      actionPlan:
+        'Para cada item detalhado: verifique se houve reclassificação intencional de IC (ex.: mudança de fonte de recurso). ' +
+        'Se não houver justificativa, corrija o saldo inicial ou a movimentação no sistema contábil.',
     });
   }
 
@@ -589,7 +596,12 @@ export function validateMultiMonth(
     const prevExec = prevMsc.filter(a => a.PO?.startsWith('2'));
     const currExec = currMsc.filter(a => a.PO?.startsWith('2'));
     if (prevExec.length > 0 && currExec.length > 0 && prevExec.length === currExec.length) {
-      const same = prevExec.every((p, idx) => p.CONTA === currExec[idx].CONTA && p.Valor === currExec[idx].Valor);
+      // Correção QA-006: comparação via Map (insensível à ordem de exportação)
+      const currExecMap = new Map(currExec.map(a => [mscAccountKey(a), a.Valor]));
+      const same = prevExec.every(p => {
+        const key = mscAccountKey(p);
+        return currExecMap.has(key) && Math.abs((currExecMap.get(key) ?? -1) - p.Valor) < 0.01;
+      });
       if (same) {
         results.push({
           ruleId: 'D1_00023', dimension: 'D1', description: 'MSCs idênticas do Executivo', severity: 'warning', impactsCapag: false,
@@ -602,7 +614,12 @@ export function validateMultiMonth(
     const prevLeg = prevMsc.filter(a => a.PO?.startsWith('1'));
     const currLeg = currMsc.filter(a => a.PO?.startsWith('1'));
     if (prevLeg.length > 0 && currLeg.length > 0 && prevLeg.length === currLeg.length) {
-      const same = prevLeg.every((p, idx) => p.CONTA === currLeg[idx].CONTA && p.Valor === currLeg[idx].Valor);
+      // Correção QA-006: comparação via Map (insensível à ordem de exportação)
+      const currLegMap = new Map(currLeg.map(a => [mscAccountKey(a), a.Valor]));
+      const same = prevLeg.every(p => {
+        const key = mscAccountKey(p);
+        return currLegMap.has(key) && Math.abs((currLegMap.get(key) ?? -1) - p.Valor) < 0.01;
+      });
       if (same) {
         results.push({
           ruleId: 'D1_00024', dimension: 'D1', description: 'MSCs idênticas do Legislativo', severity: 'warning', impactsCapag: false,

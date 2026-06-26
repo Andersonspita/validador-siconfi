@@ -1,6 +1,6 @@
 # Documentação Técnica — Validador Siconfi
 
-> **Versão:** 3.0 · **Data:** 2026-06-25 · **Repositório:** https://github.com/Andersonspita/validador-siconfi  
+> **Versão:** 3.1.0 · **Data:** 2026-06-25 · **Repositório:** https://github.com/Andersonspita/validador-siconfi  
 > **GitHub Pages:** https://andersonspita.github.io/validador-siconfi/
 
 ---
@@ -8,6 +8,17 @@
 ## 1. Visão Geral
 
 O Validador Siconfi é uma **Single Page Application (SPA)** que executa validações fiscais e contábeis inteiramente no navegador do usuário — os arquivos nunca saem da máquina do cliente. A aplicação replica localmente as verificações D1–D4 do sistema SICONFI da STN (Secretaria do Tesouro Nacional), permitindo que municípios antecipem erros antes do envio oficial.
+
+### Funções exportadas de `parsers.ts`
+
+| Função | Descrição |
+|--------|-----------|
+| `parseFiles(files)` | Ponto de entrada principal — processa File[] e retorna ParsedData |
+| `parseMSCWithMeta(csvText)` | Parser de CSV MSC com extração de período e enteId |
+| `readTextWithEncoding(file)` | Lê File com fallback de encoding (UTF-8 → windows-1252 → iso-8859-1) |
+| `decodeTextFromBytes(bytes)` | Versão testável/reutilizável para Uint8Array (usada também em ZIP) |
+
+---
 
 ### Por que Client-Side?
 
@@ -53,6 +64,9 @@ validador-siconfi/
 │   │   ├── xmlExtractors.ts          ← Extratores de valores dos demonstrativos XLS/XML
 │   │   ├── rulesMetadata.ts          ← Carrega metadados das regras do CSV público
 │   │   ├── parsers.test.ts           ← Testes unitários do parser
+│   │   └── validators/
+│   │       ├── rulesD1.test.ts       ← Testes D1 (17 casos)
+│   │       └── rulesD2.test.ts       ← Testes D2 (9 casos)
 │   │   └── validators/
 │   │       ├── index.ts              ← Orquestrador runValidations()
 │   │       ├── rulesD1.ts            ← D1: qualidade MSC, entrega, encerramento

@@ -9,11 +9,11 @@ const xmlParser = new XMLParser({
   attributeNamePrefix: "@_"
 });
 
-/** Lê texto do arquivo tentando UTF-8, depois Windows-1252 / ISO-8859-1. */
-export async function readTextWithEncoding(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-
+/** Detecta encoding e decodifica bytes de MSC CSV (UTF-8, windows-1252, iso-8859-1).
+ *  Lança erro explícito se o conteúdo não for uma MSC SICONFI válida (sem cabeçalho CONTA;).
+ *  Correção QA-002/QA-004.
+ */
+export function decodeTextFromBytes(bytes: Uint8Array): string {
   const tryDecode = (label: string): string | null => {
     try {
       const text = new TextDecoder(label).decode(bytes);
@@ -24,12 +24,25 @@ export async function readTextWithEncoding(file: File): Promise<string> {
     }
   };
 
-  return (
-    tryDecode('utf-8') ??
-    tryDecode('windows-1252') ??
-    tryDecode('iso-8859-1') ??
-    new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/, '')
-  );
+  const result = tryDecode('utf-8') ?? tryDecode('windows-1252') ?? tryDecode('iso-8859-1');
+  if (result) return result;
+
+  // Fallback: retorna UTF-8 mas lança erro se não for uma MSC reconhecível
+  const fallback = new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/, '');
+  if (!fallback.includes('CONTA;') && !fallback.includes('conta;')) {
+    throw new Error(
+      'Arquivo não reconhecido como MSC SICONFI. ' +
+      'O cabeçalho "CONTA;" não foi encontrado. Verifique se o arquivo é uma MSC válida e se está no encoding correto.'
+    );
+  }
+  return fallback;
+}
+
+/** Lê texto do arquivo tentando UTF-8, depois Windows-1252 / ISO-8859-1. */
+export async function readTextWithEncoding(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  return decodeTextFromBytes(bytes);
 }
 
 const normalizeEnteId = (raw: string): string =>
@@ -81,10 +94,25 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
           else if (lname.includes('dca')) result.dca = parsedXml;
 
         } else if (lname.endsWith('.csv')) {
-          const csvText = await zipEntry.async('string');
+          // QA-002: usar arraybuffer para detecção de encoding (windows-1252 de sistemas legados)
+          const csvBuffer = await zipEntry.async('arraybuffer');
+          const csvBytes = new Uint8Array(csvBuffer);
+          const csvText = decodeTextFromBytes(csvBytes);
           const { accounts, period, enteId } = parseMSCWithMeta(csvText);
           if (enteId) result.enteId = enteId;
           storeMSC(result, await accounts, period);
+
+        } else if (lname.endsWith('.xls') || lname.endsWith('.xlsx')) {
+          // QA-003: processar XLS/XLSX dentro de ZIP (antes eram silenciosamente ignorados)
+          const xlsBuffer = await zipEntry.async('arraybuffer');
+          const workbook = XLSX.read(xlsBuffer, { type: 'array', cellDates: true, dateNF: 'dd/mm/yyyy' });
+          const parsedXls: XLSReport = {};
+          workbook.SheetNames.forEach(sheetName => {
+            parsedXls[sheetName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+          });
+          if (lname.includes('rreo')) result.rreo = parsedXls;
+          else if (lname.includes('rgf')) result.rgf = parsedXls;
+          else if (lname.includes('dca')) result.dca = parsedXls;
         }
       }
 
@@ -98,10 +126,11 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
 
     } else if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      // QA-011: cellDates evita que datas virem número serial Excel
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, dateNF: 'dd/mm/yyyy' });
       const parsedXls: XLSReport = {};
       workbook.SheetNames.forEach(sheetName => {
-        parsedXls[sheetName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+        parsedXls[sheetName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
       });
       const lname = file.name.toLowerCase();
       if (lname.includes('rreo')) result.rreo = parsedXls;

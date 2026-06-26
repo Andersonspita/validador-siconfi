@@ -112,7 +112,7 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
       description: 'Integridade do DDR (saldo 721 ≠ saldo 821)',
       severity: 'error',
       impactsCapag: false,
-      affectedAccounts: ['7211', '8211'],
+      affectedAccounts: [...DDR_DEVEDORA_PREFIXES, ...DDR_CREDORA_PREFIXES],
       message: pm(
         `Divergência nas contas de controle do DDR. Saldo final 7211: R$ ${vlDDR721.toFixed(2)} | Saldo final 8211: R$ ${vlDDR821.toFixed(2)} | Diferença: R$ ${Math.abs(vlDDR721 - vlDDR821).toFixed(2)}.`
       ),
@@ -529,9 +529,10 @@ export function validateD2_MSC_Encerramento_DCA(data: ParsedData, _rulesMap: Map
   // (D2_00047 omitida por falta de extrator para Natureza_Receita na MSC)
 
   // D2_00050: Despesas orçamentárias (MSC Encerramento vs DCA Anexo I-D)
-  // Apenas comparando o total de despesas (empenhadas)
+  // Saldo líquido do grupo 62213 (Créditos Empenhados a Pagar) no beginning_balance do encerramento.
+  // Correção QA-001: códigos PCASP são puramente numéricos — nunca contêm ponto.
   const mscDespesasEmpenhadas = mscEnc
-    .filter(a => (a.CONTA.startsWith('62213.01') || a.CONTA === '62213.01.00') && a.Tipo_valor === 'beginning_balance')
+    .filter(a => a.CONTA.startsWith('62213') && a.Tipo_valor === 'beginning_balance')
     .reduce((acc, curr) => acc + (curr.Natureza_valor === 'D' ? curr.Valor : -curr.Valor), 0);
   const dcaDespesasTotais = getDCA_DespesasTotais(data.dca);
 
