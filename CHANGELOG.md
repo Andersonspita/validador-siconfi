@@ -1,3 +1,29 @@
+## [3.2.0] — 2026-06-26
+
+### Lançamentos Contábeis Corretivos (feature)
+
+- **`correctiveEntries.ts`** — novo módulo que mapeia 14 regras de validação a
+  lançamentos PCASP D/C sugeridos para corrigir cada inconsistência:
+  D2_00083 (DDR), D2_00081 (férias/13º), D2_00067/68 (depreciação),
+  D2_00055 (amortização), D2_00053 (estoques), D2_00059/60 (créditos),
+  D2_00030/31/34/40 (saldos negativos), D2_00094/95 (RPPS/RGPS),
+  D1_00021 (ativo invertido), D1_00025 (passivo invertido),
+  D1_00029-33 (ICs ausentes — não há lançamento, orienta atualizar no sistema),
+  D2_00080 (estoques), D2_00054 (equivalência patrimonial).
+- **`types.ts`** — nova interface `SuggestedEntry` e campo `suggestedEntries?`
+  em `ValidationResult`.
+- **`validators/index.ts`** — chama `enrichWithCorrectiveEntries()` após
+  `runValidations()` para popular automaticamente os lançamentos sugeridos.
+- **`pdfGenerator.ts`** — nova seção "Plano de Correção Contábil" no PDF com
+  tabela D/C por regra, valores calculados automaticamente quando possível
+  (ex.: diferença DDR, estimativa 8% para férias, 20%+8% para RGPS).
+
+### Melhorias no PDF
+- `buildDoc()` unificado (browser + CLI)
+- Orientações de servidor compactadas em 1 linha com link siconfi.tesouro.gov.br
+- Caixas coloridas de resumo no cabeçalho
+- Colunas calculadas para zero overflow em A4 (22+80+80 = 182mm)
+
 # Changelog — Validador Siconfi
 
 ## [3.1.0] — 2026-06-25

@@ -7,6 +7,20 @@ export interface DetailedItem {
   valor?: number;
 }
 
+/** Lançamento contábil PCASP sugerido para correção de uma inconsistência. */
+export interface SuggestedEntry {
+  /** Descrição do lançamento em linguagem contábil clara. */
+  descricao: string;
+  /** Conta devedora (D) no PCASP. */
+  debito: { conta: string; descricao: string };
+  /** Conta credora (C) no PCASP. */
+  credito: { conta: string; descricao: string };
+  /** Valor sugerido quando calculável automaticamente. */
+  valor?: number;
+  /** Observação — limitações, variações possíveis, referência normativa. */
+  obs?: string;
+}
+
 export interface RuleDefinition {
   ruleId: string;
   description: string;
@@ -26,6 +40,8 @@ export interface ValidationResult {
   detailedItems?: DetailedItem[];
   message: string;
   actionPlan?: string;
+  /** Lançamentos PCASP sugeridos para corrigir a inconsistência detectada. */
+  suggestedEntries?: SuggestedEntry[];
 }
 
 export interface XLSReport {
@@ -36,8 +52,8 @@ export interface ParsedData {
   enteId?: string;
   anoReferencia?: string;
   msc?: MSCAccount[];
-  mscPeriods?: string[];                    // períodos detectados (YYYY-MM)
-  mscByPeriod?: Record<string, MSCAccount[]>; // período → contas daquele mês
+  mscPeriods?: string[];
+  mscByPeriod?: Record<string, MSCAccount[]>;
   rreo?: any;
   rgf?: any;
   dca?: any;
@@ -46,11 +62,11 @@ export interface ParsedData {
 export interface MSCAccount {
   CONTA: string;
   PO?: string;
-  FP?: string;  // atributo superávit financeiro (IC2 quando TIPO2='FP')
-  FS?: string;  // função/subfunção (IC2 quando TIPO2='FS', contas 622xxx)
-  FR?: string;  // fonte ou destinação de recurso (IC3)
-  CO?: string;  // complemento (IC4)
-  ND?: string;  // natureza da despesa (IC5 quando TIPO5='ND', contas 622xxx)
+  FP?: string;
+  FS?: string;
+  FR?: string;
+  CO?: string;
+  ND?: string;
   Valor: number;
   Tipo_valor: 'beginning_balance' | 'period_change' | 'ending_balance';
   Natureza_valor: 'D' | 'C';

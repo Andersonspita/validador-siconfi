@@ -4,6 +4,7 @@ import { validateD2_MSC, validateD2_DCA, validateD2_MSC_Encerramento_DCA } from 
 import { validateD3_RREO, validateD3_Fiscal, validateMSC_CAPAG } from './rulesD3';
 import { validateD4_Cruzamentos } from './rulesD4';
 import { findEncerramentoPeriod, isRegularMonthPeriod } from './utils';
+import { enrichWithCorrectiveEntries } from '../correctiveEntries';
 
 export const runValidations = async (data: ParsedData, rulesMap: Map<string, RuleDefinition>): Promise<ValidationResult[]> => {
   const results: ValidationResult[] = [];
@@ -52,7 +53,8 @@ export const runValidations = async (data: ParsedData, rulesMap: Map<string, Rul
     results.push(...validateD3_Fiscal(data.rreo, data.rgf, rulesMap));
   }
 
-  return results.map(res => {
+  // Enriquecer metadados das regras via rulesMap
+  const enriched = results.map(res => {
     const ruleDef = rulesMap.get(res.ruleId);
     if (ruleDef) {
       if (ruleDef.description) res.description = ruleDef.description;
@@ -61,4 +63,7 @@ export const runValidations = async (data: ParsedData, rulesMap: Map<string, Rul
     }
     return res;
   });
+
+  // Adicionar lançamentos corretivos sugeridos (quando MSC disponível)
+  return data.msc ? enrichWithCorrectiveEntries(enriched, data.msc) : enriched;
 };
