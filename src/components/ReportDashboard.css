@@ -359,3 +359,41 @@
     filter: grayscale(100%);
   }
 }
+
+/* ── Abas Validações | Relatórios ───────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-radius: 8px 8px 0 0;
+}
+
+.tab-btn:hover { color: var(--text); background: var(--hover-bg); }
+
+.tab-btn.tab-active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background: rgba(59, 130, 246, 0.07);
+}
+
+.report-tab-content {
+  padding-top: 8px;
+}

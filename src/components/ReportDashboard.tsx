@@ -4,7 +4,9 @@ import { runValidations } from '../core/validatorEngine';
 import { ValidationResult, RuleDefinition } from '../core/types';
 import { generatePDF } from '../core/pdfGenerator';
 import Papa from 'papaparse';
-import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3 } from 'lucide-react';
+import ReportView from './ReportView';
+import { MSCAccount } from '../core/types';
 import './ReportDashboard.css';
 
 interface ReportDashboardProps {
@@ -19,6 +21,9 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
   const [filter, setFilter] = useState<'all' | 'error' | 'warning' | 'info' | 'capag'>('all');
   const [processError, setProcessError] = useState<string | null>(null);
   const [reportMeta, setReportMeta] = useState<{ enteId?: string; periodo?: string }>({});
+  const [parsedMsc, setParsedMsc] = useState<MSCAccount[]>([]);
+  const [mscPeriods, setMscPeriods] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'validacoes' | 'relatorios'>('validacoes');
 
   useEffect(() => {
     const process = async () => {
@@ -27,7 +32,9 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
         const parsedData = await parseFiles(files);
         const validationResults = await runValidations(parsedData, rulesMap);
         setResults(validationResults);
+        setParsedMsc(parsedData.msc ?? []);
         const periods = parsedData.mscPeriods ?? [];
+        setMscPeriods(periods);
         setReportMeta({
           enteId: parsedData.enteId,
           periodo: periods.length === 1 ? periods[0] : periods.length > 1 ? `${periods[0]} a ${periods[periods.length - 1]}` : parsedData.anoReferencia,
@@ -149,6 +156,24 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
             </button>
           </div>
         </div>
+        {/* Abas: Validações | Relatórios */}
+        <div className="tab-bar hide-on-print">
+          <button
+            className={`tab-btn ${activeTab === 'validacoes' ? 'tab-active' : ''}`}
+            onClick={() => setActiveTab('validacoes')}
+          >
+            <ShieldAlert size={16} /> Validações
+          </button>
+          {parsedMsc.length > 0 && (
+            <button
+              className={`tab-btn ${activeTab === 'relatorios' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('relatorios')}
+            >
+              <BarChart3 size={16} /> Relatórios de Execução
+            </button>
+          )}
+        </div>
+
         <div className="summary-stats">
           <div className="stat-card glass-panel">
             <span className="stat-value">{errorsCount + warningsCount}</span>
@@ -173,6 +198,14 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
         </div>
       </div>
 
+      {activeTab === 'relatorios' && parsedMsc.length > 0 && (
+        <div className="report-tab-content">
+          <ReportView msc={parsedMsc} periodos={mscPeriods} />
+        </div>
+      )}
+
+      {activeTab === 'validacoes' && (
+        <>
       <div className="filters-container glass-panel hide-on-print">
         <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>Todas as Regras</button>
         <button className={`filter-btn ${filter === 'error' ? 'active' : ''}`} onClick={() => setFilter('error')}>Erros</button>
@@ -253,6 +286,8 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
           ))
         )}
       </div>
+    </>
+      )}
     </div>
   );
 }
