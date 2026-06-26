@@ -1,8 +1,6 @@
 # Status do Projeto — Validador Siconfi
 
-> Documento de continuidade para retomada do desenvolvimento.
->
-> **Última atualização:** 25 de Junho de 2026 (v3.1.0 — correções auditoria QA)  
+> **Última atualização:** 26 de Junho de 2026 (v3.3.0)  
 > **Repositório:** https://github.com/Andersonspita/validador-siconfi  
 > **GitHub Pages:** https://andersonspita.github.io/validador-siconfi/
 
@@ -10,9 +8,7 @@
 
 ## 1. Resumo executivo
 
-O **Validador Siconfi** é uma SPA React/TypeScript que executa validações fiscais e contábeis **no navegador**, replicando regras D1–D4 do SICONFI (STN). Nenhum arquivo financeiro é enviado a servidores próprios — o processamento é 100% client-side.
-
-Após auditoria QA (jun/2026), o motor foi corrigido em pontos críticos: equilíbrio D=C, validação MSC **por período**, DDR (7211×8211), parser com encoding legado, exportação PDF e testes automatizados.
+O **Validador Siconfi** é uma SPA React/TypeScript que executa validações fiscais e contábeis **no navegador**, replicando regras D1–D4 do SICONFI (STN). Nenhum arquivo financeiro é enviado a servidores próprios. A aplicação detecta automaticamente se o Firebase está configurado — sem credenciais, funciona em modo aberto (sem login).
 
 ---
 
@@ -22,17 +18,23 @@ Após auditoria QA (jun/2026), o motor foi corrigido em pontos críticos: equil�
 |------|--------|
 | Upload MSC / RREO / RGF / DCA / ZIP | ✅ |
 | Parser MSC (UTF-8, Windows-1252, IBGE 7 dígitos, múltiplos meses) | ✅ |
-| Validação D1 (qualidade MSC, entrega, encerramento) | ✅ |
-| Validação D2 (consistência patrimonial, DCA, equilíbrio D=C) | ✅ |
-| Validação D3 (RREO, RGF, CAPAG) | ✅ |
-| Validação D4 (cruzamentos MSC × RREO/RGF/DCA) | ✅ |
-| Extratores XLS (`xmlExtractors.ts`) | ✅ |
-| Metadados das regras (`Descricao_verificacoes.csv`) | ✅ |
+| XLS/XLSX dentro de ZIP | ✅ v3.1.0 |
+| Detecção de encoding para CSV em ZIP | ✅ v3.1.0 |
+| Validação D1 (qualidade MSC, entrega, encerramento) | ✅ 24 regras |
+| Validação D2 (consistência patrimonial, DCA) | ✅ 38 regras |
+| Validação D3 (RREO, RGF, CAPAG) | ✅ 11 regras |
+| Validação D4 (cruzamentos MSC × RREO/RGF/DCA) | ✅ 10 regras |
+| **Total: 99 regras implementadas** | ✅ |
+| Equilíbrio geral MSC D=C (beginning / period / ending) | ✅ |
+| DDR (7211 × 8211) com flag `impactsCapag: true` | ✅ v3.3.0 |
+| Lançamentos PCASP corretivos por regra | ✅ v3.2.0 |
+| Relatório PDF com seção "Plano de Correção Contábil" | ✅ v3.2.0 |
+| Exportação CSV | ✅ |
 | API Siconfi — extrato de entregas (D1_00001) | ✅ parcial |
-| Relatório PDF + CSV | ✅ |
-| Testes Vitest (parser + utils + rulesD1 + rulesD2) | ✅ 18 testes |
+| Testes Vitest (parser + utils + rulesD1 + rulesD2) | ✅ 33 testes |
+| Script CLI `test-and-pdf.mts` | ✅ v3.2.0 |
 | Deploy GitHub Pages | ✅ |
-| Autenticação Firebase | ✅ |
+| Firebase opcional (app abre sem .env) | ✅ v3.3.0 |
 
 ---
 
@@ -42,52 +44,44 @@ Após auditoria QA (jun/2026), o motor foi corrigido em pontos críticos: equil�
 |---------|--------|
 | `src/core/parsers.ts` | Leitura CSV/XLS/XML/ZIP → `ParsedData` |
 | `src/core/pcaspRules.ts` | Constantes PCASP externalizadas (MDF 15ª ed.) |
+| `src/core/types.ts` | Interfaces TypeScript (incl. `SuggestedEntry`) |
+| `src/core/correctiveEntries.ts` | Lançamentos PCASP D/C sugeridos por regra |
+| `src/core/pdfGenerator.ts` | Relatório PDF com `buildDoc()` unificado |
 | `src/core/validators/index.ts` | Orquestrador `runValidations()` |
 | `src/core/validators/rulesD1.ts` … `rulesD4.ts` | Implementação das regras por dimensão |
 | `src/core/validators/utils.ts` | Helpers: equilíbrio D=C, somas, comparações |
 | `src/core/xmlExtractors.ts` | Extração de valores de planilhas RREO/RGF/DCA |
-| `src/core/pdfGenerator.ts` | Relatório PDF |
-| `src/core/rulesMetadata.ts` | Carrega descrições oficiais das regras |
+| `src/core/rulesMetadata.ts` | Carrega descrições oficiais das regras (CSV) |
 | `src/services/siconfiApi.ts` | API STN (extrato de entregas) |
-| `scripts/run-local-validation.mts` | Teste local via CLI (ZIP/MSC) |
-| `public/data/Descricao_verificacoes.csv` | Catálogo oficial STN (~197 regras) |
+| `src/firebase.ts` | Firebase opcional (init condicional) |
+| `scripts/test-and-pdf.mts` | Teste local via CLI: valida ZIP e gera PDF |
 
 ---
 
-## 4. Cobertura de regras (visão honesta)
+## 4. Cobertura de regras
 
-O CSV oficial lista **~197 verificações**. O validador cobre a maior parte das regras **passíveis de execução offline** com os arquivos disponíveis.
+O CSV oficial lista **~197 verificações**. O validador cobre **99 regras** (as passíveis de execução offline).
 
 | Categoria | Comportamento |
 |-----------|---------------|
 | Regras com lógica matemática/contábil | Implementadas em `rulesD1`–`rulesD4` |
-| Regras que exigem metadados do servidor SICONFI | Emitidas como `[ORIENTAÇÃO]` (`info`) — ex.: D1_00002–15 |
-| Regras que exigem DCA/RREO/RGF ausentes no upload | Não executadas ou aviso de arquivo faltante |
-| Equilíbrio geral MSC D=C | `D2_MSC_EQUILIBRIO` (por tipo de saldo) |
-
-**Referência normativa configurável:** `MDF 15ª edição` em `pcaspRules.ts`.
-
-### Verificação local
-
-```bash
-npm test
-npx tsx scripts/run-local-validation.mts "arquivo.zip"
-```
+| Regras que exigem metadados do servidor SICONFI | Emitidas como `[ORIENTAÇÃO]` (`info`) |
+| Regras de encerramento D2_00069–74 | ❌ Pendentes (ver seção 6) |
 
 ---
 
-## 5. Melhorias recentes (auditoria QA — jun/2026)
+## 5. Testes
 
-1. **Equilíbrio D=C** — `validateEquilibrioGeral()` verifica `SUM(D)=SUM(C)` por `beginning_balance`, `period_change` e `ending_balance`.
-2. **MSC por período** — regras D1/D2 rodam sobre cada mês em `mscByPeriod`, não sobre dados concatenados.
-3. **DDR** — D2_00083 usa subgrupos `7211` × `8211` (exclui garantias/avais 722/823).
-4. **D1_00021** — exclui depreciação acumulada (`1238101`, `1238102`).
-5. **D1_00026** — exclui deduções do PL com natureza D legítima.
-6. **D2_00081** — provisões `211110102`, `211110103`, `211110104` no `ending_balance`.
-7. **D4** — cruzamentos de receita usam campo **CO** (natureza da receita), não D/C.
-8. **Parser** — fallback encoding; normalização IBGE; `anoReferencia` para API.
-9. **PDF** — nome com ente/período, `detailedItems`, versão MDF.
-10. **Removidas** regras D2 fictícias que marcavam “validado” sem lógica real.
+```bash
+npm test      # 33 testes Vitest (4 arquivos)
+```
+
+| Arquivo | Testes | O que cobre |
+|---------|--------|-------------|
+| `parsers.test.ts` | 3 | Encoding, IBGE, notação científica |
+| `validators/utils.test.ts` | 6 | Equilíbrio D=C, DDR, invertidas |
+| `validators/rulesD1.test.ts` | 14 | D1_00017/18/21/22/23/24/31 |
+| `validators/rulesD2.test.ts` | 10 | D2_00050/55/81/83 |
 
 ---
 
@@ -95,49 +89,52 @@ npx tsx scripts/run-local-validation.mts "arquivo.zip"
 
 | Item | Prioridade | Notas |
 |------|------------|-------|
-| Regras D2 de encerramento ainda não implementadas (ex.: D2_00069–74 MSC×DCA) | Média | Requer extratores DCA + MSC encerramento |
+| Regras D2 de encerramento (D2_00069–74 MSC×DCA) | Média | Requer extratores DCA + MSC encerramento |
 | Tempestividade exata (prazos LRF por bimestre) | Baixa | API retorna homologação, não prazo legal |
 | D1_00038 — volume de avisos em contas 5/6 | Baixa | Expandir lista de exceções em `pcaspRules.ts` |
-| Performance MSC > 50k linhas | Baixa | Monitorar no browser |
-| CI/CD com testes no GitHub Actions | Baixa | `npm test` manual hoje |
-| Firebase no GitHub Pages | Média | Variáveis `VITE_*` no build de deploy |
+| Lançamentos corretivos para mais regras D3/D4 | Baixa | `correctiveEntries.ts` cobre D1/D2 hoje |
+| Firebase CI/CD (secrets no GitHub Actions) | Baixa | Hoje funciona sem auth no GitHub Pages |
+| CSV `Descricao_verificacoes.csv` no repo | Baixa | Excluído por `*.csv` no .gitignore; app funciona sem ele |
 
 ---
 
-## 7. Contexto de negócio
+## 7. Histórico de versões
 
-- **Cliente:** Lopes Consultoria Contábil
-- **Público-alvo:** Contadores de prefeituras
-- **Motivação:** Antecipar erros SICONFI e proteger nota **CAPAG**
-- **Deploy:** GitHub Pages (`npm run deploy`)
+### v3.3.0 — 2026-06-26
+- `firebase.ts`: inicialização condicional — sem env vars, app abre sem login
+- `App.tsx`: pula auth quando Firebase não configurado; `rulesMap` inicia como `Map` vazio
+- `rulesMetadata.ts`: fetch com `.catch()` → Map vazio se CSV não existe (sem crash)
+- `Login.tsx`, `ChangePasswordModal.tsx`: `auth!` non-null assertion onde Firebase garantido
+- D2_00083 DDR: `impactsCapag: false` → **`true`** + mensagem explica impacto no IL/CAPAG e Ranking ICF (Portaria MF 1.583/2023)
+
+### v3.2.0 — 2026-06-26
+- `correctiveEntries.ts`: 14 regras mapeadas a lançamentos PCASP D/C (DDR, férias, depreciação, RPPS/RGPS, etc.)
+- `types.ts`: interface `SuggestedEntry` + campo `suggestedEntries?` em `ValidationResult`
+- `pdfGenerator.ts`: seção "Plano de Correção Contábil" com tabela D/C por regra
+- `scripts/test-and-pdf.mts`: CLI para validação e geração de PDF sem browser
+
+### v3.1.0 — 2026-06-25
+- QA-001 [Crítico]: D2_00050 com ponto no código de conta corrigido
+- QA-002/003/004: encoding CSV em ZIP, XLS/XLSX em ZIP, fallback sem validação
+- QA-005/006: D1_00018 mensagem melhorada; D1_00023/24 comparação via Map
+- QA-007: rulesD1.test.ts + rulesD2.test.ts (33 testes total)
+- QA-010/011: affectedAccounts via constantes; cellDates no XLSX.read
+- `pdfGenerator.ts`: buildDoc() unificado, layout A4 sem overflow, orientações compactadas
+
+### v3.0.0 — 2026-06-25
+- Equilíbrio D=C por tipo de saldo; MSC por período; DDR 7211×8211
+- D1_00021 excluindo depreciação; D2_00081 com 13º proporcional
+- Parser com fallback de encoding; PDF com MDF version
 
 ---
 
 ## 8. Comandos úteis
 
 ```bash
-npm run dev       # desenvolvimento
-npm test          # Vitest
-npm run build     # produção
-npm run deploy    # GitHub Pages
+npm run dev          # desenvolvimento → http://localhost:5173
+npm test             # 33 testes Vitest
+npx tsc --noEmit     # verificar tipos TypeScript
+npm run build        # build de produção → /dist
+npm run deploy       # publicar no GitHub Pages
+npx tsx scripts/test-and-pdf.mts arquivo.zip  # validar localmente + gerar PDF
 ```
-
----
-
-## 7. Correções QA — v3.1.0 (2026-06-25)
-
-Auditoria conduzida com Claude Sonnet 4.6 (Lopes Consultoria). 11 achados, sendo 1 crítico.
-
-| ID | Severidade | Arquivo | Descrição |
-|----|-----------|---------|-----------|
-| QA-001 | **Crítico** | `rulesD2.ts` | D2_00050 com ponto no código de conta → falso erro impeditivo 100% do tempo |
-| QA-002 | Alto | `parsers.ts` | CSV em ZIP sem detecção de encoding (windows-1252 corrompido) |
-| QA-003 | Alto | `parsers.ts` | XLS/XLSX em ZIP silenciosamente ignorados |
-| QA-004 | Alto | `parsers.ts` | Fallback de encoding sem validação de `CONTA;` |
-| QA-005 | Médio | `rulesD1.ts` | Mensagem D1_00018 sem contexto sobre IC reclassificação |
-| QA-006 | Médio | `rulesD1.ts` | D1_00023/24 comparação order-dependent → falso negativo |
-| QA-007 | Médio | `*.test.ts` | Zero testes para rulesD1/D2/D3/D4 |
-| QA-010 | Baixo | `rulesD2.ts` | `affectedAccounts` hardcoded em D2_00083 |
-| QA-011 | Baixo | `parsers.ts` | `XLSX.read` sem `cellDates` → datas viram número serial |
-
-Todos corrigidos neste commit. Ver `CHANGELOG.md` para detalhes.

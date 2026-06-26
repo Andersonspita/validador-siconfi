@@ -1,27 +1,43 @@
-# Diário de Implementação
+# Diário de Implementação — Validador Siconfi
 
-Neste arquivo constam as decisões e o progresso do desenvolvimento do Validador Siconfi.
+Registro cronológico das principais decisões técnicas e evoluções do projeto.
 
-## Dia 1
-- **Análise Inicial**: Estudada a metodologia de ranqueamento da STN (D1, D2, D3, D4).
-- **Decisão de Arquitetura**: Optou-se por um modelo Client-Side (React/Vite) para preservar o sigilo das informações orçamentárias (sem backend). O usuário validou e aprovou.
-- **Mudança de Escopo**: Usuário solicitou a inclusão imediata de leitura de ZIP/XML para DCA, RREO e RGF.
-- **Implementação do Design**: Construído um design system em Vanilla CSS utilizando propriedades de *Glassmorphism* e *Dark Mode / Light Mode* nativo (variáveis CSS). O uso de Tailwind foi descartado para manter as dependências leves e seguir a restrição solicitada, usando Vanilla CSS otimizado.
-- **Motor de Validação**: 
-  - `papaparse` adicionado para leitura de CSV ultra-rápida.
-  - `jszip` e `fast-xml-parser` para varredura de RREO/RGF e extração dos XMLs em memória.
-  - Implementado o mock do D1_00017, D1_00018 e D1_00021 para demonstrar a varredura das regras.
-  - Implementado flag especial de `impactsCapag` no motor e destacado visualmente no componente `ReportDashboard`.
+---
 
-- **Próximos Passos (Evolução Contínua)**:
-  - Validar contra mais de 100 regras listadas no arquivo `descricao_ranking.csv`.
-  - Melhorar a tipagem do XML lido com o `fast-xml-parser` para mapear com exatidão as tags do Siconfi (STN_XBRL).
+## 2026-06-26 — v3.3.0
 
+**Firebase opcional + Correção de tela em branco no GitHub Pages**
 
-### Fases 1 a 5 Concluídas (23/06/2026)
-- Refatoração completa da engine.
-- Extração avançada de células e headers XML (RREO, RGF, DCA).
-- Integração da API do Tesouro Nacional Siconfi para checagem de prazos.
-- Cruzamento fiscal D3 (DCL, RCL, Limites de Pessoal e Educação).
-- Cruzamento Contábil x Fiscal D4 (Empenhos MSC x RREO, RP MSC x RGF).
-- Limpeza de dependências e `Build` Vite/React ok.
+O app crashava silenciosamente no GitHub Pages porque `firebase.ts` tentava `initializeApp()` com todas as credenciais `undefined` (o `.env` não existe no GitHub Pages). A correção torna o Firebase completamente opcional: `isFirebaseConfigured` verifica se as env vars existem antes de inicializar. Sem Firebase, o app abre direto na tela de upload sem login. `rulesMetadata.ts` passou a ter `.catch()` no fetch do CSV para não crashar com 404.
+
+**D2_00083 marcada como risco CAPAG**
+
+Após análise da Portaria MF nº 1.583/2023 e da metodologia de cálculo do Indicador de Liquidez, confirmou-se que um DDR desequilibrado impacta o CAPAG por dois canais: (1) distorção do IL que usa apenas fontes não vinculadas, (2) degradação do Ranking ICF que desde 2023 bloqueia elegibilidade para crédito com garantia da União.
+
+---
+
+## 2026-06-26 — v3.2.0
+
+**Lançamentos contábeis corretivos por regra**
+
+Criado `correctiveEntries.ts` mapeando 14 regras a lançamentos PCASP D/C com valores calculados automaticamente. O módulo é chamado em `validators/index.ts` após `runValidations()` via `enrichWithCorrectiveEntries()`. `SuggestedEntry` adicionada a `types.ts` e `suggestedEntries?` a `ValidationResult`. O PDF ganhou uma seção dedicada "Plano de Correção Contábil". Criado `scripts/test-and-pdf.mts` para uso em CLI.
+
+---
+
+## 2026-06-25 — v3.1.0 (Auditoria QA — Lopes Consultoria)
+
+**9 bugs corrigidos, 25 testes adicionados**
+
+Auditoria com Claude Sonnet 4.6 identificou 11 achados (1 crítico, 3 altos, 5 médios/baixos). O crítico (QA-001) era um filtro `CONTA.startsWith('62213.01')` com ponto — códigos PCASP são puramente numéricos, então a condição nunca era satisfeita, forçando `mscDespesasEmpenhadas = R$0` e gerando falso erro impeditivo permanente na D2_00050.
+
+Os bugs de alto impacto eram todos no parser de ZIP: CSV sem detecção de encoding (windows-1252 corrompido), XLS/XLSX ignorados silenciosamente, e fallback de encoding sem validar presença do cabeçalho `CONTA;`.
+
+`pdfGenerator.ts` foi refatorado com `buildDoc()` unificado eliminando duplicação entre `generatePDF` (browser) e `generatePDFBuffer` (Node/CLI). Layout A4 corrigido (22+80+80 = 182mm, zero overflow). Orientações de servidor compactadas em 1 linha.
+
+---
+
+## 2026-06-25 — v3.0.0
+
+**Validação por período e DDR corrigido**
+
+Revisão pós-testes reais com MSC de PM Teixeira de Freitas (16.037 linhas). O equilíbrio D=C foi confirmado como perfeito (diferença exata de R$0,00) e o DDR desequilibrado (R$87,1M) foi identificado e reportado corretamente. Validação migrada de `msc[]` concatenado para `mscByPeriod` para evitar falsos positivos quando múltiplos meses são enviados. DDR ajustado para usar subgrupos `7211` × `8211` (excluindo garantias 722/822). Integração com API da STN para checar homologação de entregas.
