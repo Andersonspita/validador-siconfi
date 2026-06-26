@@ -1,6 +1,6 @@
 # Status do Projeto — Validador Siconfi
 
-> **Última atualização:** 26 de Junho de 2026 (v3.3.0)  
+> **Última atualização:** 26 de Junho de 2026 (v3.4.0)  
 > **Repositório:** https://github.com/Andersonspita/validador-siconfi  
 > **GitHub Pages:** https://andersonspita.github.io/validador-siconfi/
 
@@ -8,7 +8,7 @@
 
 ## 1. Resumo executivo
 
-O **Validador Siconfi** é uma SPA React/TypeScript que executa validações fiscais e contábeis **no navegador**, replicando regras D1–D4 do SICONFI (STN). Nenhum arquivo financeiro é enviado a servidores próprios. A aplicação detecta automaticamente se o Firebase está configurado — sem credenciais, funciona em modo aberto (sem login).
+O **Validador Siconfi** é uma SPA React/TypeScript que executa validações fiscais e contábeis **no navegador**, replicando regras D1–D4 do SICONFI (STN) e gerando relatórios analíticos de execução orçamentária. Nenhum arquivo financeiro sai da máquina do usuário. Firebase é opcional — sem credenciais, o app abre diretamente sem login.
 
 ---
 
@@ -20,21 +20,22 @@ O **Validador Siconfi** é uma SPA React/TypeScript que executa validações fis
 | Parser MSC (UTF-8, Windows-1252, IBGE 7 dígitos, múltiplos meses) | ✅ |
 | XLS/XLSX dentro de ZIP | ✅ v3.1.0 |
 | Detecção de encoding para CSV em ZIP | ✅ v3.1.0 |
-| Validação D1 (qualidade MSC, entrega, encerramento) | ✅ 24 regras |
-| Validação D2 (consistência patrimonial, DCA) | ✅ 38 regras |
-| Validação D3 (RREO, RGF, CAPAG) | ✅ 11 regras |
-| Validação D4 (cruzamentos MSC × RREO/RGF/DCA) | ✅ 10 regras |
+| Validação D1 — 24 regras | ✅ |
+| Validação D2 — 38 regras | ✅ |
+| Validação D3 — 11 regras | ✅ |
+| Validação D4 — 10 regras | ✅ |
 | **Total: 99 regras implementadas** | ✅ |
 | Equilíbrio geral MSC D=C (beginning / period / ending) | ✅ |
-| DDR (7211 × 8211) com flag `impactsCapag: true` | ✅ v3.3.0 |
-| Lançamentos PCASP corretivos por regra | ✅ v3.2.0 |
+| D2_00083 DDR com `impactsCapag: true` + justificativa normativa | ✅ v3.3.0 |
+| Lançamentos PCASP corretivos por regra (`correctiveEntries.ts`) | ✅ v3.2.0 |
 | Relatório PDF com seção "Plano de Correção Contábil" | ✅ v3.2.0 |
-| Exportação CSV | ✅ |
+| **Relatórios de Execução Orçamentária com drill-down** | ✅ v3.4.0 |
+| Exportação CSV (validações e relatórios) | ✅ |
 | API Siconfi — extrato de entregas (D1_00001) | ✅ parcial |
-| Testes Vitest (parser + utils + rulesD1 + rulesD2) | ✅ 33 testes |
+| Testes Vitest — 33 testes (4 arquivos) | ✅ |
 | Script CLI `test-and-pdf.mts` | ✅ v3.2.0 |
 | Deploy GitHub Pages | ✅ |
-| Firebase opcional (app abre sem .env) | ✅ v3.3.0 |
+| Firebase opcional (sem .env = sem crash) | ✅ v3.3.0 |
 
 ---
 
@@ -46,15 +47,18 @@ O **Validador Siconfi** é uma SPA React/TypeScript que executa validações fis
 | `src/core/pcaspRules.ts` | Constantes PCASP externalizadas (MDF 15ª ed.) |
 | `src/core/types.ts` | Interfaces TypeScript (incl. `SuggestedEntry`) |
 | `src/core/correctiveEntries.ts` | Lançamentos PCASP D/C sugeridos por regra |
+| `src/core/reportEngine.ts` | Motor de relatórios de execução orçamentária |
 | `src/core/pdfGenerator.ts` | Relatório PDF com `buildDoc()` unificado |
 | `src/core/validators/index.ts` | Orquestrador `runValidations()` |
-| `src/core/validators/rulesD1.ts` … `rulesD4.ts` | Implementação das regras por dimensão |
+| `src/core/validators/rulesD1.ts` … `rulesD4.ts` | Regras por dimensão |
 | `src/core/validators/utils.ts` | Helpers: equilíbrio D=C, somas, comparações |
-| `src/core/xmlExtractors.ts` | Extração de valores de planilhas RREO/RGF/DCA |
-| `src/core/rulesMetadata.ts` | Carrega descrições oficiais das regras (CSV) |
-| `src/services/siconfiApi.ts` | API STN (extrato de entregas) |
+| `src/core/xmlExtractors.ts` | Extração de valores RREO/RGF/DCA |
+| `src/core/rulesMetadata.ts` | Carrega descrições oficiais (CSV opcional) |
+| `src/services/siconfiApi.ts` | API STN — extrato de entregas |
 | `src/firebase.ts` | Firebase opcional (init condicional) |
-| `scripts/test-and-pdf.mts` | Teste local via CLI: valida ZIP e gera PDF |
+| `src/components/ReportDashboard.tsx` | Painel principal com abas |
+| `src/components/ReportView.tsx` | Tabela de relatórios com drill-down |
+| `scripts/test-and-pdf.mts` | CLI: valida ZIP + gera PDF |
 
 ---
 
@@ -66,69 +70,90 @@ O CSV oficial lista **~197 verificações**. O validador cobre **99 regras** (as
 |-----------|---------------|
 | Regras com lógica matemática/contábil | Implementadas em `rulesD1`–`rulesD4` |
 | Regras que exigem metadados do servidor SICONFI | Emitidas como `[ORIENTAÇÃO]` (`info`) |
-| Regras de encerramento D2_00069–74 | ❌ Pendentes (ver seção 6) |
+| Regras de encerramento D2_00069–74 | ❌ Pendentes |
 
 ---
 
-## 5. Testes
+## 5. Relatórios de Execução (v3.4.0)
+
+Motor extraído de `reportEngine.ts` que agrega contas 622xxx da MSC:
+
+| Agrupamento | Descrição |
+|-------------|-----------|
+| Função | 2 primeiros dígitos do FS (ex.: 10 = Saúde) |
+| Função/Subfunção | Código FS completo (ex.: 10301 = Atenção Básica) |
+| Fonte de Recurso | Campo FR (ex.: 1500, 1540, 1550) |
+| Natureza de Despesa | 6 primeiros dígitos do ND |
+| Órgão/Poder | Campo PO |
+
+**Estágios de execução (PCASP):**
+- Empenhado = conta `622130100` (net C−D)
+- Liquidado = contas `622130200`, `622130300`, `622130400` (net C−D)
+- Pago = contas `622130300`, `622130400` (net C−D)
+
+**Drill-down:** Função → Subfunção → Fonte de Recurso (com breadcrumb)  
+**Toggle:** Movimentação (`period_change`) × Acumulado (`ending_balance`)
+
+---
+
+## 6. Testes
 
 ```bash
 npm test      # 33 testes Vitest (4 arquivos)
 ```
 
-| Arquivo | Testes | O que cobre |
-|---------|--------|-------------|
+| Arquivo | Testes | Cobertura |
+|---------|--------|-----------|
 | `parsers.test.ts` | 3 | Encoding, IBGE, notação científica |
-| `validators/utils.test.ts` | 6 | Equilíbrio D=C, DDR, invertidas |
+| `validators/utils.test.ts` | 6 | Equilíbrio D=C, DDR, contas invertidas |
 | `validators/rulesD1.test.ts` | 14 | D1_00017/18/21/22/23/24/31 |
 | `validators/rulesD2.test.ts` | 10 | D2_00050/55/81/83 |
 
 ---
 
-## 6. Pendências conhecidas
+## 7. Pendências conhecidas
 
 | Item | Prioridade | Notas |
 |------|------------|-------|
 | Regras D2 de encerramento (D2_00069–74 MSC×DCA) | Média | Requer extratores DCA + MSC encerramento |
 | Tempestividade exata (prazos LRF por bimestre) | Baixa | API retorna homologação, não prazo legal |
-| D1_00038 — volume de avisos em contas 5/6 | Baixa | Expandir lista de exceções em `pcaspRules.ts` |
-| Lançamentos corretivos para mais regras D3/D4 | Baixa | `correctiveEntries.ts` cobre D1/D2 hoje |
-| Firebase CI/CD (secrets no GitHub Actions) | Baixa | Hoje funciona sem auth no GitHub Pages |
-| CSV `Descricao_verificacoes.csv` no repo | Baixa | Excluído por `*.csv` no .gitignore; app funciona sem ele |
+| Lançamentos corretivos para regras D3/D4 | Baixa | `correctiveEntries.ts` cobre D1/D2 hoje |
+| Firebase CI/CD (secrets no GitHub Actions) | Baixa | Funciona sem auth no GitHub Pages |
+| CSV `Descricao_verificacoes.csv` no repo | Baixa | Excluído por `*.csv` no .gitignore |
+| Relatórios: comparação com RREO Anexo 02 (D4) | Futura | Cross-validação de valores |
 
 ---
 
-## 7. Histórico de versões
+## 8. Histórico de versões
+
+### v3.4.0 — 2026-06-26
+- `reportEngine.ts`: motor de relatórios de execução orçamentária
+- `ReportView.tsx` + `ReportView.css`: tabela com drill-down e breadcrumb
+- `ReportDashboard.tsx`: aba "Relatórios de Execução" ao lado de "Validações"
+- Export CSV por visão/agrupamento no relatório
 
 ### v3.3.0 — 2026-06-26
-- `firebase.ts`: inicialização condicional — sem env vars, app abre sem login
-- `App.tsx`: pula auth quando Firebase não configurado; `rulesMap` inicia como `Map` vazio
-- `rulesMetadata.ts`: fetch com `.catch()` → Map vazio se CSV não existe (sem crash)
-- `Login.tsx`, `ChangePasswordModal.tsx`: `auth!` non-null assertion onde Firebase garantido
-- D2_00083 DDR: `impactsCapag: false` → **`true`** + mensagem explica impacto no IL/CAPAG e Ranking ICF (Portaria MF 1.583/2023)
+- Firebase opcional (init condicional; app abre sem .env)
+- D2_00083 `impactsCapag: true` com justificativa normativa (Portaria MF 1.583/2023)
+- Tela em branco no GitHub Pages corrigida
 
 ### v3.2.0 — 2026-06-26
-- `correctiveEntries.ts`: 14 regras mapeadas a lançamentos PCASP D/C (DDR, férias, depreciação, RPPS/RGPS, etc.)
-- `types.ts`: interface `SuggestedEntry` + campo `suggestedEntries?` em `ValidationResult`
-- `pdfGenerator.ts`: seção "Plano de Correção Contábil" com tabela D/C por regra
-- `scripts/test-and-pdf.mts`: CLI para validação e geração de PDF sem browser
+- `correctiveEntries.ts`: lançamentos PCASP corretivos por regra
+- PDF: seção "Plano de Correção Contábil"
+- `scripts/test-and-pdf.mts`: CLI completo
 
 ### v3.1.0 — 2026-06-25
-- QA-001 [Crítico]: D2_00050 com ponto no código de conta corrigido
-- QA-002/003/004: encoding CSV em ZIP, XLS/XLSX em ZIP, fallback sem validação
-- QA-005/006: D1_00018 mensagem melhorada; D1_00023/24 comparação via Map
-- QA-007: rulesD1.test.ts + rulesD2.test.ts (33 testes total)
-- QA-010/011: affectedAccounts via constantes; cellDates no XLSX.read
-- `pdfGenerator.ts`: buildDoc() unificado, layout A4 sem overflow, orientações compactadas
+- 9 correções QA (1 crítico, 3 altos, 5 médios/baixos)
+- 33 testes Vitest
+- `buildDoc()` unificado; layout A4 sem overflow
 
 ### v3.0.0 — 2026-06-25
-- Equilíbrio D=C por tipo de saldo; MSC por período; DDR 7211×8211
-- D1_00021 excluindo depreciação; D2_00081 com 13º proporcional
-- Parser com fallback de encoding; PDF com MDF version
+- Validação por período; equilíbrio D=C; DDR 7211×8211
+- Constantes PCASP externalizadas; integração API Siconfi
 
 ---
 
-## 8. Comandos úteis
+## 9. Comandos úteis
 
 ```bash
 npm run dev          # desenvolvimento → http://localhost:5173
@@ -136,5 +161,5 @@ npm test             # 33 testes Vitest
 npx tsc --noEmit     # verificar tipos TypeScript
 npm run build        # build de produção → /dist
 npm run deploy       # publicar no GitHub Pages
-npx tsx scripts/test-and-pdf.mts arquivo.zip  # validar localmente + gerar PDF
+npx tsx scripts/test-and-pdf.mts arquivo.zip   # validar + gerar PDF
 ```

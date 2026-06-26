@@ -1,3 +1,21 @@
+## [3.4.0] — 2026-06-26
+
+### Relatórios de Execução Orçamentária (feature)
+
+- **`reportEngine.ts`** — motor de relatórios que extrai e agrega dados de despesa
+  da MSC (contas 622xxx) por 5 dimensões: Função, Função/Subfunção, Fonte de Recurso,
+  Natureza de Despesa, Órgão/Poder. Mapeamento PCASP:
+  Empenhado = 622130100, Liquidado = 622130200/300/400, Pago = 622130300/400.
+  Toggle Movimentação (`period_change`) × Acumulado (`ending_balance`).
+  Drill-down: Função → Subfunção → Fonte (com filtros encadeados).
+- **`ReportView.tsx` + `ReportView.css`** — tabela interativa com seletor de
+  agrupamento (segmented control), breadcrumb navegável, linha de TOTAL no rodapé
+  e export CSV da visão atual.
+- **`ReportDashboard.tsx`** — nova aba "Relatórios de Execução" ao lado de
+  "Validações"; `parsedMsc` e `mscPeriods` salvos no state após processamento.
+
+---
+
 ## [3.2.0] — 2026-06-26
 
 ### Lançamentos Contábeis Corretivos (feature)
