@@ -111,11 +111,14 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
       dimension: 'D2',
       description: 'Integridade do DDR (saldo 721 ≠ saldo 821)',
       severity: 'error',
-      impactsCapag: false,
+      impactsCapag: true, // CAPAG: distorce IL + degrada Ranking ICF (Portaria MF 1.583/2023)
       affectedAccounts: [...DDR_DEVEDORA_PREFIXES, ...DDR_CREDORA_PREFIXES],
       message: pm(
-        `Divergência nas contas de controle do DDR. Saldo final 7211: R$ ${vlDDR721.toFixed(2)} | Saldo final 8211: R$ ${vlDDR821.toFixed(2)} | Diferença: R$ ${Math.abs(vlDDR721 - vlDDR821).toFixed(2)}.`
+        `Divergência nas contas de controle do DDR. Saldo final 7211: R$ ${vlDDR721.toFixed(2)} | Saldo final 8211: R$ ${vlDDR821.toFixed(2)} | Diferença: R$ ${Math.abs(vlDDR721 - vlDDR821).toFixed(2)}. RISCO CAPAG: desequilíbrio distorce o Indicador de Liquidez (IL) e degrada o Ranking ICF — pode bloquear elegibilidade para crédito com garantia da União (Portaria MF 1.583/2023).`
       ),
+      actionPlan:
+        'Identificar a destinação de recurso que gerou o desequilíbrio e registrar o ajuste no subgrupo 721/821 correspondente. ' +
+        'Enquanto não corrigido, o Indicador de Liquidez do CAPAG pode estar superestimado ou subestimado.',
     });
   }
 
