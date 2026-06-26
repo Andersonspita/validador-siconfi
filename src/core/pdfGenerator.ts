@@ -136,3 +136,80 @@ export function generatePDF(results: ValidationResult[], meta: PdfReportMeta = {
   const periodPart = meta.periodo ? `${meta.periodo}_` : '';
   doc.save(`Relatorio_Siconfi_${entePart}${periodPart}${new Date().toISOString().slice(0, 10)}.pdf`);
 }
+
+/**
+ * Variante para uso em Node/CLI: retorna o ArrayBuffer do PDF sem acionar download no browser.
+ * Compartilha toda a lógica de generatePDF via output('arraybuffer').
+ */
+export function generatePDFBuffer(results: ValidationResult[], meta: PdfReportMeta = {}): ArrayBuffer {
+  // jsPDF em Node: doc.output('arraybuffer') retorna os bytes diretamente.
+  // Re-implementa chamando generatePDF mas interceptando o output antes do save.
+  const doc = new jsPDF();
+
+  // Rebuild inline (duplicar é necessário pois generatePDF não retorna doc)
+  const errors   = results.filter(r => r.severity === 'error');
+  const warnings = results.filter(r => r.severity === 'warning');
+  const infos    = results.filter(r => r.severity === 'info');
+
+  doc.setFontSize(18);
+  doc.setTextColor(34, 197, 94);
+  doc.text('Relatório de Auditoria - Validador Siconfi', 14, 22);
+
+  doc.setFontSize(11);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Data de Geração: ${new Date().toLocaleString('pt-BR')}`, 14, 30);
+  let metaY = 30;
+  if (meta.enteId)   { metaY += 6; doc.text(`Ente (IBGE): ${meta.enteId}`, 14, metaY); }
+  if (meta.periodo)  { metaY += 6; doc.text(`Período: ${meta.periodo}`, 14, metaY); }
+  metaY += 6;
+  doc.text(`Referência normativa: ${MDF_VERSION}`, 14, metaY);
+  metaY += 6;
+  doc.text(`Total: ${errors.length} impeditivo(s) | ${warnings.length} aviso(s) | ${infos.length} orientação(ões)`, 14, metaY);
+
+  let currentY = metaY + 10;
+
+  const addTable = (
+    title: string, color: [number, number, number],
+    rows: ValidationResult[], headColor: [number, number, number]
+  ) => {
+    if (!rows.length) return;
+    if (currentY > 250) { doc.addPage(); currentY = 20; }
+    doc.setFontSize(13);
+    doc.setTextColor(...color);
+    doc.text(title, 14, currentY);
+    currentY += 4;
+    autoTable(doc, {
+      startY: currentY,
+      head: [['Regra', 'Impacto & Descrição', 'Plano de Ação Corretiva']],
+      body: rows.map(r => [
+        r.ruleId,
+        r.description ? `${r.description}\n${r.message}` : r.message,
+        formatDetails(r),
+      ]),
+      headStyles: { fillColor: headColor, fontSize: 7.5 },
+      bodyStyles: { fontSize: 7.5, cellPadding: 2 },
+      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 78 }, 2: { cellWidth: 77 } },
+      theme: 'striped',
+    });
+    currentY = (doc as any).lastAutoTable?.finalY + 8 ?? currentY + 20;
+  };
+
+  addTable(`Erros Críticos (${errors.length})`,   [220, 38, 38],  errors,   [220, 38, 38]);
+  addTable(`Avisos e Informativos (${warnings.length})`, [234, 179, 8], warnings, [180, 130, 0]);
+  addTable(`Orientações (${infos.length})`,        [59, 130, 246], infos,    [59, 100, 200]);
+
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(
+      `Página ${i} de ${pageCount} - Gerado pelo Validador Siconfi Local`,
+      doc.internal.pageSize.width / 2,
+      doc.internal.pageSize.height - 10,
+      { align: 'center' }
+    );
+  }
+
+  return doc.output('arraybuffer');
+}
