@@ -4,7 +4,7 @@ import Dropzone from './components/Dropzone';
 import ReportDashboard from './components/ReportDashboard';
 import Login from './components/Login';
 import ChangePasswordModal from './components/ChangePasswordModal';
-import { auth } from './firebase';
+import { auth, isFirebaseConfigured } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { loadRulesMetadata } from './core/rulesMetadata';
 import { RuleDefinition } from './core/types';
@@ -15,17 +15,28 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [rulesMap, setRulesMap] = useState<Map<string, RuleDefinition> | null>(null);
+  const [rulesMap, setRulesMap] = useState<Map<string, RuleDefinition>>(new Map());
+  const [rulesLoaded, setRulesLoaded] = useState(false);
 
   useEffect(() => {
     document.body.className = `theme-${theme}`;
   }, [theme]);
 
+  // Carrega metadados de regras — continua normalmente se o CSV não estiver disponível
   useEffect(() => {
-    loadRulesMetadata().then(map => setRulesMap(map));
+    loadRulesMetadata()
+      .then(map => setRulesMap(map))
+      .catch(() => {/* sem CSV: descrições ficam em branco, validação funciona normalmente */})
+      .finally(() => setRulesLoaded(true));
   }, []);
 
+  // Autenticação Firebase — apenas quando configurado
   useEffect(() => {
+    if (!isFirebaseConfigured || !auth) {
+      // Sem Firebase: pular autenticação e liberar acesso direto
+      setLoadingAuth(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoadingAuth(false);
@@ -33,16 +44,15 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   const handleLogout = async () => {
-    await signOut(auth);
+    if (auth) await signOut(auth);
     setFiles([]);
   };
 
-  if (loadingAuth || !rulesMap) {
+  // Aguarda apenas a checagem de auth — rulesMap pode carregar depois
+  if (loadingAuth) {
     return (
       <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Loader2 size={48} className="spin" style={{ color: 'var(--primary)' }} />
@@ -50,7 +60,8 @@ function App() {
     );
   }
 
-  if (!user) {
+  // Tela de login — somente quando Firebase está configurado e sem usuário
+  if (isFirebaseConfigured && !user) {
     return (
       <div className="app-container">
         <header className="glass-header">
@@ -78,12 +89,16 @@ function App() {
             <button onClick={toggleTheme} className="icon-btn" aria-label="Toggle Theme" title="Tema">
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
             </button>
-            <button onClick={() => setShowChangePassword(true)} className="icon-btn" aria-label="Alterar Senha" title="Alterar Senha">
-              <KeyRound size={20} />
-            </button>
-            <button onClick={handleLogout} className="icon-btn logout-btn" aria-label="Sair" title="Sair">
-              <LogOut size={20} />
-            </button>
+            {isFirebaseConfigured && user && (
+              <>
+                <button onClick={() => setShowChangePassword(true)} className="icon-btn" aria-label="Alterar Senha" title="Alterar Senha">
+                  <KeyRound size={20} />
+                </button>
+                <button onClick={handleLogout} className="icon-btn logout-btn" aria-label="Sair" title="Sair">
+                  <LogOut size={20} />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -94,18 +109,24 @@ function App() {
           <p>Faça o upload da sua MSC, RREO, RGF ou DCA e antecipe possíveis erros nas validações do Siconfi (D1 a D4), protegendo a nota CAPAG do seu município.</p>
         </section>
 
+        {!rulesLoaded && (
+          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Carregando metadados de regras…
+          </p>
+        )}
+
         {files.length === 0 ? (
           <Dropzone onFilesDropped={setFiles} />
         ) : (
           <ReportDashboard files={files} rulesMap={rulesMap} onReset={() => setFiles([])} />
         )}
       </main>
-      
+
       <footer className="app-footer">
         <p>Validador Local • Não enviamos seus dados financeiros para a nuvem.</p>
       </footer>
 
-      {showChangePassword && (
+      {showChangePassword && isFirebaseConfigured && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
       )}
     </div>

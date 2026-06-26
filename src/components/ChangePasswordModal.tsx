@@ -30,8 +30,8 @@ export default function ChangePasswordModal({ onClose }: Props) {
     setError('');
 
     try {
-      if (auth.currentUser) {
-        await updatePassword(auth.currentUser, newPassword);
+      if (auth?.currentUser) {
+        await updatePassword(auth!.currentUser!, newPassword);
         setSuccess(true);
         setTimeout(() => {
           onClose();
