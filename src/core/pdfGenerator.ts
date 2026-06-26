@@ -191,7 +191,7 @@ export function generatePDFBuffer(results: ValidationResult[], meta: PdfReportMe
       columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 78 }, 2: { cellWidth: 77 } },
       theme: 'striped',
     });
-    currentY = (doc as any).lastAutoTable?.finalY + 8 ?? currentY + 20;
+    const finalY = (doc as any).lastAutoTable?.finalY; currentY = finalY != null ? finalY + 8 : currentY + 20;
   };
 
   addTable(`Erros Críticos (${errors.length})`,   [220, 38, 38],  errors,   [220, 38, 38]);
