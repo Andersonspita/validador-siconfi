@@ -1,5 +1,5 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { getAuth, Auth, browserSessionPersistence, setPersistence } from 'firebase/auth';
 
 const {
   VITE_FIREBASE_API_KEY,
@@ -32,6 +32,8 @@ if (isFirebaseConfigured) {
     appId:             VITE_FIREBASE_APP_ID,
   });
   authInstance = getAuth(app);
+  // Sessão apenas por aba: fechar a aba desloga automaticamente
+  setPersistence(authInstance, browserSessionPersistence).catch(console.error);
 }
 
 export const auth = authInstance;

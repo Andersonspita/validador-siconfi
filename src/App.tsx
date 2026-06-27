@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Moon, Sun, ShieldCheck, LogOut, Loader2, KeyRound } from 'lucide-react';
 import Dropzone from './components/Dropzone';
 import ReportDashboard from './components/ReportDashboard';
@@ -6,6 +6,8 @@ import Login from './components/Login';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import { auth, isFirebaseConfigured } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+
+const INATIVIDADE_MS = 30 * 60 * 1000; // 30 minutos
 import { loadRulesMetadata } from './core/rulesMetadata';
 import { RuleDefinition } from './core/types';
 
@@ -17,6 +19,7 @@ function App() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [rulesMap, setRulesMap] = useState<Map<string, RuleDefinition>>(new Map());
   const [rulesLoaded, setRulesLoaded] = useState(false);
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     document.body.className = `theme-${theme}`;
@@ -29,6 +32,26 @@ function App() {
       .catch(() => {/* sem CSV: descrições ficam em branco, validação funciona normalmente */})
       .finally(() => setRulesLoaded(true));
   }, []);
+
+  // Timer de inatividade: desloga após 30 min sem interação
+  const resetTimer = useCallback(() => {
+    if (!isFirebaseConfigured || !auth) return;
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    inactivityTimer.current = setTimeout(async () => {
+      await signOut(auth!);
+      alert('Sessão encerrada por inatividade (30 minutos). Faça login novamente.');
+    }, INATIVIDADE_MS);
+  }, []);
+
+  useEffect(() => {
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetTimer));
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    };
+  }, [resetTimer]);
 
   // Autenticação Firebase — apenas quando configurado
   useEffect(() => {
