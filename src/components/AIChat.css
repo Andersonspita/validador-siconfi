@@ -17,9 +17,9 @@
 /* FAB */
 .ai-fab {
   position: fixed;
-  bottom: 28px;
-  right: 28px;
-  z-index: 1000;
+  bottom: 24px;
+  left: 24px;
+  z-index: 1002;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -234,8 +234,8 @@ body.theme-light .ai-input {
 .ai-send:disabled { opacity: 0.4; cursor: not-allowed; }
 
 @media (max-width: 440px) {
-  .ai-panel { width: calc(100vw - 32px); right: 16px; }
-  .ai-fab { bottom: 16px; right: 16px; }
+  .ai-panel { width: calc(100vw - 32px); left: 8px; right: 8px; }
+  .ai-fab { bottom: 16px; left: 16px; }
 }
 
 /* Configuração da chave */
