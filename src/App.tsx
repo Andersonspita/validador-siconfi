@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Moon, Sun, ShieldCheck, LogOut, Loader2, KeyRound } from 'lucide-react';
 import Dropzone from './components/Dropzone';
+import AIChat from './components/AIChat';
 import ReportDashboard from './components/ReportDashboard';
 import Login from './components/Login';
 import ChangePasswordModal from './components/ChangePasswordModal';
@@ -152,6 +153,9 @@ function App() {
       {showChangePassword && isFirebaseConfigured && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
       )}
+
+      {/* Assistente IA — sempre visível, independente de arquivo carregado */}
+      <AIChat results={[]} meta={{}} />
     </div>
   );
 }

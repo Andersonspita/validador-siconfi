@@ -43,8 +43,9 @@ function buildSystemPrompt(
     `[${r.ruleId}][${r.severity}${r.impactsCapag ? '/CAPAG' : ''}] ${r.message.slice(0, 200)}`
   ).join('\n');
 
-  return `Você é um assistente especialista em contabilidade pública brasileira, SICONFI, PCASP, LRF e CAPAG.
-O usuário está analisando resultados de validação fiscal do município ${meta.enteId ?? '(não identificado)'}, período ${meta.periodo ?? '(não informado)'}.
+  const temResultados = results.length > 0;
+  const contextoResultados = temResultados
+    ? `O usuário está analisando resultados de validação fiscal do município ${meta.enteId ?? '(não identificado)'}, período ${meta.periodo ?? '(não informado)'}.
 
 RESUMO DAS INCONSISTÊNCIAS:
 - ${errors.length} erro(s) crítico(s) impeditivo(s)
@@ -52,9 +53,23 @@ RESUMO DAS INCONSISTÊNCIAS:
 - ${capag.length} risco(s) CAPAG
 
 DETALHAMENTO (até 20 regras):
-${resumo}
+${resumo}`
+    : 'Nenhum arquivo foi carregado ainda. Responda perguntas gerais sobre SICONFI, PCASP, LRF, CAPAG, MDF e contabilidade pública.';
 
-Responda de forma objetiva e prática, sempre em português brasileiro. Cite normas (MCASP, MDF, LRF, NBC TSP) quando aplicável. Seja direto — o usuário é contador público.`;
+  return `Você é um assistente especialista em contabilidade pública brasileira. Seu conhecimento cobre:
+- SICONFI: MSC, RREO, RGF, DCA, regras D1–D4, CAUC, CAPAG
+- PCASP: Plano de Contas Aplicado ao Setor Público (Classes 1–8)
+- LRF: Lei de Responsabilidade Fiscal — limites de pessoal, dívida, crédito, ARO
+- MCASP: Manual de Contabilidade Aplicada ao Setor Público (11ª ed.)
+- MDF: Manual de Demonstrativos Fiscais (15ª ed.)
+- NBC TSP: Normas Brasileiras de Contabilidade do Setor Público
+- Portaria MF 1.583/2023: Ranking ICF e CAPAG
+- Portaria STN 501/2017: indicadores CAPAG (endividamento, poupança, liquidez)
+- DDR: Disponibilidade por Destinação de Recursos
+
+${contextoResultados}
+
+Responda sempre em português brasileiro, de forma objetiva e prática. Cite artigos de lei e normas quando relevante. O usuário é contador público ou gestor municipal — seja técnico e direto.`;
 }
 
 export async function sendMessage(
@@ -96,6 +111,17 @@ export function buildSuggestions(results: ValidationResult[]): string[] {
   const suggestions: string[] = [];
   const ids = results.map(r => r.ruleId);
 
+  if (results.length === 0) {
+    // Sugestões gerais — sem arquivo carregado
+    return [
+      'O que é o SICONFI e para que serve?',
+      'Como calcular a RCL para verificar o limite de pessoal?',
+      'O que é DDR e como impacta o CAPAG?',
+      'Quais são os prazos de entrega do RREO e RGF?',
+      'Como funciona o Ranking ICF e a nota CAPAG?',
+    ];
+  }
+
   if (ids.includes('D2_00083'))   suggestions.push('Como corrigir o desequilíbrio DDR (D2_00083)?');
   if (ids.includes('D2_00081'))   suggestions.push('Por que preciso provisionar férias e 13º todo mês?');
   if (results.some(r => r.impactsCapag)) suggestions.push('Como esses erros afetam minha nota CAPAG?');
@@ -103,7 +129,6 @@ export function buildSuggestions(results: ValidationResult[]): string[] {
     suggestions.push('O que são Indicadores de Conta (IC) e como preencher?');
   if (ids.includes('D1_00018'))   suggestions.push('O que significa SI + MOV ≠ SF?');
   if (ids.includes('D1_00021'))   suggestions.push('Por que contas do ativo têm natureza Credora?');
-
   suggestions.push('Qual é a prioridade de correção dessas inconsistências?');
   suggestions.push('O que é o Ranking ICF e como impacta o município?');
   return suggestions.slice(0, 5);

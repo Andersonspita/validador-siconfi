@@ -6,7 +6,6 @@ import { generatePDF } from '../core/pdfGenerator';
 import Papa from 'papaparse';
 import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3 } from 'lucide-react';
 import ReportView from './ReportView';
-import AIChat from './AIChat';
 import CAPAGPanel from './CAPAGPanel';
 import { MSCAccount } from '../core/types';
 import './ReportDashboard.css';
@@ -152,7 +151,6 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
               <Download size={20} />
               Exportar CSV
             </button>
-            <AIChat results={results} meta={reportMeta} />
             <button onClick={() => generatePDF(filteredResults, reportMeta)} className="export-btn glass-panel print-btn">
               <Printer size={20} />
               Gerar Relatório Oficial (PDF)
