@@ -197,9 +197,9 @@ function buildDoc(results: ValidationResult[], meta: PdfReportMeta = {}): jsPDF 
 
       // Tabela de lançamentos
       const colD  = 28;
-      const colDA = Math.floor((COL_AVAIL - colD) * 0.28);
-      const colCA = Math.floor((COL_AVAIL - colD) * 0.28);
-      const colV  = 22;
+      const colDA = Math.floor((COL_AVAIL - colD) * 0.22);
+      const colCA = Math.floor((COL_AVAIL - colD) * 0.22);
+      const colV  = 18;
       const colObs = COL_AVAIL - colD - colDA - colCA - colV;
 
       autoTable(doc, {
@@ -211,7 +211,7 @@ function buildDoc(results: ValidationResult[], meta: PdfReportMeta = {}): jsPDF 
           `${e.debito.conta}\n${e.debito.descricao}`,
           `${e.credito.conta}\n${e.credito.descricao}`,
           e.valor != null ? brl(e.valor) : '—',
-          e.obs ? truncate(e.obs, 250) : '—',
+          e.obs ?? '—',
         ]),
         headStyles: { fillColor: [30, 100, 60], fontSize: 7, fontStyle: 'bold', textColor: [255,255,255] },
         bodyStyles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak', lineWidth: 0.1 },
