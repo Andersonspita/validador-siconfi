@@ -220,8 +220,8 @@
 
 /* Painel informativo CAUC */
 .cauc-info-card {
-  background: var(--bg-accent, #eff6ff);
-  border: 0.5px solid var(--border-accent, #bfdbfe);
+  background: #eff6ff;
+  border: 0.5px solid #bfdbfe;
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 16px;
@@ -229,44 +229,64 @@
 .cauc-info-title {
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: #1e3a5f;
   margin: 0 0 8px;
 }
 .cauc-info-text {
   font-size: 12.5px;
-  color: var(--text-secondary);
+  color: #334155;
   line-height: 1.65;
   margin: 0 0 6px;
 }
 .cauc-info-text:last-child { margin-bottom: 0; }
 
+/* Tema escuro: card com fundo azul-marinho e texto claro */
+body.theme-dark .cauc-info-card {
+  background: #0f2744;
+  border-color: #1e4d8c;
+}
+body.theme-dark .cauc-info-title { color: #bfdbfe; }
+body.theme-dark .cauc-info-text  { color: #94a3b8; }
+body.theme-dark .cauc-info-text strong { color: #e2edfb; }
+
 .cauc-links { display: flex; flex-direction: column; gap: 8px; }
 .cauc-links-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: #475569;
   margin: 0 0 4px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+body.theme-dark .cauc-links-title { color: #64748b; }
 .cauc-link-btn {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 10px 14px;
-  background: var(--surface-2, #f8fafc);
-  border: 0.5px solid var(--border-color, #e2e8f0);
+  background: #f8fafc;
+  border: 0.5px solid #e2e8f0;
   border-radius: 8px;
   text-decoration: none;
-  color: var(--text-accent, #2563eb);
+  color: #2563eb;
   font-size: 13px;
   font-weight: 500;
   transition: background 0.12s, border-color 0.12s;
 }
 .cauc-link-btn:hover {
-  background: var(--bg-accent, #eff6ff);
-  border-color: var(--border-accent, #93c5fd);
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
+body.theme-dark .cauc-link-btn {
+  background: #0f172a;
+  border-color: #1e3a5f;
+  color: #60a5fa;
+}
+body.theme-dark .cauc-link-btn:hover {
+  background: #0f2744;
+  border-color: #2563eb;
+}
+body.theme-dark .cauc-link-desc { color: #64748b; }
 .cauc-link-primary {
   background: var(--fill-accent, #2563eb);
   color: #fff;
@@ -285,6 +305,8 @@
 .cauc-ente-hint {
   margin: 12px 0 0;
   font-size: 12px;
-  color: var(--text-muted);
+  color: #64748b;
   text-align: center;
 }
+body.theme-dark .cauc-ente-hint { color: #475569; }
+body.theme-dark .cauc-ente-hint strong { color: #94a3b8; }
