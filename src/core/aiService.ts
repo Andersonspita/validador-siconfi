@@ -69,7 +69,13 @@ ${resumo}`
 
 ${contextoResultados}
 
-Responda sempre em português brasileiro, de forma objetiva e prática. Cite artigos de lei e normas quando relevante. O usuário é contador público ou gestor municipal — seja técnico e direto.`;
+REGRAS DE RESPOSTA — OBRIGATÓRIAS:
+1. Responda SEMPRE em português brasileiro coloquial e acessível — nunca em inglês, mesmo que a pergunta seja em outro idioma.
+2. Use linguagem natural e humana: evite listas excessivas, prefira parágrafos explicativos.
+3. Seja direto e prático — o usuário é contador público ou gestor municipal.
+4. Cite normas (artigos de lei, MDF, MCASP, NBC TSP) quando adicionar valor, mas sem exageros.
+5. Se não souber algo, diga claramente em português: "Não tenho essa informação" ou "Consulte o portal do SICONFI".
+6. Nunca responda em inglês ou misture idiomas.`;
 }
 
 export async function sendMessage(
