@@ -217,3 +217,74 @@
 
 .cauc-details summary { font-size: 12px; color: var(--text-accent); cursor: pointer; padding: 6px 0; }
 .cauc-details .cauc-item { padding: 4px 0; }
+
+/* Painel informativo CAUC */
+.cauc-info-card {
+  background: var(--bg-accent, #eff6ff);
+  border: 0.5px solid var(--border-accent, #bfdbfe);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.cauc-info-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+.cauc-info-text {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0 0 6px;
+}
+.cauc-info-text:last-child { margin-bottom: 0; }
+
+.cauc-links { display: flex; flex-direction: column; gap: 8px; }
+.cauc-links-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cauc-link-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  background: var(--surface-2, #f8fafc);
+  border: 0.5px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text-accent, #2563eb);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.12s, border-color 0.12s;
+}
+.cauc-link-btn:hover {
+  background: var(--bg-accent, #eff6ff);
+  border-color: var(--border-accent, #93c5fd);
+}
+.cauc-link-primary {
+  background: var(--fill-accent, #2563eb);
+  color: #fff;
+  border-color: transparent;
+}
+.cauc-link-primary:hover {
+  background: #1d4ed8;
+  border-color: transparent;
+}
+.cauc-link-primary .cauc-link-desc { color: rgba(255,255,255,0.8); }
+.cauc-link-desc {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.cauc-ente-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}

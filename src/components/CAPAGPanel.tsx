@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { MSCAccount } from '../core/types';
 import { calcularCapag, ResultadoCapag, NotaCapag } from '../core/capagEngine';
-import { consultarCauc, CaucResult } from '../services/caucService';
+import { getCaucLinks } from '../services/caucService';
 import './CAPAGPanel.css';
 
 interface Props {
   msc: MSCAccount[];
   enteId?: string;
-  ano?: number;
+  ano?: number;  // reservado para uso futuro
 }
 
 const NOTA_COR: Record<NotaCapag, string> = { A: '#16a34a', B: '#d97706', C: '#dc2626', '–': '#6b7280' };
@@ -16,24 +16,15 @@ const NOTA_BG:  Record<NotaCapag, string> = { A: '#f0fdf4', B: '#fffbeb', C: '#f
 const brl = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (v: number | null) => v !== null ? `${(v * 100).toFixed(2)}%` : '–';
 
-export default function CAPAGPanel({ msc, enteId, ano }: Props) {
+export default function CAPAGPanel({ msc, enteId }: Props) {
   const [capag, setCapag] = useState<ResultadoCapag | null>(null);
-  const [cauc, setCauc]   = useState<CaucResult | null>(null);
-  const [loadCauc, setLoadCauc] = useState(false);
-  const [tabCauc, setTabCauc]   = useState(false);
+  const [tabCauc, setTabCauc] = useState(false);
 
   useEffect(() => {
     if (msc.length > 0) setCapag(calcularCapag(msc));
   }, [msc]);
 
-  async function fetchCauc() {
-    if (!enteId) return;
-    setLoadCauc(true);
-    const result = await consultarCauc(enteId, ano);
-    setCauc(result);
-    setLoadCauc(false);
-    setTabCauc(true);
-  }
+
 
   if (!capag) return null;
 
@@ -57,9 +48,9 @@ export default function CAPAGPanel({ msc, enteId, ano }: Props) {
         </button>
         <button
           className={`capag-tab ${tabCauc ? 'capag-tab-active' : ''}`}
-          onClick={() => { setTabCauc(true); if (!cauc && enteId) fetchCauc(); }}
+          onClick={() => setTabCauc(true)}
         >
-          CAUC {cauc && cauc.qtdIrregulares > 0 && <span className="cauc-badge-alert">{cauc.qtdIrregulares}</span>}
+          CAUC 
         </button>
       </div>
 
@@ -106,57 +97,54 @@ export default function CAPAGPanel({ msc, enteId, ano }: Props) {
       {/* ── Aba CAUC ── */}
       {tabCauc && (
         <div className="cauc-section">
-          {!enteId && <p className="cauc-no-ente">Código IBGE não detectado na MSC — não é possível consultar o CAUC.</p>}
+          <div className="cauc-info-card">
+            <p className="cauc-info-title">ℹ️ Sobre o CAUC</p>
+            <p className="cauc-info-text">
+              O <strong>CAUC (Sistema de Informações sobre Requisitos Fiscais)</strong> verifica a
+              regularidade fiscal do município para acesso a transferências voluntárias e crédito com
+              garantia da União. Desde a <strong>Instrução Normativa STN/MF nº 8/2025</strong>, o
+              sistema ganhou novos itens e foi migrado para o portal <strong>sti.tesouro.gov.br</strong>.
+            </p>
+            <p className="cauc-info-text">
+              O extrato atualizado diariamente <strong>não possui API pública</strong> — a consulta
+              deve ser feita diretamente no portal oficial com login gov.br.
+            </p>
+          </div>
 
-          {enteId && !cauc && !loadCauc && (
-            <div className="cauc-action">
-              <p>Consulta a situação de regularidade fiscal do município no CAUC da STN.</p>
-              <button className="cauc-btn" onClick={fetchCauc}>Consultar CAUC agora</button>
-            </div>
-          )}
-
-          {loadCauc && <p className="cauc-loading">⏳ Consultando CAUC na API da STN…</p>}
-
-          {cauc && !loadCauc && (
-            <>
-              {cauc.erro && <p className="cauc-erro">Erro na consulta: {cauc.erro}. Verifique a conectividade.</p>}
-              {!cauc.erro && cauc.totalItens === 0 && (
-                <p className="cauc-vazio">Nenhum dado retornado para o ente {cauc.enteId} / {cauc.ano}.</p>
-              )}
-              {!cauc.erro && cauc.totalItens > 0 && (
-                <>
-                  <div className="cauc-resumo">
-                    <div className="cauc-stat cauc-ok"><strong>{cauc.regular.length}</strong><span>Regular</span></div>
-                    <div className="cauc-stat cauc-irr"><strong>{cauc.qtdIrregulares}</strong><span>Irregular</span></div>
-                    <div className="cauc-stat cauc-na"><strong>{cauc.naoAplicavel.length}</strong><span>N/A</span></div>
-                  </div>
-
-                  {cauc.irregular.length > 0 && (
-                    <div className="cauc-list">
-                      <p className="cauc-list-title cauc-irr-title">Requisitos irregulares:</p>
-                      {cauc.irregular.map((item, i) => (
-                        <div key={i} className="cauc-item cauc-item-irr">
-                          <span className="cauc-dot cauc-dot-irr" aria-hidden="true" />
-                          <span>{item.no_requisito}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {cauc.regular.length > 0 && (
-                    <details className="cauc-details">
-                      <summary>Ver {cauc.regular.length} requisito(s) regular(es)</summary>
-                      {cauc.regular.map((item, i) => (
-                        <div key={i} className="cauc-item cauc-item-ok">
-                          <span className="cauc-dot cauc-dot-ok" aria-hidden="true" />
-                          <span>{item.no_requisito}</span>
-                        </div>
-                      ))}
-                    </details>
-                  )}
-                </>
-              )}
-            </>
+          <div className="cauc-links">
+            <p className="cauc-links-title">Consultar agora:</p>
+            <a
+              href={getCaucLinks().portalNovo}
+              target="_blank"
+              rel="noreferrer"
+              className="cauc-link-btn cauc-link-primary"
+            >
+              🔗 Novo CAUC — sti.tesouro.gov.br
+              <span className="cauc-link-desc">Extrato diário · Requer login gov.br</span>
+            </a>
+            <a
+              href={getCaucLinks().transfereGov}
+              target="_blank"
+              rel="noreferrer"
+              className="cauc-link-btn"
+            >
+              🔗 TransfereGov.br
+              <span className="cauc-link-desc">Canal oficial de convênios e transferências</span>
+            </a>
+            <a
+              href={getCaucLinks().dadosAbertos}
+              target="_blank"
+              rel="noreferrer"
+              className="cauc-link-btn"
+            >
+              📊 Dados Abertos CAUC — Tesouro Transparente
+              <span className="cauc-link-desc">Arquivo semanal CSV/XLSX com situação dos municípios</span>
+            </a>
+          </div>
+          {enteId && (
+            <p className="cauc-ente-hint">
+              Ao acessar o portal, consulte o ente: <strong>{enteId}</strong>
+            </p>
           )}
         </div>
       )}
