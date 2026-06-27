@@ -27,6 +27,56 @@ export default function AIChat({ results, meta }: Props) {
       endRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [messages, open]);
 
+  // Detecta carregamento de arquivo: injeta mensagem de contexto na conversa
+  const prevResultsLen = useRef(0);
+  useEffect(() => {
+    const prev = prevResultsLen.current;
+    const curr = results.length;
+    prevResultsLen.current = curr;
+
+    // Só age quando passa de sem resultados para com resultados
+    if (prev === 0 && curr > 0) {
+      const errors   = results.filter(r => r.severity === 'error').length;
+      const warnings = results.filter(r => r.severity === 'warning').length;
+      const capag    = results.filter(r => r.impactsCapag).length;
+
+      const contextMsg: AIMessage = {
+        role: 'assistant',
+        content:
+          `📂 Arquivo carregado! Agora tenho acesso ao resultado da validação` +
+          (meta.enteId ? ` do ente **${meta.enteId}**` : '') +
+          (meta.periodo ? ` — período ${meta.periodo}` : '') +
+          `.
+
+` +
+          `Encontrei **${curr} ocorrência(s)**: ` +
+          `${errors} erro(s) crítico(s)${capag ? ` (${capag} com risco CAPAG)` : ''}, ` +
+          `${warnings} aviso(s).
+
+` +
+          `Como posso ajudar a corrigir os problemas encontrados?`,
+      };
+
+      setMessages(prev => {
+        // Se não havia conversa, só atualiza as sugestões (não injeta msg)
+        if (prev.length === 0) return prev;
+        // Se havia conversa, injeta a mensagem de novo contexto
+        return [...prev, contextMsg];
+      });
+
+      // Abre o chat automaticamente se estava fechado
+      setOpen(true);
+    }
+
+    // Arquivo removido: notifica que voltou ao modo geral
+    if (prev > 0 && curr === 0 && messages.length > 0) {
+      setMessages(p => [...p, {
+        role: 'assistant',
+        content: '🔄 Arquivo removido. Voltei ao modo geral — pode me perguntar qualquer coisa sobre SICONFI, PCASP ou LRF.',
+      }]);
+    }
+  }, [results.length]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleSaveKey() {
     if (!keyInput.trim().startsWith('sk-')) {
       setError('Chave inválida — deve começar com "sk-".');
