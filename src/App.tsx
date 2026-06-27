@@ -10,6 +10,7 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 
 const INATIVIDADE_MS = 30 * 60 * 1000; // 30 minutos
 import { loadRulesMetadata } from './core/rulesMetadata';
+import { ValidationResult } from './core/types';
 import { RuleDefinition } from './core/types';
 
 function App() {
@@ -21,6 +22,8 @@ function App() {
   const [rulesMap, setRulesMap] = useState<Map<string, RuleDefinition>>(new Map());
   const [rulesLoaded, setRulesLoaded] = useState(false);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [aiResults, setAiResults] = useState<ValidationResult[]>([]);
+  const [aiMeta, setAiMeta] = useState<{ enteId?: string; periodo?: string }>({});
 
   useEffect(() => {
     document.body.className = `theme-${theme}`;
@@ -142,7 +145,7 @@ function App() {
         {files.length === 0 ? (
           <Dropzone onFilesDropped={setFiles} />
         ) : (
-          <ReportDashboard files={files} rulesMap={rulesMap} onReset={() => setFiles([])} />
+          <ReportDashboard files={files} rulesMap={rulesMap} onReset={() => { setFiles([]); setAiResults([]); setAiMeta({}); }} onResultsReady={(r, m) => { setAiResults(r); setAiMeta(m); }} />
         )}
       </main>
 
@@ -155,7 +158,7 @@ function App() {
       )}
 
       {/* Assistente IA — sempre visível, independente de arquivo carregado */}
-      <AIChat results={[]} meta={{}} />
+      <AIChat results={aiResults} meta={aiMeta} />
     </div>
   );
 }

@@ -14,9 +14,10 @@ interface ReportDashboardProps {
   files: File[];
   rulesMap: Map<string, RuleDefinition>;
   onReset: () => void;
+  onResultsReady?: (results: ValidationResult[], meta: { enteId?: string; periodo?: string }) => void;
 }
 
-export default function ReportDashboard({ files, rulesMap, onReset }: ReportDashboardProps) {
+export default function ReportDashboard({ files, rulesMap, onReset, onResultsReady }: ReportDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<ValidationResult[]>([]);
   const [filter, setFilter] = useState<'all' | 'error' | 'warning' | 'info' | 'capag'>('all');
@@ -34,6 +35,7 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
         const validationResults = await runValidations(parsedData, rulesMap);
         setResults(validationResults);
         setParsedMsc(parsedData.msc ?? []);
+        onResultsReady?.(validationResults, { enteId: parsedData.enteId, periodo: parsedData.mscPeriods?.[0] });
         const periods = parsedData.mscPeriods ?? [];
         setMscPeriods(periods);
         setReportMeta({
@@ -48,6 +50,7 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
             : 'Falha ao processar os arquivos. Verifique se os arquivos não estão corrompidos ou em formato incompatível.'
         );
         setResults([]);
+        onResultsReady?.([], {});
       } finally {
         setLoading(false);
       }
