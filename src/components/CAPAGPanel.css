@@ -1,0 +1,219 @@
+.capag-panel {
+  background: var(--surface-1);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.capag-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.capag-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0 0 3px;
+}
+
+.capag-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.capag-nota-geral {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 10px 20px;
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.capag-nota-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.capag-nota-valor {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Abas */
+.capag-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 0.5px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.capag-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: all 0.12s;
+  border-radius: 6px 6px 0 0;
+}
+
+.capag-tab:hover { color: var(--text-primary); background: var(--surface-0); }
+.capag-tab-active { color: var(--text-accent); border-bottom-color: var(--fill-accent); }
+
+.cauc-badge-alert {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* Grid de indicadores */
+.capag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.capag-card {
+  background: var(--surface-2);
+  border: 0.5px solid var(--border);
+  border-top: 3px solid;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.capag-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.capag-ind-nome {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.capag-ind-nota {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 6px;
+}
+
+.capag-formula {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+  font-style: italic;
+}
+
+.capag-valores {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 0.5px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.capag-val-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.capag-resultado-row {
+  padding-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.capag-ref {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Advertências */
+.capag-advertencias { display: flex; flex-direction: column; gap: 4px; }
+.capag-aviso, .capag-aviso-base {
+  font-size: 11.5px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin: 0;
+  line-height: 1.5;
+}
+.capag-aviso { background: var(--bg-warning); color: var(--text-warning); }
+.capag-aviso-base { background: var(--surface-0); color: var(--text-muted); }
+
+/* CAUC */
+.cauc-section { padding: 4px 0; }
+.cauc-no-ente, .cauc-loading, .cauc-vazio {
+  font-size: 13px; color: var(--text-muted); padding: 16px 0; text-align: center;
+}
+.cauc-erro { font-size: 13px; color: var(--text-danger); background: var(--bg-danger); border-radius: 8px; padding: 10px 14px; }
+.cauc-action { text-align: center; padding: 16px 0; }
+.cauc-action p { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.cauc-btn {
+  padding: 8px 20px; font-size: 13px; font-weight: 500;
+  background: var(--fill-accent); color: var(--on-accent);
+  border: none; border-radius: 8px; cursor: pointer; transition: filter 0.12s;
+}
+.cauc-btn:hover { filter: brightness(1.1); }
+
+.cauc-resumo {
+  display: flex; gap: 12px; margin-bottom: 16px;
+}
+.cauc-stat {
+  flex: 1; text-align: center; padding: 10px 8px;
+  border-radius: 10px; border: 0.5px solid var(--border);
+}
+.cauc-stat strong { display: block; font-size: 24px; font-weight: 700; }
+.cauc-stat span { font-size: 11px; color: var(--text-muted); }
+.cauc-ok { background: var(--bg-success); border-color: var(--border-success); }
+.cauc-ok strong { color: var(--text-success); }
+.cauc-irr { background: var(--bg-danger); border-color: var(--border-danger); }
+.cauc-irr strong { color: var(--text-danger); }
+.cauc-na { background: var(--surface-0); }
+
+.cauc-list { margin-bottom: 12px; }
+.cauc-list-title { font-size: 12px; font-weight: 500; color: var(--text-primary); margin: 0 0 8px; }
+.cauc-irr-title { color: var(--text-danger); }
+.cauc-item { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; font-size: 12.5px; color: var(--text-secondary); border-bottom: 0.5px solid var(--border); }
+.cauc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.cauc-dot-ok { background: #16a34a; }
+.cauc-dot-irr { background: #dc2626; }
+.cauc-item-irr { color: var(--text-primary); }
+
+.cauc-details summary { font-size: 12px; color: var(--text-accent); cursor: pointer; padding: 6px 0; }
+.cauc-details .cauc-item { padding: 4px 0; }

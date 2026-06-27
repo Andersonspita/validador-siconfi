@@ -464,3 +464,135 @@ export function validateMSC_CAPAG(data: ParsedData, _rulesMap: Map<string, RuleD
 
   return results;
 }
+
+// ── Validações LRF Adicionais (MSC-based) ────────────────────────────────────
+
+/**
+ * Valida limites da LRF a partir de dados da MSC:
+ * - Art. 19/20: Despesa Total com Pessoal ≤ 60% RCL (Total) | 54% Exec | 6% Leg
+ * - Art. 37: ARO (Antecipação de Receita Orçamentária) ≤ 7% RCL
+ * - Art. 32 §1°: Operações de Crédito ≤ 16% RCL no exercício
+ */
+export function validateLRF_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): ValidationResult[] {
+  const results: ValidationResult[] = [];
+  if (!data.msc?.length) return results;
+
+  const msc = data.msc;
+
+  // RCL anualizada: period_change de receitas correntes × 12
+  const recMes = msc
+    .filter(a => a.CONTA.startsWith('6211') && a.Tipo_valor === 'period_change' && a.Natureza_valor === 'C')
+    .reduce((s, a) => s + a.Valor, 0);
+  const rcl = recMes * 12;
+
+  if (rcl < 0.01) return results; // sem RCL, não calcula
+
+  const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
+
+  // ── Despesa Total com Pessoal (Art. 19/20 LRF) ───────────────────────────
+  const pessoalExec = msc
+    .filter(a => a.CONTA.startsWith('311') && a.Tipo_valor === 'period_change' && a.Natureza_valor === 'D' && a.PO?.startsWith('2'))
+    .reduce((s, a) => s + a.Valor, 0) * 12;
+
+  const pessoalLeg = msc
+    .filter(a => a.CONTA.startsWith('311') && a.Tipo_valor === 'period_change' && a.Natureza_valor === 'D' && a.PO?.startsWith('1'))
+    .reduce((s, a) => s + a.Valor, 0) * 12;
+
+  const pessoalTotal = pessoalExec + pessoalLeg;
+
+  const ratioExec  = pessoalExec  / rcl;
+  const ratioLeg   = pessoalLeg   / rcl;
+  const ratioTotal = pessoalTotal / rcl;
+
+  // Limite total: 60% RCL | Limite Exec: 54% | Limite Leg: 6%
+  if (ratioTotal > 0.60) {
+    results.push({
+      ruleId: 'D2_LRF_PESSOAL_TOTAL',
+      dimension: 'D2',
+      description: 'Despesa Total com Pessoal acima do limite LRF',
+      severity: 'error',
+      impactsCapag: true,
+      message: `Despesa Total com Pessoal estimada: ${brl(pessoalTotal)} = ${pct(ratioTotal)} da RCL estimada (${brl(rcl)}). Limite LRF art. 19: 60%. Excesso: ${brl(pessoalTotal - rcl * 0.60)}.`,
+      actionPlan: 'Adotar medidas de redução conforme art. 23 LRF: redução de 1/3 do excedente em 2 quadrimestres. Proibição de novas admissões e progressões (art. 22 LRF).',
+      affectedAccounts: ['311'],
+    });
+  } else if (ratioTotal > 0.54) {
+    results.push({
+      ruleId: 'D2_LRF_PESSOAL_ALERTA',
+      dimension: 'D2',
+      description: 'Despesa com Pessoal no limite de alerta LRF',
+      severity: 'warning',
+      impactsCapag: true,
+      message: `Despesa Total com Pessoal estimada: ${pct(ratioTotal)} da RCL (limite: 60%). Percentual acima de 90% do limite — zona de alerta (art. 22 LRF). Exec: ${pct(ratioExec)} | Leg: ${pct(ratioLeg)}.`,
+      actionPlan: 'Monitorar a evolução das despesas com pessoal. Acima de 95% do limite é vedada a concessão de novas vantagens (art. 22, parágrafo único LRF).',
+    });
+  }
+
+  if (ratioExec > 0.54) {
+    results.push({
+      ruleId: 'D2_LRF_PESSOAL_EXEC',
+      dimension: 'D2',
+      description: 'Despesa com Pessoal do Executivo acima do limite LRF',
+      severity: 'error',
+      impactsCapag: true,
+      message: `Despesa com Pessoal do Executivo estimada: ${brl(pessoalExec)} = ${pct(ratioExec)} da RCL. Limite art. 20, III, b: 54%.`,
+      actionPlan: 'Adotar medidas de redução do art. 23 LRF. Proibidas: novas admissões, horas extras, progressões e reajustes voluntários.',
+      affectedAccounts: ['311'],
+    });
+  }
+
+  if (ratioLeg > 0.06) {
+    results.push({
+      ruleId: 'D2_LRF_PESSOAL_LEG',
+      dimension: 'D2',
+      description: 'Despesa com Pessoal do Legislativo acima do limite LRF',
+      severity: 'error',
+      impactsCapag: false,
+      message: `Despesa com Pessoal do Legislativo estimada: ${brl(pessoalLeg)} = ${pct(ratioLeg)} da RCL. Limite art. 20, III, a: 6%.`,
+      affectedAccounts: ['311'],
+    });
+  }
+
+  // ── ARO (Art. 37 e 38 LRF) ───────────────────────────────────────────────
+  // Conta PCASP: 21311 (ARO - Dívida Flutuante) ou 21312
+  const saldoARO = msc
+    .filter(a => (a.CONTA.startsWith('21311') || a.CONTA.startsWith('21312')) && a.Tipo_valor === 'ending_balance')
+    .reduce((s, a) => s + (a.Natureza_valor === 'C' ? a.Valor : -a.Valor), 0);
+
+  const limiteARO = rcl * 0.07;
+  if (saldoARO > limiteARO && saldoARO > 0.01) {
+    results.push({
+      ruleId: 'D2_LRF_ARO',
+      dimension: 'D2',
+      description: 'ARO acima do limite LRF (7% da RCL)',
+      severity: 'error',
+      impactsCapag: false,
+      message: `Antecipação de Receita Orçamentária (ARO) estimada: ${brl(saldoARO)}. Limite art. 38, I, LRF: ${brl(limiteARO)} (7% da RCL estimada de ${brl(rcl)}). Excesso: ${brl(saldoARO - limiteARO)}.`,
+      actionPlan: 'Verificar se a ARO foi devidamente autorizada por lei, tem prazo de até 10 dias antes do encerramento do exercício e está sendo liquidada. Art. 38 LRF.',
+      affectedAccounts: ['21311', '21312'],
+    });
+  }
+
+  // ── Operações de Crédito (Art. 32 §1° LRF) ──────────────────────────────
+  // Conta PCASP: 21211 (dívida fundada interna - Op. Crédito) + emissões 21212/21213
+  const opCredito = msc
+    .filter(a => a.CONTA.startsWith('2121') && a.Tipo_valor === 'period_change')
+    .reduce((s, a) => s + (a.Natureza_valor === 'C' ? a.Valor : -a.Valor), 0) * 12;
+
+  const limiteOC = rcl * 0.16;
+  if (opCredito > limiteOC && opCredito > 0.01) {
+    results.push({
+      ruleId: 'D2_LRF_OP_CREDITO',
+      dimension: 'D2',
+      description: 'Operações de Crédito acima do limite LRF (16% RCL)',
+      severity: 'error',
+      impactsCapag: true,
+      message: `Operações de Crédito estimadas no exercício: ${brl(opCredito)} = ${pct(opCredito / rcl)} da RCL (${brl(rcl)}). Limite Resolução SF 43/2001: 16% = ${brl(limiteOC)}.`,
+      actionPlan: 'Suspender contratação de novas operações de crédito até que o saldo retorne ao limite. Verificar junto ao Tesouro Nacional as operações registradas no CAUC.',
+      affectedAccounts: ['2121'],
+    });
+  }
+
+  return results;
+}

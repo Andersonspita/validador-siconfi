@@ -1,7 +1,7 @@
 import { ParsedData, ValidationResult, RuleDefinition } from '../types';
 import { validateD1_Entrega, validateD1_MSC, validateMultiMonth, validateD1_Encerramento } from './rulesD1';
 import { validateD2_MSC, validateD2_DCA, validateD2_MSC_Encerramento_DCA } from './rulesD2';
-import { validateD3_RREO, validateD3_Fiscal, validateMSC_CAPAG } from './rulesD3';
+import { validateD3_RREO, validateD3_Fiscal, validateMSC_CAPAG, validateLRF_MSC } from './rulesD3';
 import { validateD4_Cruzamentos } from './rulesD4';
 import { findEncerramentoPeriod, isRegularMonthPeriod } from './utils';
 import { enrichWithCorrectiveEntries } from '../correctiveEntries';
@@ -31,6 +31,7 @@ export const runValidations = async (data: ParsedData, rulesMap: Map<string, Rul
 
   if (data.msc) {
     results.push(...validateMSC_CAPAG(data, rulesMap));
+    results.push(...validateLRF_MSC(data, rulesMap));
   }
 
   if (data.mscByPeriod && Object.keys(data.mscByPeriod).length >= 2) {

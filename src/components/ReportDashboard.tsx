@@ -7,6 +7,7 @@ import Papa from 'papaparse';
 import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3 } from 'lucide-react';
 import ReportView from './ReportView';
 import AIChat from './AIChat';
+import CAPAGPanel from './CAPAGPanel';
 import { MSCAccount } from '../core/types';
 import './ReportDashboard.css';
 
@@ -24,7 +25,7 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
   const [reportMeta, setReportMeta] = useState<{ enteId?: string; periodo?: string }>({});
   const [parsedMsc, setParsedMsc] = useState<MSCAccount[]>([]);
   const [mscPeriods, setMscPeriods] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'validacoes' | 'relatorios'>('validacoes');
+  const [activeTab, setActiveTab] = useState<'validacoes' | 'relatorios' | 'capag'>('validacoes');
 
   useEffect(() => {
     const process = async () => {
@@ -173,6 +174,14 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
               <BarChart3 size={16} /> Relatórios de Execução
             </button>
           )}
+          {parsedMsc.length > 0 && (
+            <button
+              className={`tab-btn ${activeTab === 'capag' ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('capag')}
+            >
+              🛡 CAPAG &amp; CAUC
+            </button>
+          )}
         </div>
 
         <div className="summary-stats">
@@ -198,6 +207,16 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
           </div>
         </div>
       </div>
+
+      {activeTab === 'capag' && parsedMsc.length > 0 && (
+        <div className="report-tab-content">
+          <CAPAGPanel
+            msc={parsedMsc}
+            enteId={reportMeta.enteId}
+            ano={reportMeta.periodo ? parseInt(reportMeta.periodo.split('-')[0]) : undefined}
+          />
+        </div>
+      )}
 
       {activeTab === 'relatorios' && parsedMsc.length > 0 && (
         <div className="report-tab-content">
