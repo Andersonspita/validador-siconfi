@@ -18,7 +18,7 @@
 .ai-fab {
   position: fixed;
   bottom: 24px;
-  left: 24px;
+  right: 24px;
   z-index: 1002;
   display: flex;
   align-items: center;
@@ -52,7 +52,7 @@
 .ai-panel {
   position: fixed;
   bottom: 88px;
-  left: 24px;
+  right: 24px;
   z-index: 1001;
   width: 390px;
   max-height: 560px;
@@ -235,7 +235,7 @@ body.theme-light .ai-input {
 
 @media (max-width: 440px) {
   .ai-panel { width: calc(100vw - 32px); left: 8px; right: 8px; }
-  .ai-fab { bottom: 16px; left: 16px; }
+  .ai-fab { bottom: 16px; right: 16px; }
 }
 
 /* Configuração da chave */
