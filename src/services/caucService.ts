@@ -16,7 +16,7 @@ export interface CaucLinks {
 export function getCaucLinks(): CaucLinks {
   return {
     portalNovo:   'https://sti.tesouro.gov.br/ng/',
-    transfereGov: 'https://transferegov.sistema.gov.br/',
+    transfereGov: 'https://portal.transferegov.sistema.gov.br/portal/home',
     dadosAbertos: 'https://www.tesourotransparente.gov.br/temas/estados-e-municipios/cauc-sistema-de-informacoes-sobre-requisitos-fiscais',
   };
 }
