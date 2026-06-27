@@ -96,11 +96,17 @@ export default function ReportView({ msc, periodos }: Props) {
           <div className="segmented">
             <button
               className={tipoSaldo === 'period_change' ? 'active' : ''}
+              style={tipoSaldo === 'period_change'
+                ? { background: '#2563eb', color: '#fff', fontWeight: 600 }
+                : undefined}
               onClick={() => setTipoSaldo('period_change')}
               title="Movimentação ocorrida no período"
             >Movimentação</button>
             <button
               className={tipoSaldo === 'ending_balance' ? 'active' : ''}
+              style={tipoSaldo === 'ending_balance'
+                ? { background: '#2563eb', color: '#fff', fontWeight: 600 }
+                : undefined}
               onClick={() => setTipoSaldo('ending_balance')}
               title="Saldo acumulado (Saldo Final)"
             >Acumulado</button>
