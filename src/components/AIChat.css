@@ -197,3 +197,57 @@
   .ai-panel { width: calc(100vw - 32px); right: 16px; }
   .ai-fab { bottom: 16px; right: 16px; }
 }
+
+/* Configuração da chave */
+.ai-key-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 2px;
+}
+.ai-key-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+}
+.ai-key-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+.ai-key-input {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  border: 0.5px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.ai-key-input:focus {
+  outline: none;
+  border-color: var(--border-accent);
+}
+.ai-key-btn {
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--fill-accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: filter 0.12s;
+}
+.ai-key-btn:hover { filter: brightness(1.1); }
+.ai-key-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+  text-align: center;
+}
+.ai-key-hint a { color: var(--text-accent); }
