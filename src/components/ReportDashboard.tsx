@@ -6,6 +6,7 @@ import { generatePDF } from '../core/pdfGenerator';
 import Papa from 'papaparse';
 import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3 } from 'lucide-react';
 import ReportView from './ReportView';
+import AIChat from './AIChat';
 import { MSCAccount } from '../core/types';
 import './ReportDashboard.css';
 
@@ -288,6 +289,7 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
       </div>
     </>
       )}
+      <AIChat results={results} meta={reportMeta} />
     </div>
   );
 }
