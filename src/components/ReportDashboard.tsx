@@ -152,6 +152,7 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
               <Download size={20} />
               Exportar CSV
             </button>
+            <AIChat results={results} meta={reportMeta} />
             <button onClick={() => generatePDF(filteredResults, reportMeta)} className="export-btn glass-panel print-btn">
               <Printer size={20} />
               Gerar Relatório Oficial (PDF)
@@ -308,7 +309,6 @@ export default function ReportDashboard({ files, rulesMap, onReset }: ReportDash
       </div>
     </>
       )}
-      <AIChat results={results} meta={reportMeta} />
     </div>
   );
 }
