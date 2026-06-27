@@ -60,3 +60,25 @@ Para regras onde não há lançamento (D1_00029–33: ICs ausentes), a orientaç
 **DDR:** ajustado de `721` para subgrupos `7211` × `8211` (excluindo garantias 722/822). Testado com arquivo real da PM Teixeira de Freitas (16.037 linhas) — divergência de R$87,1M detectada e confirmada ao centavo.
 
 **API Siconfi:** integração com `getExtratoEntregas()` em D1_00001 para verificar homologação real quando o código IBGE é detectado na MSC.
+
+---
+
+## 2026-06-26 — v3.5.0 — UX de upload, segurança e funcionalidades complementares
+
+**Painel de cobertura no Dropzone**
+
+Percebemos que o usuário não tinha clareza sobre quais arquivos enviar e por que enviar múltiplos de uma vez. O Dropzone foi reformulado com um painel explicativo mostrando os quatro tipos de arquivo (MSC/RREO/RGF/DCA), o que é obrigatório, o formato aceito e quais dimensões de validação cada um habilita. Uma dica explícita orienta selecionar todos juntos na mesma janela.
+
+**Segurança da sessão**
+
+O Firebase por padrão usa `localStorage` — sessão persiste indefinidamente mesmo após fechar o navegador. Para um sistema com dados fiscais municipais, isso é inaceitável. Implementado `browserSessionPersistence` (fechar aba = logout imediato) e timer de inatividade de 30 minutos com `signOut()` automático.
+
+**Assistente IA com contexto dinâmico**
+
+O AIChat foi movido para `App.tsx` como componente global (sempre visível). O `ReportDashboard` notifica via `onResultsReady()` quando a validação termina — o `App.tsx` repassa ao `AIChat`. Ao carregar arquivo durante conversa, o chat injeta mensagem automática com o resumo dos resultados. Sem arquivo, responde perguntas gerais com sugestões sobre SICONFI/CAPAG/LRF.
+
+**CAPAG, CAUC e LRF**
+
+Investigação confirmou que o CAUC não tem API pública — o extrato diário requer autenticação gov.br e a STN só disponibiliza dados agregados semanalmente em CSV. A aba CAUC foi substituída por painel informativo com links para os portais oficiais.
+
+As regras de Pessoal (art. 19/20 LRF), ARO (art. 37/38) e Operações de Crédito (Res. SF 43/2001) foram implementadas em `validateLRF_MSC()` com estimativas a partir da MSC mensal.

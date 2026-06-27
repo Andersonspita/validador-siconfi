@@ -1,6 +1,6 @@
 # Documentação Técnica — Validador Siconfi
 
-> **Versão:** 3.4.0 · **Data:** 2026-06-26  
+> **Versão:** 3.5.0 · **Data:** 2026-06-26  
 > **Repositório:** https://github.com/Andersonspita/validador-siconfi  
 > **GitHub Pages:** https://andersonspita.github.io/validador-siconfi/
 
@@ -66,7 +66,7 @@ validador-siconfi/
 │   │       ├── rulesD1.test.ts        ← 14 testes das regras D1
 │   │       └── rulesD2.test.ts        ← 10 testes das regras D2
 │   ├── components/
-│   │   ├── Dropzone.tsx               ← Upload drag-and-drop
+│   │   ├── Dropzone.tsx               ← Upload com painel de cobertura por arquivo
 │   │   ├── ReportDashboard.tsx        ← Painel principal (abas Validações + Relatórios)
 │   │   ├── ReportView.tsx             ← Tabela de relatórios com drill-down
 │   │   ├── ReportView.css
@@ -400,6 +400,18 @@ npm run deploy                  # GitHub Pages
 ---
 
 ## 18. Histórico
+
+### v3.5.0 — Jun/2026
+- `Dropzone.tsx`: painel de cobertura com tabela MSC/RREO/RGF/DCA, o que cada um habilita e dica de multi-upload
+- `firebase.ts`: browserSessionPersistence — sessão encerra ao fechar aba
+- `App.tsx`: timer inatividade 30min (mousedown/mousemove/keydown/scroll/click)
+- `AIChat.tsx`: sempre visível (bottom-right fixed), contexto dinâmico via onResultsReady
+- `aiService.ts`: system prompt adaptativo (geral sem arquivo, contextual com resultados)
+- `capagEngine.ts`: cálculo estimado dos 3 indicadores CAPAG a partir da MSC
+- `caucService.ts`: links oficiais (sem API pública disponível)
+- `validators/rulesD3.ts`: validateLRF_MSC — Pessoal (60%/54%/6%), ARO (7%), Op. Crédito (16%)
+- `CAPAGPanel.tsx`: 3 cards de indicadores + aba CAUC com links
+- `pdfGenerator.ts`: obs sem truncamento, colunas otimizadas
 
 ### v3.4.0 — Jun/2026
 - `reportEngine.ts`: motor de relatórios de execução por Função/Subfunção/Fonte

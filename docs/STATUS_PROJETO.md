@@ -1,6 +1,6 @@
 # Status do Projeto — Validador Siconfi
 
-> **Última atualização:** 26 de Junho de 2026 (v3.4.0)  
+> **Última atualização:** 26 de Junho de 2026 (v3.5.0)  
 > **Repositório:** https://github.com/Andersonspita/validador-siconfi  
 > **GitHub Pages:** https://andersonspita.github.io/validador-siconfi/
 
@@ -30,6 +30,12 @@ O **Validador Siconfi** é uma SPA React/TypeScript que executa validações fis
 | Lançamentos PCASP corretivos por regra (`correctiveEntries.ts`) | ✅ v3.2.0 |
 | Relatório PDF com seção "Plano de Correção Contábil" | ✅ v3.2.0 |
 | **Relatórios de Execução Orçamentária com drill-down** | ✅ v3.4.0 |
+| Upload multi-arquivo com painel de cobertura por tipo | ✅ v3.5.0 |
+| Segurança: browserSessionPersistence + inatividade 30min | ✅ v3.5.0 |
+| Assistente IA (OpenAI) com contexto dinâmico | ✅ v3.5.0 |
+| CAPAG estimado A/B/C (3 indicadores) | ✅ v3.5.0 |
+| CAUC com links para portais oficiais | ✅ v3.5.0 |
+| Limites LRF: Pessoal, ARO, Op. Crédito | ✅ v3.5.0 |
 | Exportação CSV (validações e relatórios) | ✅ |
 | API Siconfi — extrato de entregas (D1_00001) | ✅ parcial |
 | Testes Vitest — 33 testes (4 arquivos) | ✅ |
@@ -125,6 +131,17 @@ npm test      # 33 testes Vitest (4 arquivos)
 ---
 
 ## 8. Histórico de versões
+
+### v3.5.0 — 2026-06-26
+- Dropzone: painel de cobertura explicando quais arquivos enviar e o que cada um habilita
+- Segurança: browserSessionPersistence (fechar aba = logout) + timer inatividade 30min
+- AIChat: sempre visível (bottom-right), contexto dinâmico, sugestões gerais sem arquivo
+- CAPAG: cálculo estimado A/B/C dos 3 indicadores a partir da MSC
+- CAUC: painel informativo com links oficiais (sem API pública disponível)
+- LRF: 6 novas regras — Pessoal (60%/54%/6%), ARO (7%), Op. Crédito (16%)
+- PDF: observações sem truncamento, colunas otimizadas
+- Correções tema claro: botões, segmented control, CAUC
+- TransfereGov URL corrigida para portal.transferegov.sistema.gov.br
 
 ### v3.4.0 — 2026-06-26
 - `reportEngine.ts`: motor de relatórios de execução orçamentária
