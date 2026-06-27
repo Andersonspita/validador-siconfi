@@ -20,8 +20,14 @@ export default function Login() {
     } catch (err: any) {
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError('E-mail ou senha incorretos.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('Domínio não autorizado no Firebase. Contate o administrador do sistema.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Sem conexão com a internet. Verifique e tente novamente.');
       } else {
-        setError('Erro na autenticação. Verifique se configurou as chaves do Firebase.');
+        setError('Erro ao autenticar: ' + (err.code ?? err.message));
       }
     } finally {
       setLoading(false);
