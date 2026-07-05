@@ -101,6 +101,10 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
             ? `Demonstrativo(s) NÃO homologados na API do Siconfi para o Poder Executivo em ${data.anoReferencia}: ${executivoPendente.pendentes.join(', ')}.` +
               (outrosPendentes.length > 0 ? ` Pendência(s) adicional(is) em outro(s) Poder/Órgão: ${outrosPendentes.map(formatPendenciaInstituicao).join(' | ')}.` : '')
             : `Sem pendência confirmada para o Poder Executivo, mas há demonstrativo(s) NÃO homologado(s) em outro(s) Poder/Órgão do ente: ${resumoPorInstituicao}.`,
+          actionPlan: executivoPendente
+            ? `Acesse o Siconfi (https://siconfi.tesouro.gov.br) e homologue ${executivoPendente.pendentes.join(', ')} do Poder Executivo para ${data.anoReferencia}. ` +
+              (outrosPendentes.length > 0 ? `Verifique também a pendência do(s) outro(s) Poder/Órgão listado(s) na descrição — cada instituição homologa separadamente.` : '')
+            : `Verifique com o(s) outro(s) Poder/Órgão listado(s) na descrição (ex.: Câmara de Vereadores) a situação de homologação deles no Siconfi; não é necessária ação do Poder Executivo.`,
           debugInfo: {
             label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
             payload: { pendenciasPorPoder, entregas },
@@ -116,6 +120,7 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
           affectedAccounts: ausentes,
           message:
             `Os arquivos ${ausentes.join(', ')} não foram inseridos para validação de cruzamento (D3/D4), mas constam como homologados na API do Siconfi para todo(s) o(s) Poder/Órgão identificado(s).`,
+          actionPlan: `Nenhuma ação corretiva necessária junto ao Siconfi. Se desejar habilitar as verificações de cruzamento D3/D4 neste validador, anexe também ${ausentes.join(', ')} ao upload.`,
           debugInfo: {
             label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
             payload: entregas,
@@ -137,6 +142,7 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
            message:
              `Demonstrativo(s) não incluído(s) no upload: ${ausentes.join(', ')}. ` +
              `A API do Siconfi não retornou dados para confirmar homologação. Confirme manualmente no SICONFI.`,
+           actionPlan: `Acesse https://siconfi.tesouro.gov.br e confirme manualmente se ${ausentes.join(', ')} foram entregues e homologados para o ente ${data.enteId} em ${data.anoReferencia}. A checagem automática falhou (indisponibilidade da API ou bloqueio de rede/CORS).`,
            debugInfo: {
              label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
              payload: { items: [], observacao: 'A API não retornou nenhum item (lista vazia) ou a chamada falhou. Veja o console do navegador para detalhes de erro de rede/CORS.' },
@@ -157,6 +163,7 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
         message:
           `Demonstrativo(s) ausentes no upload: ${ausentes.join(', ')}. ` +
           `Não foi possível validar a tempestividade (D1) via API porque o código do ente (IBGE) não foi detectado na MSC.`,
+        actionPlan: `Confirme manualmente no Siconfi (https://siconfi.tesouro.gov.br) a homologação de ${ausentes.join(', ')}. Para habilitar a verificação automática, envie um arquivo MSC com o código IBGE do ente no cabeçalho.`,
       });
     }
   }
@@ -200,6 +207,7 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
             `Exercício ${year}: localmente foram enviadas ${yearPeriods.length} MSC(s) (meses: ${meses.join(', ')}). ` +
             `Mês(es) ausente(s): ${missing.map(m => String(m).padStart(2,'0')).join(', ')}. ` +
             `Verifique se as demais foram homologadas no Siconfi.`,
+          actionPlan: `Se ${year} ainda estiver em andamento, isso é esperado (envie as próximas MSCs mensalmente). Se o exercício já se encerrou, confirme no Siconfi que os meses ${missing.map(m => String(m).padStart(2,'0')).join(', ')} foram homologados e, se necessário, anexe-os aqui para revalidação completa do ano.`,
         });
       }
     }
@@ -336,6 +344,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
       affectedAccounts: uniqueContas,
       detailedItems: buildInvertedItems(activeInverted, 'D'),
       message: pm(`${activeInverted.length} registro(s) / ${uniqueContas.length} conta(s) PCASP do ativo com natureza Credora (C). Natureza padrão: Devedora (D).`),
+      actionPlan: `Para cada conta listada na amostra: se o saldo C for legítimo (ex.: ajuste/depreciação), reclassifique na conta retificadora correta; caso contrário, estorne o lançamento. Ver sugestão de lançamento na seção "Plano de Correção Contábil".`,
     });
   }
 
@@ -436,6 +445,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
       affectedAccounts: Array.from(new Set(receitaSemCO.map(a => a.CONTA))),
       detailedItems: receitaSemCO.map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: 'Natureza de receita (CO) ausente' })),
       message: `${receitaSemCO.length} lançamento(s) nos grupos 6211/6212/6213 sem detalhamento de Natureza da Receita (CO).`,
+      actionPlan: 'Não requer lançamento contábil. Atualize o cadastro de Natureza de Receita (CO) das contas listadas no módulo de configuração de receitas do sistema de origem e gere uma nova MSC para revalidar.',
     });
   }
 
@@ -492,6 +502,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
       affectedAccounts: Array.from(new Set(despesaSemFS.map(a => a.CONTA))),
       detailedItems: despesaSemFS.map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: `FS: ${a.FS || '(vazio)'}` })),
       message: `${despesaSemFS.length} lançamento(s) no grupo 622 sem detalhamento de Função/Subfunção (FS).`,
+      actionPlan: 'Não requer lançamento contábil. Atualize o cadastro de Função/Subfunção (FS) das contas listadas no módulo de configuração de despesas do sistema de origem e gere uma nova MSC para revalidar.',
     });
   }
 
@@ -590,6 +601,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
         return { conta: a.CONTA, po: a.PO, fr: a.FR, co: a.CO, valor: a.Valor, detalhe: `Natureza informada: ${a.Natureza_valor} (esperado: ${esperado})` };
       }),
       message: pm(`${orcamInverted.length} conta(s) orçamentária(s) (classes 5/6) com natureza diferente do padrão PCASP.`),
+      actionPlan: 'Verifique, no sistema contábil de origem, os lançamentos que geraram natureza invertida nessas contas orçamentárias. Cancelamentos/estornos legítimos podem justificar a inversão pontualmente; caso contrário, corrija o lançamento.',
     });
   }
 
@@ -728,7 +740,8 @@ export function validateMultiMonth(
     if (hasDiff) {
       results.push({
         ruleId: 'D1_00020', dimension: 'D1', description: 'Diferença de saldos entre meses', severity: 'error', impactsCapag: true,
-        message: `Foram encontradas diferenças entre os saldos finais de ${prevPeriod} e os saldos iniciais de ${currPeriod} (ver detalhes na D2_00077).`
+        message: `Foram encontradas diferenças entre os saldos finais de ${prevPeriod} e os saldos iniciais de ${currPeriod} (ver detalhes na D2_00077).`,
+        actionPlan: `Consulte os itens D2_00077 deste relatório para o valor exato da diferença em cada conta afetada, e verifique se houve lançamento de ajuste/retificação entre o encerramento de ${prevPeriod} e a abertura de ${currPeriod}.`,
       });
     }
   }

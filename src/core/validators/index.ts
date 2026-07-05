@@ -14,8 +14,13 @@ export const runValidations = async (data: ParsedData, rulesMap: Map<string, Rul
   if (data.mscByPeriod && Object.keys(data.mscByPeriod).length > 0) {
     for (const [period, periodMsc] of Object.entries(data.mscByPeriod)) {
       if (isRegularMonthPeriod(period)) {
-        results.push(...validateD1_MSC(periodMsc, rulesMap, period));
-        results.push(...validateD2_MSC({ ...data, msc: periodMsc }, rulesMap, period));
+        // BUGFIX (jul/2026): resultados por mês precisam ficar marcados com o
+        // período de origem. Sem isso, enrichWithCorrectiveEntries calculava
+        // os lançamentos sugeridos usando o MSC de todos os meses achatado
+        // (data.msc), fazendo com que Jan/Fev/Mar mostrassem exatamente o
+        // mesmo valor de provisão de férias/13º no relatório.
+        results.push(...validateD1_MSC(periodMsc, rulesMap, period).map(r => ({ ...r, period })));
+        results.push(...validateD2_MSC({ ...data, msc: periodMsc }, rulesMap, period).map(r => ({ ...r, period })));
       }
     }
 
@@ -66,5 +71,5 @@ export const runValidations = async (data: ParsedData, rulesMap: Map<string, Rul
   });
 
   // Adicionar lançamentos corretivos sugeridos (quando MSC disponível)
-  return data.msc ? enrichWithCorrectiveEntries(enriched, data.msc) : enriched;
+  return data.msc ? enrichWithCorrectiveEntries(enriched, data.msc, data.mscByPeriod) : enriched;
 };
