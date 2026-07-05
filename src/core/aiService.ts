@@ -22,8 +22,12 @@ export async function getStoredKey(): Promise<string> {
 
   if (db && auth?.currentUser) {
     try {
-      const snap = await getDoc(doc(db, 'config', 'ai'));
-      if (snap.exists() && snap.data().key) {
+      // Timeout de 3s para evitar que fique preso se o Firestore não estiver ativado no painel do Firebase
+      const snap = await Promise.race([
+        getDoc(doc(db, 'config', 'ai')),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout ao conectar no Firestore (Banco pode não estar criado)')), 3000))
+      ]);
+      if (snap && snap.exists() && snap.data().key) {
         key = snap.data().key;
         sessionStorage.setItem(SESSION_KEY, key as string);
         return key as string;
@@ -41,7 +45,10 @@ export async function saveKey(key: string): Promise<void> {
     sessionStorage.setItem(SESSION_KEY, trimmed);
     if (db && auth?.currentUser) {
       try {
-        await setDoc(doc(db, 'config', 'ai'), { key: trimmed });
+        await Promise.race([
+          setDoc(doc(db, 'config', 'ai'), { key: trimmed }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout: O banco de dados Firestore pode não estar ativado no Firebase Console.')), 3000))
+        ]);
       } catch (error) {
         console.error('Erro ao salvar chave no Firestore:', error);
       }
@@ -54,9 +61,12 @@ export async function saveKey(key: string): Promise<void> {
 export async function clearKey(): Promise<void> {
   sessionStorage.removeItem(SESSION_KEY);
   if (db && auth?.currentUser) {
-    try {
-      await deleteDoc(doc(db, 'config', 'ai'));
-    } catch (error) {
+      try {
+        await Promise.race([
+          deleteDoc(doc(db, 'config', 'ai')),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+        ]);
+      } catch (error) {
       console.error('Erro ao limpar chave no Firestore:', error);
     }
   }
