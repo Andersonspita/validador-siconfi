@@ -40,6 +40,15 @@ export interface ValidationResult {
   detailedItems?: DetailedItem[];
   message: string;
   actionPlan?: string;
+  /**
+   * Período (ex.: "2026-01") ao qual este resultado se refere, quando a
+   * regra é avaliada mês a mês (ver loop em validators/index.ts). Usado por
+   * enrichWithCorrectiveEntries para calcular os lançamentos sugeridos com
+   * os dados do MÊS CORRETO, em vez do array de MSC de todos os meses
+   * achatado (bug corrigido em jul/2026: o mesmo valor de provisão de
+   * férias/13º aparecia repetido e idêntico para Jan/Fev/Mar).
+   */
+  period?: string;
   /** Lançamentos PCASP sugeridos para corrigir a inconsistência detectada. */
   suggestedEntries?: SuggestedEntry[];
   /**

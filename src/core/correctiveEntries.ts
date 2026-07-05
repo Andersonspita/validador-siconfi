@@ -309,14 +309,27 @@ export function buildCorrectiveEntries(
 /**
  * Enriquece os resultados de validação com lançamentos corretivos sugeridos.
  * Chamado após runValidations(), antes de gerar o relatório.
+ *
+ * BUGFIX (jul/2026): antes, todo resultado — inclusive os gerados mês a mês
+ * (D1_00021, D1_00030, D1_00032, D2_00081 etc.) — era enriquecido com o
+ * array de MSC de TODOS os meses achatado (`msc`). Isso fazia com que o
+ * valor calculado (ex.: 8% da despesa de pessoal para a provisão de
+ * férias/13º) fosse o mesmo trimestre inteiro, repetido de forma idêntica
+ * em cada mês no relatório, em vez de refletir a despesa daquele mês
+ * específico. Agora, quando o resultado traz `r.period` e existe o MSC
+ * daquele período em `mscByPeriod`, usamos o MSC do mês correto; caso
+ * contrário (regras multi-mês/globais, sem período específico), mantemos o
+ * comportamento anterior usando o array completo.
  */
 export function enrichWithCorrectiveEntries(
   results: ValidationResult[],
-  msc: MSCAccount[]
+  msc: MSCAccount[],
+  mscByPeriod?: Record<string, MSCAccount[]>
 ): ValidationResult[] {
   return results.map(r => {
     if (r.severity === 'info') return r; // orientações não têm lançamento
-    const entries = buildCorrectiveEntries(r, msc);
+    const mscDoPeriodo = r.period && mscByPeriod?.[r.period] ? mscByPeriod[r.period] : msc;
+    const entries = buildCorrectiveEntries(r, mscDoPeriodo);
     return entries.length > 0 ? { ...r, suggestedEntries: entries } : r;
   });
 }
