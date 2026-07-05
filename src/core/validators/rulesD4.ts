@@ -24,7 +24,8 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
   const results: ValidationResult[] = [];
 
   // D4_00045: Recursos Extraorçamentários (MSC vs RGF Anexo 07)
-  // Contas começadas por 1113, FRs 860, 861, 862, 869, do executivo (PO 2).
+  // Contas começadas por 1113, FRs 860, 861, 862, 869, do executivo (PO 1).
+  // BUGFIX: PO 1x = Executivo, não PO 2x (ver nota em rulesD1.ts, D1_00019/D1_00022).
   if (data.mscByPeriod && data.rgf) {
     const encPeriodKey = Object.keys(data.mscByPeriod).find(p => p.endsWith('-12') || p.endsWith('-13') || p.endsWith('-00'));
     if (encPeriodKey) {
@@ -32,7 +33,7 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
       const mscRecursos = mscDec
         .filter(a => a.CONTA.startsWith('1113') &&
                      ['860', '861', '862', '869'].includes(a.FR || '') &&
-                     (a.PO || '').startsWith('2') &&
+                     (a.PO || '').startsWith('1') &&
                      a.Tipo_valor === 'ending_balance')
         .reduce((sum, a) => sum + Math.abs(a.Valor), 0);
       
@@ -58,6 +59,15 @@ export function validateD4_Cruzamentos(data: ParsedData, _rulesMap: Map<string, 
       const mscDec = data.mscByPeriod[encPeriodKey];
       const rgfPiso = getRGF_PisoEnfermagem(data.rgf) || 0;
       
+      // ATENÇÃO (não alterado — confiança insuficiente para corrigir sem validação):
+      // este filtro usa múltiplos prefixos de PO ('2','3','4','8') numa checagem de
+      // repasses de enfermagem. Diferente dos outros pontos corrigidos nesta revisão
+      // (que assumiam explicitamente "PO 2 = Executivo"), aqui não há comentário
+      // afirmando o que cada prefixo representa, e a lista de 4 códigos não mapeia
+      // claramente para Executivo/Legislativo. Pode estar tentando capturar
+      // "administração indireta" (autarquias/fundações) ou outra segmentação
+      // legítima. Recomendo confirmar com a tabela oficial de códigos de Órgão
+      // antes de tocar aqui.
       const mscEnfRepasses = mscDec
         .filter(a => ['6221303', '6221304', '6221305', '6221306', '6221307'].some(c => a.CONTA.startsWith(c))
                   && ['2', '3', '4', '8'].some(p => (a.PO || '').startsWith(p))

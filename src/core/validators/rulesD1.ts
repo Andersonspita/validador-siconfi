@@ -185,7 +185,15 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   const pm = (msg: string) => prefixMessage(msg, periodLabel);
 
   // D1_00019: PO (Poder/Órgão) com formato inválido
-  // O PO deve ser um código de 5 dígitos numéricos e iniciar com 1 (Legislativo), 2 (Executivo), 3 (Judiciário), 4 (MP), 5 (Defensoria) ou 6 (Outros).
+  // O PO deve ser um código de 5 dígitos numéricos e iniciar com 1 (Executivo), 2 (Legislativo), 3 (Judiciário), 4 (MP), 5 (Defensoria) ou 6 (Outros).
+  // CORREÇÃO: o mapeamento original deste comentário estava invertido (dizia
+  // "1 = Legislativo, 2 = Executivo"). Confirmado com exemplo oficial da STN
+  // (Anexo I, Portaria STN nº 642/2019 — Regras Gerais MSC): "IC1 = 10111 [...]
+  // esse registro diz respeito ao Poder Executivo Estadual" — ou seja, PO
+  // iniciado em '1' é o Executivo. Confirmado também empiricamente com dados
+  // reais de Guanambi/BA (2026): PO 10131 tem ~R$1,3 bi em despesa orçamentária
+  // e ~R$12,7M em despesa de pessoal (compatível com Executivo); PO 20231 tem
+  // ~R$25M e ~R$951k respectivamente (compatível com Legislativo/Câmara).
   const poInvalidos = msc.filter(acc => {
     const po = acc.PO?.trim();
     return po && !/^[123456]\d{4}$/.test(po);
@@ -208,8 +216,10 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
   }
 
   // D1_00022: Envio de MSCs com todos os códigos de poder/órgão
-  // Verifica se pelo menos o Poder Executivo (PO iniciado em 2) está presente na MSC
-  const temExecutivo = msc.some(acc => acc.PO?.trim().startsWith('2'));
+  // Verifica se pelo menos o Poder Executivo (PO iniciado em 1) está presente na MSC.
+  // BUGFIX: antes checava startsWith('2'), tratando o Legislativo como se fosse
+  // o Executivo (ver nota acima, em D1_00019, com a fonte oficial da inversão).
+  const temExecutivo = msc.some(acc => acc.PO?.trim().startsWith('1'));
   if (!temExecutivo) {
     results.push({
       ruleId: 'D1_00022',
@@ -217,7 +227,7 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
       description: 'Envio de MSCs com todos os códigos de poder/órgão',
       severity: 'error',
       impactsCapag: true,
-      message: `O código de Poder/Órgão relativo ao Poder Executivo (iniciado em '2') não foi encontrado nesta MSC. O envio de dados do Executivo é obrigatório.`,
+      message: `O código de Poder/Órgão relativo ao Poder Executivo (iniciado em '1') não foi encontrado nesta MSC. O envio de dados do Executivo é obrigatório.`,
     });
   }
 
@@ -626,8 +636,9 @@ export function validateMultiMonth(
     const currMsc = mscByPeriod[currPeriod];
 
     // D1_00023: Envio de MSCs com dados do poder executivo iguais entre meses diferentes
-    const prevExec = prevMsc.filter(a => a.PO?.startsWith('2'));
-    const currExec = currMsc.filter(a => a.PO?.startsWith('2'));
+    // BUGFIX: PO 1x = Executivo (ver nota em D1_00019/D1_00022).
+    const prevExec = prevMsc.filter(a => a.PO?.startsWith('1'));
+    const currExec = currMsc.filter(a => a.PO?.startsWith('1'));
     if (prevExec.length > 0 && currExec.length > 0 && prevExec.length === currExec.length) {
       // Correção QA-006: comparação via Map (insensível à ordem de exportação)
       const currExecMap = new Map(currExec.map(a => [mscAccountKey(a), a.Valor]));
@@ -644,8 +655,9 @@ export function validateMultiMonth(
     }
 
     // D1_00024: Envio de MSCs com dados do legislativo iguais entre meses diferentes
-    const prevLeg = prevMsc.filter(a => a.PO?.startsWith('1'));
-    const currLeg = currMsc.filter(a => a.PO?.startsWith('1'));
+    // BUGFIX: PO 2x = Legislativo (ver nota em D1_00019/D1_00022).
+    const prevLeg = prevMsc.filter(a => a.PO?.startsWith('2'));
+    const currLeg = currMsc.filter(a => a.PO?.startsWith('2'));
     if (prevLeg.length > 0 && currLeg.length > 0 && prevLeg.length === currLeg.length) {
       // Correção QA-006: comparação via Map (insensível à ordem de exportação)
       const currLegMap = new Map(currLeg.map(a => [mscAccountKey(a), a.Valor]));

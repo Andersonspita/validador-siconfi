@@ -491,12 +491,23 @@ export function validateLRF_MSC(data: ParsedData, _rulesMap: Map<string, RuleDef
   const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 
   // ── Despesa Total com Pessoal (Art. 19/20 LRF) ───────────────────────────
+  // BUGFIX: PO 1x = Executivo, PO 2x = Legislativo (estava trocado — ver nota
+  // detalhada em rulesD1.ts, D1_00019/D1_00022, com a fonte oficial da STN e a
+  // confirmação empírica com dados reais de Guanambi/2026). O bug antigo fazia
+  // esta regra comparar a folha de pagamento REAL do Executivo (ex.: ~R$584M/
+  // ano em Guanambi) contra o limite de 6% do Legislativo (art. 20, III, a) —
+  // produzindo um IMPEDITIVO falso quase garantido em qualquer município, já
+  // que a folha do Executivo é naturalmente muito maior que 6% da RCL (seu
+  // limite correto é 54%). Ao mesmo tempo, a checagem do Executivo (ratioExec)
+  // ficava comparando a folha real do Legislativo (pequena) contra 54%,
+  // silenciando o alerta que deveria existir se o Executivo realmente
+  // extrapolasse seu próprio limite.
   const pessoalExec = msc
-    .filter(a => a.CONTA.startsWith('311') && a.Tipo_valor === 'period_change' && a.Natureza_valor === 'D' && a.PO?.startsWith('2'))
+    .filter(a => a.CONTA.startsWith('311') && a.Tipo_valor === 'period_change' && a.Natureza_valor === 'D' && a.PO?.startsWith('1'))
     .reduce((s, a) => s + a.Valor, 0) * 12;
 
   const pessoalLeg = msc
-    .filter(a => a.CONTA.startsWith('311') && a.Tipo_valor === 'period_change' && a.Natureza_valor === 'D' && a.PO?.startsWith('1'))
+    .filter(a => a.CONTA.startsWith('311') && a.Tipo_valor === 'period_change' && a.Natureza_valor === 'D' && a.PO?.startsWith('2'))
     .reduce((s, a) => s + a.Valor, 0) * 12;
 
   const pessoalTotal = pessoalExec + pessoalLeg;

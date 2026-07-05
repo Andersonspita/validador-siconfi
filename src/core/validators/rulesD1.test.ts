@@ -90,14 +90,14 @@ describe('D1_00021 — ativo com saldo invertido', () => {
 // ─── D1_00022: Executivo ausente ──────────────────────────────────────────────
 
 describe('D1_00022 — Executivo ausente na MSC', () => {
-  it('alerta quando nenhum PO começa com 2', () => {
-    const msc: MSCAccount[] = [acc({ CONTA: '111111900', PO: '10131', Valor: 100 })];
+  it('alerta quando nenhum PO começa com 1', () => {
+    const msc: MSCAccount[] = [acc({ CONTA: '111111900', PO: '20131', Valor: 100 })];
     const results = validateD1_MSC(msc, new Map());
     expect(results.find(r => r.ruleId === 'D1_00022')).toBeDefined();
   });
 
-  it('não alerta quando há PO do Executivo (começa com 2)', () => {
-    const msc: MSCAccount[] = [acc({ CONTA: '111111900', PO: '20131', Valor: 100 })];
+  it('não alerta quando há PO do Executivo (começa com 1) — bugfix: antes assumia erroneamente que PO 2 = Executivo', () => {
+    const msc: MSCAccount[] = [acc({ CONTA: '111111900', PO: '10131', Valor: 100 })];
     const results = validateD1_MSC(msc, new Map());
     expect(results.find(r => r.ruleId === 'D1_00022')).toBeUndefined();
   });
@@ -122,8 +122,10 @@ describe('D1_00031 — despesa 62213 sem ND', () => {
 // ─── D1_00023/D1_00024: MSCs idênticas — comparação via Map ──────────────────
 
 describe('D1_00023/D1_00024 — MSCs idênticas entre meses (comparação via Map)', () => {
+  // BUGFIX: antes o PO de exemplo era '20131' (Legislativo, não Executivo).
+  // PO 1x = Executivo (ver nota em D1_00019/D1_00022).
   const makeExecAcc = (conta: string, valor: number): MSCAccount =>
-    acc({ CONTA: conta, PO: '20131', Valor: valor, Tipo_valor: 'ending_balance' });
+    acc({ CONTA: conta, PO: '10131', Valor: valor, Tipo_valor: 'ending_balance' });
 
   it('detecta MSCs do Executivo idênticas mesmo em ordens diferentes', () => {
     const mscByPeriod: Record<string, MSCAccount[]> = {
