@@ -8,7 +8,7 @@ import {
   PL_DEDUCAO_PREFIXES,
   ORCAM_NATUREZA_EXCEPTION_PREFIXES,
 } from '../pcaspRules';
-import { getExtratoEntregas } from '../../services/siconfiApi';
+import { getExtratoEntregas, isEntregavelDoTipo, isHomologado } from '../../services/siconfiApi';
 
 export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
@@ -35,11 +35,15 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
       // DCA: 30 de abril do ano seguinte
       
       const missingHomologados = ausentes.filter(rep => {
-        const noSiconfi = entregas.find(e =>
-          e.relatorio?.includes(rep) &&
-          e.status_relatorio?.toLowerCase().includes('homologado')
+        // BUGFIX: a API não retorna um campo "relatorio" — o campo real é
+        // "entregavel" (ex.: "Relatório Resumido de Execução Orçamentária"),
+        // e o status vem em "status_relatorio" como código curto (ex.: "HO").
+        // O código antigo comparava contra um campo inexistente e por isso
+        // NUNCA encontrava homologação, disparando D1_00001 sempre.
+        const homologadoNoSiconfi = entregas.some(e =>
+          isEntregavelDoTipo(e.entregavel, rep) && isHomologado(e.status_relatorio)
         );
-        return !noSiconfi;
+        return !homologadoNoSiconfi;
       });
 
       if (missingHomologados.length > 0 && (temMSC || temRREO || temRGF || temDCA)) {
