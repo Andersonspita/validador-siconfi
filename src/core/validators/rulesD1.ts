@@ -712,13 +712,21 @@ export function validateMultiMonth(
         const siCurr = cAcc.Natureza_valor === 'C' ? -cAcc.Valor : cAcc.Valor;
         if (Math.abs(siCurr - sfPrev) > 0.01) {
           hasDiff = true;
+          const diff = siCurr - sfPrev;
+          const diffAbs = Math.abs(diff);
+          // Natureza da diferença na mesma convenção usada acima (D positivo / C negativo):
+          // diff > 0 => o saldo inicial ficou "mais D" (ou "menos C") do que o saldo final anterior.
+          const diffNature = diff < 0 ? 'C' : 'D';
+          const diffPct = sfPrev !== 0 ? (diffAbs / Math.abs(sfPrev)) * 100 : null;
           results.push({
             ruleId: 'D2_00077',
             dimension: 'D2',
             description: 'Validação de saldo inicial x final',
             severity: 'error',
             impactsCapag: false,
-            message: `Conta ${pAcc.CONTA}: O saldo final de ${prevPeriod} (R$ ${Math.abs(sfPrev).toFixed(2)}${sfPrev < 0 ? 'C' : 'D'}) difere do saldo inicial de ${currPeriod} (R$ ${Math.abs(siCurr).toFixed(2)}${siCurr < 0 ? 'C' : 'D'}).`,
+            affectedAccounts: [pAcc.CONTA],
+            message: `Conta ${pAcc.CONTA}: O saldo final de ${prevPeriod} (R$ ${Math.abs(sfPrev).toFixed(2)}${sfPrev < 0 ? 'C' : 'D'}) difere do saldo inicial de ${currPeriod} (R$ ${Math.abs(siCurr).toFixed(2)}${siCurr < 0 ? 'C' : 'D'}). Diferença: R$ ${diffAbs.toFixed(2)}${diffNature}${diffPct !== null ? ` (${diffPct.toFixed(2)}%)` : ''}.`,
+            actionPlan: `Verifique se houve lançamento de ajuste/retificação na conta ${pAcc.CONTA} entre o encerramento de ${prevPeriod} e a abertura de ${currPeriod}. O saldo inicial do período subsequente deve ser idêntico ao saldo final do período anterior (diferença apurada: R$ ${diffAbs.toFixed(2)}${diffNature}).`,
           });
         }
       }
