@@ -8,7 +8,7 @@ import {
   PL_DEDUCAO_PREFIXES,
   ORCAM_NATUREZA_EXCEPTION_PREFIXES,
 } from '../pcaspRules';
-import { getExtratoEntregas, isEntregavelDoTipo, isHomologado } from '../../services/siconfiApi';
+import { getExtratoEntregas, buildPendenciasPorPoder } from '../../services/siconfiApi';
 
 export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
@@ -33,32 +33,49 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
       // RREO: 30 dias após bimestre
       // RGF: 30 dias após quadrimestre/semestre
       // DCA: 30 de abril do ano seguinte
-      
-      const missingHomologados = ausentes.filter(rep => {
-        // BUGFIX: a API não retorna um campo "relatorio" — o campo real é
-        // "entregavel" (ex.: "Relatório Resumido de Execução Orçamentária"),
-        // e o status vem em "status_relatorio" como código curto (ex.: "HO").
-        // O código antigo comparava contra um campo inexistente e por isso
-        // NUNCA encontrava homologação, disparando D1_00001 sempre.
-        const homologadoNoSiconfi = entregas.some(e =>
-          isEntregavelDoTipo(e.entregavel, rep) && isHomologado(e.status_relatorio)
-        );
-        return !homologadoNoSiconfi;
-      });
+      //
+      // IMPORTANTE: um município pode ter mais de um Poder/Órgão prestando
+      // contas separadamente (ex.: Prefeitura e Câmara). O Legislativo homologar
+      // o RGF dele NÃO significa que o Executivo também homologou o dele — por
+      // isso verificamos a homologação POR instituição, não apenas "existe algum
+      // registro homologado desse tipo, de qualquer Poder".
+      //
+      // TODO(limitação conhecida): se um Poder/Órgão nunca enviou absolutamente
+      // nada ao Siconfi no exercício (nem rascunho), ele não aparece em
+      // `entregas` de forma alguma — logo, buildPendenciasPorPoder() não tem
+      // como sinalizar "esse Poder nem consta na resposta da API". Isso é
+      // diferente do caso observado em Guanambi/2026 (Prefeitura aparece
+      // porque enviou a MSC, só não o RREO/RGF). Para cobrir esse caso extremo,
+      // seria necessário comparar contra a lista de instituições/Poderes
+      // cadastrados para o ente via GET /ords/siconfi/tt/entes (ou cadastro
+      // equivalente), e não apenas contra o que já foi entregue.
+      const pendenciasPorPoder = buildPendenciasPorPoder(entregas, ausentes);
 
-      if (missingHomologados.length > 0 && (temMSC || temRREO || temRGF || temDCA)) {
+      if (pendenciasPorPoder.length > 0 && (temMSC || temRREO || temRGF || temDCA)) {
+        const executivoPendente = pendenciasPorPoder.find(p => p.poder === 'Executivo');
+        const outrosPendentes = pendenciasPorPoder.filter(p => p.poder !== 'Executivo');
+        const todosPendentesUnicos = Array.from(new Set(pendenciasPorPoder.flatMap(p => p.pendentes)));
+        const resumoPorInstituicao = pendenciasPorPoder
+          .map(p => `${p.instituicao} [${p.poder}]: ${p.pendentes.join(', ')}`)
+          .join(' | ');
+
         results.push({
           ruleId: 'D1_00001',
           dimension: 'D1',
           description: 'Verificação de entrega dos demonstrativos',
-          severity: 'error',
-          impactsCapag: true,
-          affectedAccounts: missingHomologados,
-          message:
-            `Demonstrativo(s) não enviados localmente e NÃO homologados na API do Siconfi para ${data.anoReferencia}: ${missingHomologados.join(', ')}.`,
+          // Só é IMPEDITIVO se a pendência for do Poder Executivo. Pendência
+          // isolada de outro Poder (ex.: Legislativo) ainda é informada, mas
+          // como aviso — não bloqueia o relatório do Executivo em si.
+          severity: executivoPendente ? 'error' : 'warning',
+          impactsCapag: !!executivoPendente,
+          affectedAccounts: todosPendentesUnicos,
+          message: executivoPendente
+            ? `Demonstrativo(s) NÃO homologados na API do Siconfi para o Poder Executivo em ${data.anoReferencia}: ${executivoPendente.pendentes.join(', ')}.` +
+              (outrosPendentes.length > 0 ? ` Pendência(s) adicional(is) em outro(s) Poder/Órgão: ${outrosPendentes.map(p => `${p.instituicao} [${p.poder}]: ${p.pendentes.join(', ')}`).join(' | ')}.` : '')
+            : `Sem pendência confirmada para o Poder Executivo, mas há demonstrativo(s) NÃO homologado(s) em outro(s) Poder/Órgão do ente: ${resumoPorInstituicao}.`,
           debugInfo: {
             label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
-            payload: entregas,
+            payload: { pendenciasPorPoder, entregas },
           },
         });
       } else if (ausentes.length > 0) {
@@ -70,7 +87,7 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
           impactsCapag: false,
           affectedAccounts: ausentes,
           message:
-            `Os arquivos ${ausentes.join(', ')} não foram inseridos para validação de cruzamento (D3/D4), mas constam como homologados na API do Siconfi.`,
+            `Os arquivos ${ausentes.join(', ')} não foram inseridos para validação de cruzamento (D3/D4), mas constam como homologados na API do Siconfi para todo(s) o(s) Poder/Órgão identificado(s).`,
           debugInfo: {
             label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
             payload: entregas,

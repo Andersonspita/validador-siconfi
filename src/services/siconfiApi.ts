@@ -54,6 +54,74 @@ export function isHomologado(statusRelatorio: string | null | undefined): boolea
   return HOMOLOGADO_TOKENS.includes(alvo) || alvo.includes('homologad');
 }
 
+export type Poder = 'Executivo' | 'Legislativo' | 'Judiciário' | 'Ministério Público' | 'Outro';
+
+/**
+ * Classifica o Poder/Órgão a partir do nome da instituição retornado pela
+ * própria API do Siconfi (campo "instituicao").
+ *
+ * IMPORTANTE: propositalmente NÃO usamos o prefixo do campo "PO" da MSC para
+ * isso. O "PO" (Poder/Órgão) na MSC é uma informação complementar de-para que
+ * CADA ente define livremente no cadastro do Siconfi — não é um código
+ * nacional padronizado como FR ou CO. A regra D1_00022 deste projeto assume
+ * "PO iniciado em 2 = Executivo", mas nos dados reais de Guanambi observamos
+ * o oposto (PO 10131 = Executivo, com despesas de ~R$174M; PO 20231 =
+ * Legislativo, com despesas de ~R$8,5M). Por isso, para D1_00001, confiamos
+ * apenas no texto de "instituicao" devolvido pela STN, que é confiável.
+ */
+export function classificarPoder(instituicao: string | null | undefined): Poder {
+  if (!instituicao) return 'Outro';
+  const alvo = instituicao.toLowerCase();
+  if (alvo.includes('câmara') || alvo.includes('camara') || alvo.includes('legislativ') || alvo.includes('assembl')) {
+    return 'Legislativo';
+  }
+  if (alvo.includes('prefeitura') || alvo.includes('governo do estado') || alvo.includes('governo do distrito') || alvo.includes('executivo')) {
+    return 'Executivo';
+  }
+  if (alvo.includes('tribunal de justiça') || alvo.includes('judiciário') || alvo.includes('judiciario')) {
+    return 'Judiciário';
+  }
+  if (alvo.includes('ministério público') || alvo.includes('ministerio publico')) {
+    return 'Ministério Público';
+  }
+  return 'Outro';
+}
+
+export interface PendenciaPorPoder {
+  instituicao: string;
+  poder: Poder;
+  pendentes: string[];
+}
+
+/**
+ * Para cada instituição (Poder/Órgão) presente na resposta da API, verifica
+ * quais dos demonstrativos em `ausentesLocalmente` NÃO estão homologados para
+ * aquela instituição especificamente. Isso evita o problema de "um Poder
+ * homologado esconde a pendência de outro Poder" — ex.: a Câmara homologar o
+ * RGF não significa que a Prefeitura também homologou o dela.
+ *
+ * Retorna apenas instituições que têm ao menos 1 pendência.
+ */
+export function buildPendenciasPorPoder(
+  entregas: ExtratoEntrega[],
+  ausentesLocalmente: string[]
+): PendenciaPorPoder[] {
+  const instituicoes = Array.from(new Set(entregas.map(e => e.instituicao).filter(Boolean)));
+
+  return instituicoes
+    .map(instituicao => {
+      const entregasDaInstituicao = entregas.filter(e => e.instituicao === instituicao);
+      const pendentes = ausentesLocalmente.filter(rep => {
+        const homologado = entregasDaInstituicao.some(
+          e => isEntregavelDoTipo(e.entregavel, rep) && isHomologado(e.status_relatorio)
+        );
+        return !homologado;
+      });
+      return { instituicao, poder: classificarPoder(instituicao), pendentes };
+    })
+    .filter(p => p.pendentes.length > 0);
+}
+
 export interface SiconfiApiResponse {
   items: ExtratoEntrega[];
   hasMore: boolean;

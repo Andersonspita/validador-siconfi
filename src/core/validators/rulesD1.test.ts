@@ -220,4 +220,46 @@ describe('D1_00001 — homologação via API do Siconfi', () => {
     // (severity 'warning'), não deve ser confundido com o caso confirmado.
     expect(d1).toBeDefined();
   });
+
+  it('gera IMPEDITIVO quando só o Legislativo homologou, mesmo com o Executivo pendente (payload real de Guanambi/2911709)', async () => {
+    // Payload real observado em produção: a Câmara de Guanambi homologou o RGF
+    // do 1º quadrimestre, mas a Prefeitura (Executivo) não tem NENHUM registro
+    // de RREO/RGF/DCA. Antes deste refinamento, a regra checava "existe algum
+    // registro homologado desse tipo, de QUALQUER instituição" e por isso
+    // classificaria isso incorretamente como "ok" — mascarando a pendência
+    // real do Executivo.
+    const fakeResponse = {
+      items: [
+        {
+          exercicio: 2026, cod_ibge: 2911709, populacao: 93488,
+          instituicao: 'Câmara de Vereadores de Guanambi - BA',
+          entregavel: 'Relatório de Gestão Fiscal',
+          periodo: 1, periodicidade: 'Q',
+          status_relatorio: 'HO', data_status: '2026-07-01T16:07:17Z',
+          forma_envio: 'M', tipo_relatorio: 'P',
+        },
+        {
+          exercicio: 2026, cod_ibge: 2911709, populacao: 93488,
+          instituicao: 'Prefeitura Municipal de Guanambi - BA',
+          entregavel: 'MSC Agregada',
+          periodo: 1, periodicidade: 'M',
+          status_relatorio: null, data_status: '2026-06-15T14:51:01Z',
+          forma_envio: 'CSV', tipo_relatorio: null,
+        },
+      ],
+      hasMore: false, limit: 5000, offset: 0, count: 2,
+    };
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => fakeResponse,
+    }));
+
+    const results = await validateD1_Entrega(baseData, new Map());
+    const d1 = results.find(r => r.ruleId === 'D1_00001');
+
+    expect(d1?.severity).toBe('error');
+    expect(d1?.message).toContain('Poder Executivo');
+    expect(d1?.message).toMatch(/RREO|RGF|DCA/);
+  });
 });
