@@ -264,4 +264,45 @@ describe('D1_00001 — homologação via API do Siconfi', () => {
     expect(d1?.message).toContain('Poder Executivo');
     expect(d1?.message).toMatch(/RREO|RGF|DCA/);
   });
+
+  it('diferencia RGF (responsabilidade própria do Poder) de RREO/DCA (documento consolidado pelo Executivo) na mensagem', async () => {
+    // Cenário: Executivo com tudo pendente (RREO, RGF, DCA) e Legislativo com
+    // RGF pendente (dele mesmo) e RREO pendente (que na verdade depende do
+    // Executivo consolidar/homologar, não de um envio próprio da Câmara).
+    const fakeResponse = {
+      items: [
+        {
+          exercicio: 2026, cod_ibge: 2911709, populacao: 93488,
+          instituicao: 'Prefeitura Municipal de Guanambi - BA',
+          entregavel: 'MSC Agregada',
+          periodo: 1, periodicidade: 'M',
+          status_relatorio: null, data_status: '2026-06-15T14:51:01Z',
+          forma_envio: 'CSV', tipo_relatorio: null,
+        },
+        {
+          exercicio: 2026, cod_ibge: 2911709, populacao: 93488,
+          instituicao: 'Câmara de Vereadores de Guanambi - BA',
+          entregavel: 'MSC Agregada',
+          periodo: 1, periodicidade: 'M',
+          status_relatorio: null, data_status: '2026-06-15T14:51:02Z',
+          forma_envio: 'CSV', tipo_relatorio: null,
+        },
+      ],
+      hasMore: false, limit: 5000, offset: 0, count: 2,
+    };
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => fakeResponse,
+    }));
+
+    const results = await validateD1_Entrega(baseData, new Map());
+    const d1 = results.find(r => r.ruleId === 'D1_00001');
+
+    expect(d1?.severity).toBe('error');
+    // A parte do Legislativo deve citar RGF como responsabilidade própria...
+    expect(d1?.message).toMatch(/Câmara.*RGF.*elaboração própria/s);
+    // ...e o RREO/DCA como documento consolidado do Executivo.
+    expect(d1?.message).toMatch(/Câmara.*(RREO|DCA).*consolidado.*Executivo/s);
+  });
 });

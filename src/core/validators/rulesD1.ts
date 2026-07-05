@@ -8,7 +8,7 @@ import {
   PL_DEDUCAO_PREFIXES,
   ORCAM_NATUREZA_EXCEPTION_PREFIXES,
 } from '../pcaspRules';
-import { getExtratoEntregas, buildPendenciasPorPoder } from '../../services/siconfiApi';
+import { getExtratoEntregas, buildPendenciasPorPoder, PendenciaPorPoder } from '../../services/siconfiApi';
 
 export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
@@ -26,7 +26,37 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
   // Integracao Siconfi API para Tempestividade
   if (data.enteId && data.anoReferencia) {
     const entregas = await getExtratoEntregas(data.enteId, data.anoReferencia);
-    
+
+    // Nem todo demonstrativo é "de cada Poder": pela LRF, o RGF é elaborado e
+    // publicado separadamente por cada Poder/Órgão (art. 20), mas o RREO é um
+    // documento ÚNICO e consolidado, elaborado pelo Poder Executivo abrangendo
+    // também os demais Poderes (art. 48, caput) — os demais Poderes apenas
+    // homologam/assinam a parte deles dentro desse relatório único, não enviam
+    // um RREO próprio. O mesmo vale para a DCA (prestação de contas anual
+    // consolidada). Por isso a pendência de RREO/DCA aparecendo para um Poder
+    // que não o Executivo normalmente significa "aguardando o Executivo
+    // concluir/homologar o documento consolidado", e não "este Poder precisa
+    // enviar algo por conta própria".
+    const CONSOLIDADOS_PELO_EXECUTIVO = ['RREO', 'DCA'];
+
+    const formatPendenciaInstituicao = (pend: PendenciaPorPoder): string => {
+      if (pend.poder === 'Executivo') {
+        return `${pend.instituicao} [Executivo]: ${pend.pendentes.join(', ')} (elaboração e homologação são responsabilidade direta do Executivo)`;
+      }
+      const proprios = pend.pendentes.filter(x => !CONSOLIDADOS_PELO_EXECUTIVO.includes(x));
+      const consolidados = pend.pendentes.filter(x => CONSOLIDADOS_PELO_EXECUTIVO.includes(x));
+      const partes: string[] = [];
+      if (proprios.length > 0) {
+        partes.push(`${proprios.join(', ')} (elaboração própria deste Poder — LRF art. 20)`);
+      }
+      if (consolidados.length > 0) {
+        partes.push(
+          `${consolidados.join(', ')} (documento único e consolidado, elaborado pelo Poder Executivo — LRF art. 48; a pendência aqui reflete a assinatura/homologação da parte deste Poder dentro desse relatório, não um envio separado)`
+        );
+      }
+      return `${pend.instituicao} [${pend.poder}]: ${partes.join('; ')}`;
+    };
+
     if (entregas.length > 0) {
       // Regras de Tempestividade LRF:
       // MSC: Geralmente avaliada no encerramento (D1_00016 já cobre upload local, a API pode confirmar status)
@@ -55,9 +85,7 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
         const executivoPendente = pendenciasPorPoder.find(p => p.poder === 'Executivo');
         const outrosPendentes = pendenciasPorPoder.filter(p => p.poder !== 'Executivo');
         const todosPendentesUnicos = Array.from(new Set(pendenciasPorPoder.flatMap(p => p.pendentes)));
-        const resumoPorInstituicao = pendenciasPorPoder
-          .map(p => `${p.instituicao} [${p.poder}]: ${p.pendentes.join(', ')}`)
-          .join(' | ');
+        const resumoPorInstituicao = pendenciasPorPoder.map(formatPendenciaInstituicao).join(' | ');
 
         results.push({
           ruleId: 'D1_00001',
@@ -71,7 +99,7 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
           affectedAccounts: todosPendentesUnicos,
           message: executivoPendente
             ? `Demonstrativo(s) NÃO homologados na API do Siconfi para o Poder Executivo em ${data.anoReferencia}: ${executivoPendente.pendentes.join(', ')}.` +
-              (outrosPendentes.length > 0 ? ` Pendência(s) adicional(is) em outro(s) Poder/Órgão: ${outrosPendentes.map(p => `${p.instituicao} [${p.poder}]: ${p.pendentes.join(', ')}`).join(' | ')}.` : '')
+              (outrosPendentes.length > 0 ? ` Pendência(s) adicional(is) em outro(s) Poder/Órgão: ${outrosPendentes.map(formatPendenciaInstituicao).join(' | ')}.` : '')
             : `Sem pendência confirmada para o Poder Executivo, mas há demonstrativo(s) NÃO homologado(s) em outro(s) Poder/Órgão do ente: ${resumoPorInstituicao}.`,
           debugInfo: {
             label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
