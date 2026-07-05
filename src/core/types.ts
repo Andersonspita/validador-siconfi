@@ -42,6 +42,15 @@ export interface ValidationResult {
   actionPlan?: string;
   /** Lançamentos PCASP sugeridos para corrigir a inconsistência detectada. */
   suggestedEntries?: SuggestedEntry[];
+  /**
+   * Dados de diagnóstico para depuração (ex.: payload bruto retornado por uma
+   * API externa). Usado hoje pelo D1_00001 para expor a resposta da API de
+   * homologação do Siconfi na UI, sem precisar abrir o DevTools.
+   */
+  debugInfo?: {
+    label: string;
+    payload: unknown;
+  };
 }
 
 export interface XLSReport {

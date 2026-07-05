@@ -56,6 +56,10 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
           affectedAccounts: missingHomologados,
           message:
             `Demonstrativo(s) não enviados localmente e NÃO homologados na API do Siconfi para ${data.anoReferencia}: ${missingHomologados.join(', ')}.`,
+          debugInfo: {
+            label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
+            payload: entregas,
+          },
         });
       } else if (ausentes.length > 0) {
         results.push({
@@ -67,6 +71,10 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
           affectedAccounts: ausentes,
           message:
             `Os arquivos ${ausentes.join(', ')} não foram inseridos para validação de cruzamento (D3/D4), mas constam como homologados na API do Siconfi.`,
+          debugInfo: {
+            label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
+            payload: entregas,
+          },
         });
       }
 
@@ -84,6 +92,10 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
            message:
              `Demonstrativo(s) não incluído(s) no upload: ${ausentes.join(', ')}. ` +
              `A API do Siconfi não retornou dados para confirmar homologação. Confirme manualmente no SICONFI.`,
+           debugInfo: {
+             label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
+             payload: { items: [], observacao: 'A API não retornou nenhum item (lista vazia) ou a chamada falhou. Veja o console do navegador para detalhes de erro de rede/CORS.' },
+           },
          });
        }
     }

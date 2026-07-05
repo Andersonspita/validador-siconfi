@@ -303,6 +303,18 @@ export default function ReportDashboard({ files, rulesMap, onReset, onResultsRea
                     </div>
                   </div>
                 )}
+
+                {result.debugInfo && (
+                  <details className="debug-info-dropdown">
+                    <summary>🔧 Diagnóstico API Siconfi</summary>
+                    <div className="debug-info-body">
+                      <p className="debug-info-label">{result.debugInfo.label}</p>
+                      <pre className="debug-info-json">
+                        {JSON.stringify(result.debugInfo.payload, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
+                )}
               </div>
             </div>
           ))

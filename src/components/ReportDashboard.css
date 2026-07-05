@@ -195,6 +195,52 @@
   outline: none;
 }
 
+.debug-info-dropdown {
+  margin-top: 0.75rem;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: var(--border-radius);
+  padding: 0.4rem 0.5rem;
+}
+
+[data-theme='dark'] .debug-info-dropdown {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.debug-info-dropdown summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.35rem;
+  user-select: none;
+  color: var(--text-secondary, #888);
+  outline: none;
+}
+
+.debug-info-body {
+  padding: 0.5rem;
+}
+
+.debug-info-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+  margin: 0 0 0.4rem 0;
+}
+
+.debug-info-json {
+  max-height: 320px;
+  overflow: auto;
+  font-size: 0.75rem;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  background: rgba(0, 0, 0, 0.25);
+  color: #d4d4d4;
+  padding: 0.75rem;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .table-responsive {
   width: 100%;
   overflow-x: auto;
