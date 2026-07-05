@@ -3,8 +3,9 @@ import { parseFiles } from '../core/parsers';
 import { runValidations } from '../core/validatorEngine';
 import { ValidationResult, RuleDefinition } from '../core/types';
 import { generatePDF } from '../core/pdfGenerator';
+import { generateRelatorioTecnicoPDF } from '../core/relatorioTecnico';
 import Papa from 'papaparse';
-import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3 } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3, ClipboardList } from 'lucide-react';
 import ReportView from './ReportView';
 import CAPAGPanel from './CAPAGPanel';
 import { MSCAccount } from '../core/types';
@@ -157,6 +158,10 @@ export default function ReportDashboard({ files, rulesMap, onReset, onResultsRea
             <button onClick={() => generatePDF(filteredResults, reportMeta)} className="export-btn glass-panel print-btn">
               <Printer size={20} />
               Gerar Relatório Oficial (PDF)
+            </button>
+            <button onClick={() => generateRelatorioTecnicoPDF(filteredResults, reportMeta)} className="export-btn glass-panel print-btn">
+              <ClipboardList size={20} />
+              Relatório Técnico (Resumo Executivo)
             </button>
           </div>
         </div>
