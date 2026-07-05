@@ -1,10 +1,12 @@
 /**
  * aiService.ts
  * Assistente IA contextual — chave OpenAI inserida pelo usuário em runtime.
- * NUNCA embute a chave no bundle — armazenada apenas em sessionStorage.
+ * NUNCA embute a chave no bundle. O sistema tenta ler primeiro da sessão local, depois do banco de dados (Firestore).
  */
 
 import { ValidationResult } from './types';
+import { db, auth } from '../firebase';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 export interface AIMessage {
   role: 'user' | 'assistant';
@@ -14,21 +16,55 @@ export interface AIMessage {
 const SESSION_KEY = 'siconfi_ai_key';
 const MODEL       = 'gpt-4o-mini';
 
-export function getStoredKey(): string {
-  return sessionStorage.getItem(SESSION_KEY) ?? '';
+export async function getStoredKey(): Promise<string> {
+  let key = sessionStorage.getItem(SESSION_KEY);
+  if (key) return key;
+
+  if (db && auth?.currentUser) {
+    try {
+      const snap = await getDoc(doc(db, 'config', 'ai'));
+      if (snap.exists() && snap.data().key) {
+        key = snap.data().key;
+        sessionStorage.setItem(SESSION_KEY, key as string);
+        return key as string;
+      }
+    } catch (error) {
+      console.error('Erro ao recuperar chave do Firestore:', error);
+    }
+  }
+  return '';
 }
 
-export function saveKey(key: string): void {
-  if (key) sessionStorage.setItem(SESSION_KEY, key.trim());
-  else sessionStorage.removeItem(SESSION_KEY);
+export async function saveKey(key: string): Promise<void> {
+  if (key) {
+    const trimmed = key.trim();
+    sessionStorage.setItem(SESSION_KEY, trimmed);
+    if (db && auth?.currentUser) {
+      try {
+        await setDoc(doc(db, 'config', 'ai'), { key: trimmed });
+      } catch (error) {
+        console.error('Erro ao salvar chave no Firestore:', error);
+      }
+    }
+  } else {
+    await clearKey();
+  }
 }
 
-export function clearKey(): void {
+export async function clearKey(): Promise<void> {
   sessionStorage.removeItem(SESSION_KEY);
+  if (db && auth?.currentUser) {
+    try {
+      await deleteDoc(doc(db, 'config', 'ai'));
+    } catch (error) {
+      console.error('Erro ao limpar chave no Firestore:', error);
+    }
+  }
 }
 
-export function isAIConfigured(): boolean {
-  return !!getStoredKey();
+export async function isAIConfigured(): Promise<boolean> {
+  const key = await getStoredKey();
+  return !!key;
 }
 
 function buildSystemPrompt(
@@ -83,7 +119,7 @@ export async function sendMessage(
   results: ValidationResult[],
   meta: { enteId?: string; periodo?: string }
 ): Promise<string> {
-  const key = getStoredKey();
+  const key = await getStoredKey();
   if (!key) throw new Error('Chave OpenAI não configurada.');
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {

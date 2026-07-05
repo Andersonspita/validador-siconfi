@@ -18,9 +18,17 @@ export default function AIChat({ results, meta }: Props) {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
   const [keyInput, setKeyInput] = useState('');
-  const [configured, setConfigured] = useState(isAIConfigured());
+  const [configured, setConfigured] = useState(false);
+  const [checkingConfig, setCheckingConfig] = useState(true);
   const endRef = useRef<HTMLDivElement>(null);
   const suggestions = buildSuggestions(results);
+
+  useEffect(() => {
+    isAIConfigured().then(res => {
+      setConfigured(res);
+      setCheckingConfig(false);
+    });
+  }, []);
 
   useEffect(() => {
     if (open && endRef.current)
@@ -77,19 +85,19 @@ export default function AIChat({ results, meta }: Props) {
     }
   }, [results.length]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  function handleSaveKey() {
+  async function handleSaveKey() {
     if (!keyInput.trim().startsWith('sk-')) {
       setError('Chave inválida — deve começar com "sk-".');
       return;
     }
-    saveKey(keyInput.trim());
+    await saveKey(keyInput.trim());
     setConfigured(true);
     setKeyInput('');
     setError(null);
   }
 
-  function handleClearKey() {
-    clearKey();
+  async function handleClearKey() {
+    await clearKey();
     setConfigured(false);
     setMessages([]);
   }
@@ -154,12 +162,19 @@ export default function AIChat({ results, meta }: Props) {
 
           <div className="ai-messages">
 
+            {/* Loader caso esteja checando */}
+            {checkingConfig && (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Validando chave no servidor...
+              </div>
+            )}
+
             {/* Tela de configuração da chave */}
-            {!configured && (
+            {!configured && !checkingConfig && (
               <div className="ai-key-setup">
                 <p className="ai-key-title">🔑 Configure sua chave OpenAI</p>
                 <p className="ai-key-desc">
-                  A chave fica <strong>apenas nesta sessão do navegador</strong> — nunca é enviada ao servidor nem armazenada permanentemente.
+                  A chave é salva na nuvem de forma global — <strong>qualquer usuário autenticado</strong> na ferramenta poderá utilizá-la para conversar com a IA.
                 </p>
                 <input
                   type="password"
