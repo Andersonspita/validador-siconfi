@@ -713,34 +713,56 @@ export function validateMultiMonth(
       }
     }
 
-    const accsPrev = prevMsc.filter(a => a.CONTA.startsWith('1') || a.CONTA.startsWith('2'));
+    // A continuidade saldo-final(mês anterior) = saldo-inicial(mês atual) vale para
+    // TODAS as classes de conta que carregam saldo, não só Ativo (1) e Passivo (2).
+    // As contas de controle da execução orçamentária e de disponibilidade por fonte
+    // (classes 5, 6, 7 e 8) também têm saldo transportado entre competências, e é
+    // exatamente onde o SICONFI acusa a maioria das quebras de continuidade.
+    // (Antes o filtro '1'/'2' descartava silenciosamente essas divergências.)
+    // Na MSC-XBRL uma mesma combinação conta+atributos aparece em VÁRIAS linhas
+    // (uma por lançamento); o saldo da conta é a SOMA dessas linhas. Antes esta
+    // regra comparava linha-a-linha via .find() (pegando só a 1ª ocorrência),
+    // o que gerava milhares de falsos positivos. Agora agregamos por chave e
+    // convenção de sinal (D positivo / C negativo) antes de comparar.
+    const aggregate = (msc: MSCAccount[], tipo: MSCAccount['Tipo_valor']) => {
+      const m = new Map<string, { conta: string; saldo: number }>();
+      for (const a of msc) {
+        if (a.Tipo_valor !== tipo) continue;
+        const key = mscAccountKey(a);
+        const signed = a.Natureza_valor === 'C' ? -a.Valor : a.Valor;
+        const cur = m.get(key);
+        if (cur) cur.saldo += signed;
+        else m.set(key, { conta: a.CONTA, saldo: signed });
+      }
+      return m;
+    };
+
+    const endPrev = aggregate(prevMsc, 'ending_balance');
+    const begCurr = aggregate(currMsc, 'beginning_balance');
     let hasDiff = false;
 
-    for (const pAcc of accsPrev) {
-      if (pAcc.Tipo_valor !== 'ending_balance') continue;
-      const cAcc = currMsc.find(a => mscAccountKey(a) === mscAccountKey(pAcc) && a.Tipo_valor === 'beginning_balance');
-      if (cAcc) {
-        const sfPrev = pAcc.Natureza_valor === 'C' ? -pAcc.Valor : pAcc.Valor;
-        const siCurr = cAcc.Natureza_valor === 'C' ? -cAcc.Valor : cAcc.Valor;
-        if (Math.abs(siCurr - sfPrev) > 0.01) {
-          hasDiff = true;
-          const diff = siCurr - sfPrev;
-          const diffAbs = Math.abs(diff);
-          // Natureza da diferença na mesma convenção usada acima (D positivo / C negativo):
-          // diff > 0 => o saldo inicial ficou "mais D" (ou "menos C") do que o saldo final anterior.
-          const diffNature = diff < 0 ? 'C' : 'D';
-          const diffPct = sfPrev !== 0 ? (diffAbs / Math.abs(sfPrev)) * 100 : null;
-          results.push({
-            ruleId: 'D2_00077',
-            dimension: 'D2',
-            description: 'Validação de saldo inicial x final',
-            severity: 'error',
-            impactsCapag: false,
-            affectedAccounts: [pAcc.CONTA],
-            message: `Conta ${pAcc.CONTA}: O saldo final de ${prevPeriod} (R$ ${Math.abs(sfPrev).toFixed(2)}${sfPrev < 0 ? 'C' : 'D'}) difere do saldo inicial de ${currPeriod} (R$ ${Math.abs(siCurr).toFixed(2)}${siCurr < 0 ? 'C' : 'D'}). Diferença: R$ ${diffAbs.toFixed(2)}${diffNature}${diffPct !== null ? ` (${diffPct.toFixed(2)}%)` : ''}.`,
-            actionPlan: `Verifique se houve lançamento de ajuste/retificação na conta ${pAcc.CONTA} entre o encerramento de ${prevPeriod} e a abertura de ${currPeriod}. O saldo inicial do período subsequente deve ser idêntico ao saldo final do período anterior (diferença apurada: R$ ${diffAbs.toFixed(2)}${diffNature}).`,
-          });
-        }
+    for (const [key, prev] of endPrev) {
+      const curr = begCurr.get(key);
+      const sfPrev = prev.saldo;
+      const siCurr = curr ? curr.saldo : 0;
+      if (Math.abs(siCurr - sfPrev) > 0.01) {
+        hasDiff = true;
+        const diff = siCurr - sfPrev;
+        const diffAbs = Math.abs(diff);
+        // Natureza da diferença na mesma convenção usada acima (D positivo / C negativo):
+        // diff > 0 => o saldo inicial ficou "mais D" (ou "menos C") do que o saldo final anterior.
+        const diffNature = diff < 0 ? 'C' : 'D';
+        const diffPct = sfPrev !== 0 ? (diffAbs / Math.abs(sfPrev)) * 100 : null;
+        results.push({
+          ruleId: 'D2_00077',
+          dimension: 'D2',
+          description: 'Validação de saldo inicial x final',
+          severity: 'error',
+          impactsCapag: false,
+          affectedAccounts: [prev.conta],
+          message: `Conta ${prev.conta}: O saldo final de ${prevPeriod} (R$ ${Math.abs(sfPrev).toFixed(2)}${sfPrev < 0 ? 'C' : 'D'}) difere do saldo inicial de ${currPeriod} (R$ ${Math.abs(siCurr).toFixed(2)}${siCurr < 0 ? 'C' : 'D'}). Diferença: R$ ${diffAbs.toFixed(2)}${diffNature}${diffPct !== null ? ` (${diffPct.toFixed(2)}%)` : ''}.`,
+          actionPlan: `Verifique se houve lançamento de ajuste/retificação na conta ${prev.conta} entre o encerramento de ${prevPeriod} e a abertura de ${currPeriod}. O saldo inicial do período subsequente deve ser idêntico ao saldo final do período anterior (diferença apurada: R$ ${diffAbs.toFixed(2)}${diffNature}).`,
+        });
       }
     }
 
