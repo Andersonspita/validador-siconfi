@@ -92,6 +92,13 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
           if (lname.includes('rreo')) result.rreo = parsedXml;
           else if (lname.includes('rgf')) result.rgf = parsedXml;
           else if (lname.includes('dca')) result.dca = parsedXml;
+          else if (isMSCXbrl(parsedXml)) {
+            // MSC entregue em XBRL-GL (formato padrão do SICONFI). Antes desta
+            // correção era silenciosamente descartada, e nenhuma regra rodava.
+            const { accounts, period, enteId } = parseMSCXBRL(parsedXml);
+            if (enteId) result.enteId = enteId;
+            storeMSC(result, accounts, period);
+          }
 
         } else if (lname.endsWith('.csv')) {
           // QA-002: usar arraybuffer para detecção de encoding (windows-1252 de sistemas legados)
@@ -123,6 +130,11 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
       if (lname.includes('rreo')) result.rreo = parsedXml;
       else if (lname.includes('rgf')) result.rgf = parsedXml;
       else if (lname.includes('dca')) result.dca = parsedXml;
+      else if (isMSCXbrl(parsedXml)) {
+        const { accounts, period, enteId } = parseMSCXBRL(parsedXml);
+        if (enteId) result.enteId = enteId;
+        storeMSC(result, accounts, period);
+      }
 
     } else if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
       const buffer = await file.arrayBuffer();
@@ -237,6 +249,117 @@ export const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccoun
       }
     });
   });
+
+  return { accounts, period, enteId };
+};
+
+/**
+ * Detecta se um documento XML já parseado (fast-xml-parser) é uma MSC em XBRL-GL.
+ * A MSC do SICONFI é entregue nesse formato (xbrli:xbrl + gl-cor:accountingEntries),
+ * e NÃO como CSV. Antes desta correção o arquivo era parseado e descartado, pois
+ * o roteamento só reconhecia nomes contendo "rreo"/"rgf"/"dca".
+ */
+export const isMSCXbrl = (parsedXml: any): boolean => {
+  const root = parsedXml?.['xbrli:xbrl'] ?? parsedXml?.xbrl;
+  if (!root) return false;
+  return !!(root['gl-cor:accountingEntries'] ?? root.accountingEntries);
+};
+
+const asArray = <T,>(v: T | T[] | undefined): T[] =>
+  v === undefined ? [] : Array.isArray(v) ? v : [v];
+
+// Extrai o texto de um nó que pode vir como string ou como objeto { '#text': ... }
+const nodeText = (v: any): string | undefined => {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v === 'object') {
+    const t = v['#text'];
+    return t === undefined || t === null ? undefined : String(t).trim();
+  }
+  const s = String(v).trim();
+  return s === '' ? undefined : s;
+};
+
+/**
+ * Converte uma MSC em XBRL-GL (já parseada pelo fast-xml-parser) para o mesmo
+ * shape { accounts, period, enteId } produzido por parseMSCWithMeta, de modo que
+ * o restante do pipeline de validação funcione sem alterações.
+ */
+export const parseMSCXBRL = (
+  parsedXml: any
+): { accounts: MSCAccount[]; period: string | null; enteId: string | null } => {
+  const root = parsedXml['xbrli:xbrl'] ?? parsedXml.xbrl;
+  const entries = root['gl-cor:accountingEntries'] ?? root.accountingEntries;
+
+  // Ente: xbrli:context > xbrli:entity > xbrli:identifier (código IBGE, ex.: 2916807EX)
+  let enteId: string | null = null;
+  const contexts = asArray(root['xbrli:context'] ?? root.context);
+  for (const ctx of contexts) {
+    const ident = ctx?.['xbrli:entity']?.['xbrli:identifier'] ?? ctx?.entity?.identifier;
+    const raw = nodeText(ident);
+    if (raw) { enteId = normalizeEnteId(raw) || raw; break; }
+  }
+
+  // Período: gl-bus:periodIdentifier (YYYY-MM) ou derivado de periodEnd (YYYY-MM-DD)
+  let period: string | null = null;
+  const ei = entries?.['gl-cor:entityInformation'] ?? entries?.entityInformation;
+  const cal = ei?.['gl-bus:reportingCalendar'] ?? ei?.reportingCalendar;
+  const calPeriod = cal?.['gl-bus:reportingCalendarPeriod'] ?? cal?.reportingCalendarPeriod;
+  const periodId = nodeText(calPeriod?.['gl-bus:periodIdentifier'] ?? calPeriod?.periodIdentifier);
+  const periodEnd = nodeText(calPeriod?.['gl-bus:periodEnd'] ?? calPeriod?.periodEnd);
+  if (periodId && /^\d{4}-\d{1,2}$/.test(periodId)) {
+    const [y, m] = periodId.split('-');
+    period = `${y}-${m.padStart(2, '0')}`;
+  } else if (periodEnd && /^\d{4}-\d{2}-\d{2}$/.test(periodEnd)) {
+    period = periodEnd.slice(0, 7);
+  }
+
+  // xbrlInclude -> Tipo_valor da MSC
+  const TIPO_MAP: Record<string, MSCAccount['Tipo_valor']> = {
+    beginning_balance: 'beginning_balance',
+    period_change: 'period_change',
+    ending_balance: 'ending_balance',
+  };
+
+  const accounts: MSCAccount[] = [];
+  const headers = asArray(entries?.['gl-cor:entryHeader'] ?? entries?.entryHeader);
+
+  for (const header of headers) {
+    const details = asArray(header?.['gl-cor:entryDetail'] ?? header?.entryDetail);
+    for (const d of details) {
+      const acc = d['gl-cor:account'] ?? d.account;
+      if (!acc) continue;
+      const conta = nodeText(acc['gl-cor:accountMainID'] ?? acc.accountMainID);
+      if (!conta) continue;
+
+      const subs: Record<string, string | undefined> = {};
+      for (const sub of asArray(acc['gl-cor:accountSub'] ?? acc.accountSub)) {
+        const type = nodeText(sub['gl-cor:accountSubType'] ?? sub.accountSubType);
+        const id = nodeText(sub['gl-cor:accountSubID'] ?? sub.accountSubID);
+        if (type) subs[type] = id;
+      }
+
+      const valorRaw = nodeText(d['gl-cor:amount'] ?? d.amount);
+      const dc = nodeText(d['gl-cor:debitCreditCode'] ?? d.debitCreditCode);
+      const xbrlInfo = d['gl-cor:xbrlInfo'] ?? d.xbrlInfo;
+      const inc = nodeText(xbrlInfo?.['gl-cor:xbrlInclude'] ?? xbrlInfo?.xbrlInclude);
+
+      const tipo = inc ? TIPO_MAP[inc] : undefined;
+      if (!tipo) continue; // ignora linhas sem tipo de saldo reconhecido
+
+      accounts.push({
+        CONTA: conta,
+        PO: subs['PO'],
+        FP: subs['FP'],
+        FS: subs['FS'],
+        FR: subs['FR'],
+        CO: subs['CO'],
+        ND: subs['ND'],
+        Valor: valorRaw ? (parseFloat(valorRaw) || 0) : 0,
+        Tipo_valor: tipo,
+        Natureza_valor: (dc === 'D' ? 'D' : 'C'),
+      });
+    }
+  }
 
   return { accounts, period, enteId };
 };
