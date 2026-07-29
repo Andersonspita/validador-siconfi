@@ -4,6 +4,8 @@ import { runValidations } from '../core/validatorEngine';
 import { ValidationResult, RuleDefinition } from '../core/types';
 import { generatePDF } from '../core/pdfGenerator';
 import { generateRelatorioTecnicoPDF } from '../core/relatorioTecnico';
+import { buildScoreSummary } from '../core/scoring';
+import { buildRankingHtml, buildPlanoAcaoHtml, RankingReportMeta } from '../core/rankingReport';
 import Papa from 'papaparse';
 import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3, ClipboardList } from 'lucide-react';
 import ReportView from './ReportView';
@@ -142,6 +144,30 @@ export default function ReportDashboard({ files, rulesMap, onReset, onResultsRea
     URL.revokeObjectURL(url);
   };
 
+  const rankingMeta = (): RankingReportMeta => ({
+    enteId: reportMeta.enteId,
+    exercicio: reportMeta.periodo?.split('-')[0],
+    periodos: reportMeta.periodo ? `MSC ${reportMeta.periodo}` : undefined,
+    atualizadoEm: new Date().toLocaleString('pt-BR'),
+  });
+
+  // Abre um relatório HTML em nova aba, pronto para Ctrl+P → PDF (igual aos modelos STN).
+  const openHtmlReport = (html: string) => {
+    const w = window.open('', '_blank');
+    if (!w) { alert('Permita pop-ups para abrir o relatório em nova aba.'); return; }
+    w.document.write(html);
+    w.document.close();
+  };
+
+  const openRanking = () => {
+    const score = buildScoreSummary(results, { rulesMap });
+    openHtmlReport(buildRankingHtml(score, rankingMeta()));
+  };
+  const openPlanoAcao = () => {
+    const score = buildScoreSummary(results, { rulesMap });
+    openHtmlReport(buildPlanoAcaoHtml(score, rankingMeta()));
+  };
+
   return (
     <div className="report-dashboard animate-fade-in">
       <div className="dashboard-header">
@@ -162,6 +188,14 @@ export default function ReportDashboard({ files, rulesMap, onReset, onResultsRea
             <button onClick={() => generateRelatorioTecnicoPDF(filteredResults, reportMeta)} className="export-btn glass-panel print-btn">
               <ClipboardList size={20} />
               Relatório Técnico (Resumo Executivo)
+            </button>
+            <button onClick={openRanking} className="export-btn glass-panel print-btn">
+              <BarChart3 size={20} />
+              Ranking da Qualidade (STN)
+            </button>
+            <button onClick={openPlanoAcao} className="export-btn glass-panel print-btn">
+              <Lightbulb size={20} />
+              Plano de Ação
             </button>
           </div>
         </div>
