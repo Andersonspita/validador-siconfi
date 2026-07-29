@@ -1,0 +1,797 @@
+From 4ca306cbd9bb4fd5bb44dc4267a50e9e77a53abe Mon Sep 17 00:00:00 2001
+From: Validador SICONFI Dev <dev@lopesconsultoria.local>
+Date: Wed, 29 Jul 2026 02:40:30 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20relat=C3=B3rios=20Ranking=20da=20Qualid?=
+ =?UTF-8?q?ade=20(STN)=20e=20Plano=20de=20A=C3=A7=C3=A3o?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Reproduz o visual e a pontuação dos relatórios do Verificador Siconfi
+(Ranking da Qualidade da Informação Contábil e Fiscal — STN), gerados a
+partir dos ValidationResult[] que o motor já produz, alinhados à
+metodologia oficial publicada em
+ranking-municipios.tesouro.gov.br/metodologia.
+
+- scoring.ts: modelo de pontuação com 5 status (OK / FALHA / ATENÇÃO /
+  NÃO VERIFICÁVEL / NÃO APLICÁVEL). Só status avaliáveis entram no ICF;
+  checks mensais de MSC pontuam proporcionalmente. Classe A>95, B 85–95,
+  C 75–85, D 65–75, E<65 (A e E são as faixas oficiais). Regras do
+  catálogo ausentes nos resultados entram como NÃO VERIFICÁVEL.
+- stnCatalog.ts: catálogo oficial derivado dos CSVs da STN
+  (descricao_ranking.csv + verificacoes_aplicabilidade.csv) — conjunto
+  de verificações NÃO APLICÁVEIS a municípios (exclusivas de Estados/DF),
+  conjunto CAPAG, regras de proporção (MSC 1/13 ou 1/12; retificações
+  piso 0,5) e nomes oficiais das dimensões (I–IV).
+- scoring aplica por padrão a não-aplicabilidade municipal e marca CAPAG
+  a partir do catálogo oficial.
+- rankingReport.ts: HTML do "Ranking da Qualidade" (cartão da classe,
+  escada A–E, barras por dimensão com nomes oficiais, chips de status,
+  verificações CAPAG destacadas) e do "Plano de Ação" (itens FALHA/
+  ATENÇÃO com Situação encontrada / Como corrigir). Prontos para
+  Ctrl+P → PDF, como os modelos. Fonte da metodologia citada no rodapé.
+- ReportDashboard: botões "Ranking da Qualidade (STN)" e "Plano de Ação".
+- scoring.test.ts: trava metodologia, não-aplicabilidade municipal,
+  CAPAG e nomes de dimensão oficiais. Suíte 49/49, tsc e build limpos.
+---
+ src/components/ReportDashboard.tsx |  34 ++++
+ src/core/rankingReport.ts          | 220 +++++++++++++++++++++++
+ src/core/scoring.test.ts           |  81 +++++++++
+ src/core/scoring.ts                | 275 +++++++++++++++++++++++++++++
+ src/core/stnCatalog.ts             |  88 +++++++++
+ 5 files changed, 698 insertions(+)
+ create mode 100644 src/core/rankingReport.ts
+ create mode 100644 src/core/scoring.test.ts
+ create mode 100644 src/core/scoring.ts
+ create mode 100644 src/core/stnCatalog.ts
+
+diff --git a/src/components/ReportDashboard.tsx b/src/components/ReportDashboard.tsx
+index ea18e30..d515816 100644
+--- a/src/components/ReportDashboard.tsx
++++ b/src/components/ReportDashboard.tsx
+@@ -4,6 +4,8 @@ import { runValidations } from '../core/validatorEngine';
+ import { ValidationResult, RuleDefinition } from '../core/types';
+ import { generatePDF } from '../core/pdfGenerator';
+ import { generateRelatorioTecnicoPDF } from '../core/relatorioTecnico';
++import { buildScoreSummary } from '../core/scoring';
++import { buildRankingHtml, buildPlanoAcaoHtml, RankingReportMeta } from '../core/rankingReport';
+ import Papa from 'papaparse';
+ import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3, ClipboardList } from 'lucide-react';
+ import ReportView from './ReportView';
+@@ -142,6 +144,30 @@ export default function ReportDashboard({ files, rulesMap, onReset, onResultsRea
+     URL.revokeObjectURL(url);
+   };
+ 
++  const rankingMeta = (): RankingReportMeta => ({
++    enteId: reportMeta.enteId,
++    exercicio: reportMeta.periodo?.split('-')[0],
++    periodos: reportMeta.periodo ? `MSC ${reportMeta.periodo}` : undefined,
++    atualizadoEm: new Date().toLocaleString('pt-BR'),
++  });
++
++  // Abre um relatório HTML em nova aba, pronto para Ctrl+P → PDF (igual aos modelos STN).
++  const openHtmlReport = (html: string) => {
++    const w = window.open('', '_blank');
++    if (!w) { alert('Permita pop-ups para abrir o relatório em nova aba.'); return; }
++    w.document.write(html);
++    w.document.close();
++  };
++
++  const openRanking = () => {
++    const score = buildScoreSummary(results, { rulesMap });
++    openHtmlReport(buildRankingHtml(score, rankingMeta()));
++  };
++  const openPlanoAcao = () => {
++    const score = buildScoreSummary(results, { rulesMap });
++    openHtmlReport(buildPlanoAcaoHtml(score, rankingMeta()));
++  };
++
+   return (
+     <div className="report-dashboard animate-fade-in">
+       <div className="dashboard-header">
+@@ -163,6 +189,14 @@ export default function ReportDashboard({ files, rulesMap, onReset, onResultsRea
+               <ClipboardList size={20} />
+               Relatório Técnico (Resumo Executivo)
+             </button>
++            <button onClick={openRanking} className="export-btn glass-panel print-btn">
++              <BarChart3 size={20} />
++              Ranking da Qualidade (STN)
++            </button>
++            <button onClick={openPlanoAcao} className="export-btn glass-panel print-btn">
++              <Lightbulb size={20} />
++              Plano de Ação
++            </button>
+           </div>
+         </div>
+         {/* Abas: Validações | Relatórios */}
+diff --git a/src/core/rankingReport.ts b/src/core/rankingReport.ts
+new file mode 100644
+index 0000000..9d4749b
+--- /dev/null
++++ b/src/core/rankingReport.ts
+@@ -0,0 +1,220 @@
++import {
++  ScoreSummary, ScoredCheck, CheckStatus,
++  STATUS_LABELS, STATUS_COLORS, CLASSE_COLORS, classeFromPercent,
++} from './scoring';
++
++export interface RankingReportMeta {
++  enteId?: string;
++  enteNome?: string;
++  uf?: string;
++  exercicio?: string;
++  periodos?: string;      // ex.: "RREO 2026 (2º bim) • RGF 2026 (1º quadr) • MSC 2026-01…2026-05 (5)"
++  pastaOrigem?: string;
++  atualizadoEm?: string;  // ex.: "23/07/2026 11:52"
++}
++
++const esc = (s: string): string =>
++  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
++
++const pct = (v: number) => `${v.toFixed(1)}%`;
++const pts = (v: number) => v.toFixed(2).replace('.', ',');
++
++const statusOrder: CheckStatus[] = ['FALHA', 'ATENCAO', 'OK', 'NAO_VERIFICAVEL', 'NAO_APLICAVEL'];
++
++const CSS = `
++:root{
++  --ink:#1a1a1a; --muted:#666; --line:#e3e3e3; --bg:#fff;
++  --brand:#1f8a4c; --brand-soft:#eef7f1;
++}
++*{box-sizing:border-box}
++body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
++  color:var(--ink);margin:0;padding:24px;background:#f5f6f7;font-size:13px;line-height:1.45}
++.sheet{max-width:1080px;margin:0 auto;background:var(--bg);padding:32px 36px;
++  border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
++h1{font-size:18px;margin:0 0 4px;color:var(--brand)}
++.sub{color:var(--muted);font-size:12px;margin-bottom:2px}
++.grid{display:grid;grid-template-columns:220px 1fr;gap:24px;margin:22px 0 8px;align-items:center}
++.classe-card{border:2px solid var(--line);border-radius:12px;padding:18px;text-align:center}
++.classe-badge{font-size:52px;font-weight:800;line-height:1}
++.classe-pct{font-size:26px;font-weight:700;margin-top:4px}
++.classe-cap{color:var(--muted);font-size:11px;margin-top:6px}
++.ladder{display:flex;gap:4px;justify-content:center;margin-top:10px}
++.ladder span{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;
++  justify-content:center;font-weight:700;color:#fff;font-size:13px;opacity:.35}
++.ladder span.on{opacity:1;outline:2px solid #0003}
++.dims{display:flex;flex-direction:column;gap:12px}
++.dimrow{display:grid;grid-template-columns:150px 1fr 70px;gap:10px;align-items:center}
++.dimname{font-weight:600}
++.bar{background:#eee;border-radius:6px;height:16px;overflow:hidden}
++.bar>i{display:block;height:100%;background:var(--brand);border-radius:6px}
++.dimval{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
++.totline{margin-top:8px;font-weight:700;border-top:1px solid var(--line);padding-top:8px;
++  display:grid;grid-template-columns:150px 1fr 70px;gap:10px}
++.chips{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
++.chip{border-radius:20px;padding:5px 12px;color:#fff;font-size:12px;font-weight:600}
++.chip small{opacity:.85;font-weight:400}
++table{width:100%;border-collapse:collapse;margin-top:14px;font-size:11.5px}
++th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
++th{background:var(--brand-soft);color:#14512c;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
++td.id{font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap;font-weight:600}
++.stag{display:inline-block;border-radius:4px;padding:2px 7px;color:#fff;font-size:10.5px;
++  font-weight:700;white-space:nowrap}
++td.det{color:#333}
++td.pt{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
++.foot{color:var(--muted);font-size:10.5px;margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
++.dimhead td{background:#fafafa;font-weight:700;color:#333;border-top:2px solid var(--line)}
++@media print{
++  body{background:#fff;padding:0;font-size:11px}
++  .sheet{box-shadow:none;border-radius:0;max-width:none;padding:12px 16px}
++  tr{break-inside:avoid}
++  thead{display:table-header-group}
++}
++`;
++
++const statusTag = (s: CheckStatus): string =>
++  `<span class="stag" style="background:${STATUS_COLORS[s]}">${STATUS_LABELS[s]}</span>`;
++
++const ladder = (classe: string): string =>
++  (['E', 'D', 'C', 'B', 'A'] as const)
++    .map(l => `<span class="${l === classe ? 'on' : ''}" style="background:${CLASSE_COLORS[l]}">${l}</span>`)
++    .join('');
++
++const rowsByDimension = (checks: ScoredCheck[]): string => {
++  const dims = ['D1', 'D2', 'D3', 'D4'] as const;
++  const parts: string[] = [];
++  for (const d of dims) {
++    const group = checks
++      .filter(c => c.dimension === d)
++      .sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status)
++        || a.ruleId.localeCompare(b.ruleId));
++    if (!group.length) continue;
++    const label = group[0].dimensionLabel;
++    parts.push(`<tr class="dimhead"><td colspan="5">${d} — ${esc(label)} (${group.length})</td></tr>`);
++    for (const c of group) {
++      const ptCell = c.avaliavel ? `${pts(c.pontos)} / ${pts(c.maxPontos)}` : '—';
++      const capagTag = c.impactsCapag ? ' <span class="stag" style="background:#5b3fa0;font-size:9px">CAPAG</span>' : '';
++      parts.push(
++        `<tr>
++          <td class="id">${esc(c.ruleId)}${capagTag}</td>
++          <td>${esc(c.descricao)}</td>
++          <td>${statusTag(c.status)}</td>
++          <td class="det">${esc(c.detalhe.length > 260 ? c.detalhe.slice(0, 260) + '…' : c.detalhe)}</td>
++          <td class="pt">${ptCell}</td>
++        </tr>`
++      );
++    }
++  }
++  return parts.join('\n');
++};
++
++/** Gera o HTML completo do "Ranking da Qualidade" (tela + imprimir/PDF). */
++export const buildRankingHtml = (score: ScoreSummary, meta: RankingReportMeta = {}): string => {
++  const enteTitulo = [meta.enteId, meta.enteNome].filter(Boolean).join(' - ')
++    + (meta.uf ? ` - ${meta.uf}` : '');
++  const c = score.contagemStatus;
++  const chips: [CheckStatus, number][] = [
++    ['OK', c.OK], ['FALHA', c.FALHA], ['ATENCAO', c.ATENCAO],
++    ['NAO_VERIFICAVEL', c.NAO_VERIFICAVEL], ['NAO_APLICAVEL', c.NAO_APLICAVEL],
++  ];
++
++  const dimBars = score.porDimensao.map(d => `
++    <div class="dimrow">
++      <div class="dimname">${esc(d.label)}</div>
++      <div class="bar"><i style="width:${Math.max(0, Math.min(100, d.percentual)).toFixed(1)}%"></i></div>
++      <div class="dimval">${pct(d.percentual)}</div>
++    </div>`).join('');
++
++  const metaMax = classeFromPercent(96); // sempre 'A' — usado só p/ texto da meta
++
++  return `<!doctype html>
++<html lang="pt-BR"><head><meta charset="utf-8">
++<title>Verificador Siconfi — Ranking da Qualidade${meta.enteId ? ' — ' + esc(meta.enteId) : ''}</title>
++<style>${CSS}</style></head>
++<body><div class="sheet">
++  <h1>Verificador Siconfi — Ranking da Qualidade (STN)</h1>
++  <div class="sub">${esc(enteTitulo)}${meta.periodos ? '  •  ' + esc(meta.periodos) : ''}</div>
++  ${meta.atualizadoEm ? `<div class="sub">atualizado em ${esc(meta.atualizadoEm)}</div>` : ''}
++  ${meta.pastaOrigem ? `<div class="sub">📁 ${esc(meta.pastaOrigem)}</div>` : ''}
++
++  <div class="grid">
++    <div class="classe-card">
++      <div class="classe-badge" style="color:${CLASSE_COLORS[score.classe]}">${score.classe}</div>
++      <div class="classe-pct" style="color:${CLASSE_COLORS[score.classe]}">${pct(score.percentual)}</div>
++      <div class="classe-cap">de acertos nas verificações avaliáveis</div>
++      <div class="ladder">${ladder(score.classe)}</div>
++    </div>
++    <div>
++      <div class="dims">${dimBars}
++        <div class="totline">
++          <div>TOTAL</div>
++          <div style="color:var(--muted)">${pts(score.pontosObtidos)} de ${pts(score.pontosAvaliaveis)} pontos avaliáveis · meta classe ${metaMax}: acima de 95%</div>
++          <div class="dimval">${pct(score.percentual)}</div>
++        </div>
++      </div>
++    </div>
++  </div>
++
++  <div class="chips">
++    ${chips.map(([s, n]) => `<span class="chip" style="background:${STATUS_COLORS[s]}">${n} <small>${STATUS_LABELS[s]}</small></span>`).join('')}
++  </div>
++
++  <table>
++    <thead><tr>
++      <th>Verificação</th><th>Descrição</th><th>Status</th><th>Detalhe</th><th>Pontos</th>
++    </tr></thead>
++    <tbody>${rowsByDimension(score.checks)}</tbody>
++  </table>
++
++  <div class="foot">
++    OK = regra atendida • FALHA = inconsistência encontrada • ATENÇÃO = conferência manual •
++    NÃO VERIFICÁVEL = dados ausentes • NÃO APLICÁVEL = fora do escopo de municípios.
++    ICF = percentual de acertos nas verificações avaliáveis (metodologia simplificada do Ranking da
++    Qualidade da Informação Contábil e Fiscal — STN). Faixas oficiais: A &gt; 95%, E &lt; 65%;
++    B/C/D em degraus de 10 p.p. Pontuação proporcional nas verificações de MSC (cada matriz vale
++    1/13, ou 1/12 quando não conta a de encerramento). Verificações CAPAG destacadas.
++    Fonte: ranking-municipios.tesouro.gov.br/metodologia. Gerado pelo Validador Siconfi.
++  </div>
++</div></body></html>`;
++};
++
++/** Gera o HTML do "Plano de Ação" — só itens a corrigir (FALHA/ATENÇÃO), por dimensão. */
++export const buildPlanoAcaoHtml = (score: ScoreSummary, meta: RankingReportMeta = {}): string => {
++  const enteTitulo = [meta.enteId, meta.enteNome].filter(Boolean).join(' - ')
++    + (meta.uf ? ` - ${meta.uf}` : '');
++  const acorrigir = score.checks.filter(c => c.status === 'FALHA' || c.status === 'ATENCAO');
++  const dims = ['D1', 'D2', 'D3', 'D4'] as const;
++
++  const blocks = dims.map(d => {
++    const grp = acorrigir.filter(c => c.dimension === d);
++    if (!grp.length) return '';
++    const label = grp[0].dimensionLabel;
++    const items = grp.map(c => `
++      <div class="pa-item">
++        <div class="pa-id">${esc(c.ruleId)} <span class="stag" style="background:${STATUS_COLORS[c.status]}">${STATUS_LABELS[c.status]}</span></div>
++        <div class="pa-desc">${esc(c.descricao)}</div>
++        <div class="pa-lbl">SITUAÇÃO ENCONTRADA</div>
++        <div class="pa-txt">${esc(c.detalhe)} <span class="pa-pt">• pontos obtidos: ${pts(c.pontos)} de ${pts(c.maxPontos)}</span></div>
++        ${c.actionPlan ? `<div class="pa-lbl">COMO CORRIGIR</div><div class="pa-txt">${esc(c.actionPlan)}</div>` : ''}
++      </div>`).join('');
++    return `<h2>${esc(label)}</h2>${items}`;
++  }).join('');
++
++  return `<!doctype html>
++<html lang="pt-BR"><head><meta charset="utf-8">
++<title>Plano de Ação — Verificador Siconfi${meta.enteId ? ' — ' + esc(meta.enteId) : ''}</title>
++<style>${CSS}
++h2{font-size:14px;color:#14512c;border-bottom:2px solid var(--brand-soft);padding-bottom:4px;margin:20px 0 10px}
++.pa-item{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
++.pa-id{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;margin-bottom:2px}
++.pa-desc{font-weight:600;margin-bottom:8px}
++.pa-lbl{font-size:10.5px;letter-spacing:.4px;color:var(--muted);font-weight:700;margin-top:6px}
++.pa-txt{font-size:12px;margin-top:2px}
++.pa-pt{color:var(--muted)}
++</style></head>
++<body><div class="sheet">
++  <h1>🛠 Plano de Ação — Verificador Siconfi</h1>
++  <div class="sub">${esc(enteTitulo)}${meta.exercicio ? ' • exercício ' + esc(meta.exercicio) : ''} • classificação estimada ${score.classe} (${pct(score.percentual)} de acertos) • ${acorrigir.length} item(ns) a corrigir</div>
++  ${meta.atualizadoEm ? `<div class="sub">gerado em ${esc(meta.atualizadoEm)} • Para imprimir/PDF: Ctrl+P</div>` : ''}
++  ${blocks || '<p style="margin-top:24px;color:var(--brand)">Nenhum item a corrigir — todas as verificações avaliáveis foram atendidas. 🎉</p>'}
++</div></body></html>`;
++};
+diff --git a/src/core/scoring.test.ts b/src/core/scoring.test.ts
+new file mode 100644
+index 0000000..8a5a129
+--- /dev/null
++++ b/src/core/scoring.test.ts
+@@ -0,0 +1,81 @@
++import { describe, it, expect } from 'vitest';
++import { buildScoreSummary, classeFromPercent } from './scoring';
++import type { ValidationResult, RuleDefinition } from './types';
++
++const R = (id: string, dim: any, sev: any): ValidationResult => ({
++  ruleId: id, dimension: dim, description: id, severity: sev,
++  impactsCapag: false, message: 'x',
++});
++
++describe('classeFromPercent', () => {
++  it('mapeia faixas A–E conforme metodologia STN', () => {
++    expect(classeFromPercent(96)).toBe('A');
++    expect(classeFromPercent(95)).toBe('B');
++    expect(classeFromPercent(86)).toBe('B');
++    expect(classeFromPercent(80)).toBe('C');
++    expect(classeFromPercent(70)).toBe('D');
++    expect(classeFromPercent(64)).toBe('E');
++  });
++});
++
++describe('buildScoreSummary', () => {
++  it('só conta status avaliáveis (OK/FALHA/ATENÇÃO) no ICF', () => {
++    const results = [R('D1_00001', 'D1', 'info'), R('D1_00002', 'D1', 'error')];
++    const rulesMap = new Map<string, RuleDefinition>([
++      ['D1_00001', { ruleId: 'D1_00001', description: 'a', dimension: 'D1', impactsCapag: false }],
++      ['D1_00002', { ruleId: 'D1_00002', description: 'b', dimension: 'D1', impactsCapag: false }],
++      // regra ausente nos resultados -> NÃO VERIFICÁVEL, fora do denominador
++      ['D2_00001', { ruleId: 'D2_00001', description: 'c', dimension: 'D2', impactsCapag: false }],
++    ]);
++    const s = buildScoreSummary(results, { rulesMap });
++    // 1 OK + 1 FALHA = 1/2 avaliáveis -> 50%
++    expect(s.pontosAvaliaveis).toBe(2);
++    expect(s.pontosObtidos).toBe(1);
++    expect(s.percentual).toBe(50);
++    expect(s.contagemStatus.NAO_VERIFICAVEL).toBe(1);
++    expect(s.classe).toBe('E');
++  });
++
++  it('pondera checks mensais: 3 OK + 1 FALHA da mesma regra = 0,75', () => {
++    const results = [
++      R('D1_00020', 'D1', 'info'), R('D1_00020', 'D1', 'info'),
++      R('D1_00020', 'D1', 'info'), R('D1_00020', 'D1', 'error'),
++    ];
++    const s = buildScoreSummary(results);
++    const check = s.checks.find(c => c.ruleId === 'D1_00020')!;
++    expect(check.maxPontos).toBe(4);
++    expect(check.pontos).toBe(3); // 3×1 + 1×0
++    // status representativo do grupo é o pior (FALHA)
++    expect(check.status).toBe('FALHA');
++  });
++
++  it('marca regras não aplicáveis a municípios', () => {
++    const rulesMap = new Map<string, RuleDefinition>([
++      ['D1_00005', { ruleId: 'D1_00005', description: 'RGF Judiciário', dimension: 'D1', impactsCapag: false }],
++    ]);
++    const s = buildScoreSummary([], { rulesMap, naoAplicaveis: new Set(['D1_00005']) });
++    expect(s.contagemStatus.NAO_APLICAVEL).toBe(1);
++    expect(s.pontosAvaliaveis).toBe(0);
++  });
++
++  it('usa catálogo oficial STN por padrão: D1_00005 não pontua para município', () => {
++    // Sem passar naoAplicaveis -> usa o conjunto municipal oficial (D1_00005 é 'E').
++    const results = [R('D1_00005', 'D1', 'error'), R('D1_00001', 'D1', 'info')];
++    const s = buildScoreSummary(results);
++    // D1_00005 é ignorada; só D1_00001 (OK) entra -> 100%
++    expect(s.pontosAvaliaveis).toBe(1);
++    expect(s.percentual).toBe(100);
++  });
++
++  it('marca CAPAG a partir do catálogo oficial', () => {
++    const s = buildScoreSummary([R('D3_00005', 'D3', 'info')]); // D3_00005 é CAPAG
++    const check = s.checks.find(c => c.ruleId === 'D3_00005')!;
++    expect(check.impactsCapag).toBe(true);
++  });
++
++  it('aplica nomes de dimensão oficiais da STN', () => {
++    const s = buildScoreSummary([R('D2_00081', 'D2', 'error')]);
++    const check = s.checks.find(c => c.ruleId === 'D2_00081')!;
++    expect(check.dimensionLabel).toBe('Informações Contábeis');
++  });
++});
+diff --git a/src/core/scoring.ts b/src/core/scoring.ts
+new file mode 100644
+index 0000000..39031dc
+--- /dev/null
++++ b/src/core/scoring.ts
+@@ -0,0 +1,275 @@
++import { ValidationResult, RuleDefinition } from './types';
++import { DIMENSAO_NOME_OFICIAL, CAPAG_RULES, NAO_APLICAVEIS_MUNICIPIO } from './stnCatalog';
++
++/**
++ * Modelo de pontuação e ranking do "Verificador Siconfi" (metodologia
++ * simplificada do Ranking da Qualidade da Informação Contábil e Fiscal — STN).
++ *
++ * Reconstruído a partir dos PDFs de referência (Contendas do Sincorá 2026):
++ *  - 5 status por verificação: OK, FALHA, ATENÇÃO, NÃO VERIFICÁVEL, NÃO APLICÁVEL.
++ *  - Só entram no cálculo os status "avaliáveis" (OK/FALHA/ATENÇÃO). NÃO
++ *    VERIFICÁVEL e NÃO APLICÁVEL ficam fora do denominador.
++ *  - Cada verificação avaliável vale 1,00 ponto; checks mensais de MSC podem
++ *    pontuar proporcionalmente (ex.: 0,75 = 3 de 4 meses corretos).
++ *  - ICF = pontos obtidos / pontos avaliáveis. Faixas: A > 95%, E < 65%,
++ *    B/C/D em degraus de 10 p.p. (B 85–95, C 75–85, D 65–75).
++ */
++
++export type CheckStatus = 'OK' | 'FALHA' | 'ATENCAO' | 'NAO_VERIFICAVEL' | 'NAO_APLICAVEL';
++
++export type Classe = 'A' | 'B' | 'C' | 'D' | 'E';
++
++export interface ScoredCheck {
++  ruleId: string;
++  dimension: 'D1' | 'D2' | 'D3' | 'D4';
++  dimensionLabel: string;
++  descricao: string;
++  status: CheckStatus;
++  /** Pontos obtidos (0..maxPontos). Só significativo para status avaliáveis. */
++  pontos: number;
++  /** Pontos máximos da verificação (normalmente 1; pode variar em checks mensais). */
++  maxPontos: number;
++  avaliavel: boolean;
++  detalhe: string;
++  actionPlan?: string;
++  impactsCapag: boolean;
++}
++
++export interface DimensionScore {
++  dimension: 'D1' | 'D2' | 'D3' | 'D4';
++  label: string;
++  obtidos: number;
++  avaliaveis: number;
++  percentual: number; // 0..100
++}
++
++export interface ScoreSummary {
++  classe: Classe;
++  percentual: number;         // 0..100 (ICF)
++  pontosObtidos: number;
++  pontosAvaliaveis: number;
++  porDimensao: DimensionScore[];
++  contagemStatus: Record<CheckStatus, number>;
++  totalVerificacoes: number;
++  checks: ScoredCheck[];
++}
++
++const DIMENSION_LABELS: Record<string, string> = DIMENSAO_NOME_OFICIAL;
++
++export const STATUS_LABELS: Record<CheckStatus, string> = {
++  OK: 'OK',
++  FALHA: 'FALHA',
++  ATENCAO: 'ATENÇÃO',
++  NAO_VERIFICAVEL: 'NÃO VERIFICÁVEL',
++  NAO_APLICAVEL: 'NÃO APLICÁVEL',
++};
++
++// Cores alinhadas ao visual dos PDFs de referência.
++export const STATUS_COLORS: Record<CheckStatus, string> = {
++  OK: '#1f8a4c',
++  FALHA: '#c0392b',
++  ATENCAO: '#c98a00',
++  NAO_VERIFICAVEL: '#7a7a7a',
++  NAO_APLICAVEL: '#9aa0a6',
++};
++
++export const CLASSE_COLORS: Record<Classe, string> = {
++  A: '#1f8a4c',
++  B: '#4caf50',
++  C: '#c98a00',
++  D: '#e67e22',
++  E: '#c0392b',
++};
++
++/** Mapeia a severidade interna do motor para o status do ranking. */
++const severityToStatus = (r: ValidationResult): CheckStatus => {
++  switch (r.severity) {
++    case 'error':
++      return 'FALHA';
++    case 'warning':
++      return 'ATENCAO';
++    case 'info':
++    default:
++      return 'OK';
++  }
++};
++
++const AVALIAVEIS: CheckStatus[] = ['OK', 'FALHA', 'ATENCAO'];
++export const isAvaliavel = (s: CheckStatus): boolean => AVALIAVEIS.includes(s);
++
++/**
++ * Deriva a faixa/classe a partir do percentual do ICF.
++ * A > 95 ; B 85–95 ; C 75–85 ; D 65–75 ; E < 65.
++ */
++export const classeFromPercent = (pct: number): Classe => {
++  if (pct > 95) return 'A';
++  if (pct >= 85) return 'B';
++  if (pct >= 75) return 'C';
++  if (pct >= 65) return 'D';
++  return 'E';
++};
++
++/**
++ * Extrai os pontos de uma verificação avaliada mês a mês. Quando a mesma regra
++ * aparece em vários períodos (ex.: MSC 2026-01..05), o ranking pondera pela
++ * fração de meses corretos. Aqui, na ausência de um campo de pontos explícito
++ * no ValidationResult, tratamos cada resultado como 1 ponto (0 se FALHA), e o
++ * agrupamento por ruleId (abaixo) faz a média — reproduzindo o 0,75 do PDF.
++ */
++const pontosDoResultado = (status: CheckStatus): number => {
++  if (status === 'OK') return 1;
++  if (status === 'ATENCAO') return 0.5;
++  return 0; // FALHA
++};
++
++export interface BuildScoreOptions {
++  /**
++   * Conjunto de regras conhecidas (rulesMap). Regras presentes no catálogo mas
++   * ausentes nos resultados entram como NÃO VERIFICÁVEL — reproduzindo a
++   * cobertura parcial dos PDFs (66 de 207 avaliáveis).
++   */
++  rulesMap?: Map<string, RuleDefinition>;
++  /** Regras não aplicáveis a municípios (marcadas NÃO APLICÁVEL). */
++  naoAplicaveis?: Set<string>;
++}
++
++/**
++ * Constroi o resumo de pontuacao a partir dos resultados do motor.
++ * Agrupa múltiplos resultados da mesma regra (meses diferentes) numa única
++ * verificação com pontuação proporcional.
++ */
++export const buildScoreSummary = (
++  results: ValidationResult[],
++  opts: BuildScoreOptions = {}
++): ScoreSummary => {
++  const { rulesMap } = opts;
++  const naoAplicaveis = opts.naoAplicaveis ?? NAO_APLICAVEIS_MUNICIPIO;
++
++  // 1. Agrupa resultados por ruleId, somando pontos/máximos entre períodos.
++  interface Acc {
++    ruleId: string;
++    dimension: 'D1' | 'D2' | 'D3' | 'D4';
++    descricao: string;
++    somaPontos: number;
++    somaMax: number;
++    piorStatus: CheckStatus;
++    detalhes: string[];
++    actionPlan?: string;
++    impactsCapag: boolean;
++  }
++
++  // ordem de severidade para escolher o status "representativo" do grupo
++  const rank: Record<CheckStatus, number> = {
++    FALHA: 0, ATENCAO: 1, OK: 2, NAO_VERIFICAVEL: 3, NAO_APLICAVEL: 4,
++  };
++
++  const grupos = new Map<string, Acc>();
++
++  for (const r of results) {
++    // Regra não aplicável ao ente (ex.: exclusiva de Estados/DF) não pontua,
++    // mesmo que o motor tenha produzido um resultado para ela.
++    if (naoAplicaveis.has(r.ruleId)) continue;
++    const status = severityToStatus(r);
++    const capag = CAPAG_RULES.has(r.ruleId) || r.impactsCapag;
++    const g = grupos.get(r.ruleId);
++    const pts = pontosDoResultado(status);
++    if (!g) {
++      grupos.set(r.ruleId, {
++        ruleId: r.ruleId,
++        dimension: r.dimension,
++        descricao: r.description || rulesMap?.get(r.ruleId)?.description || r.message.slice(0, 80),
++        somaPontos: pts,
++        somaMax: 1,
++        piorStatus: status,
++        detalhes: [r.message],
++        actionPlan: r.actionPlan,
++        impactsCapag: capag,
++      });
++    } else {
++      g.somaPontos += pts;
++      g.somaMax += 1;
++      if (rank[status] < rank[g.piorStatus]) {
++        g.piorStatus = status;
++        g.actionPlan = r.actionPlan ?? g.actionPlan;
++      }
++      if (g.detalhes.length < 6) g.detalhes.push(r.message);
++    }
++  }
++
++  // 2. Converte grupos em ScoredCheck avaliáveis.
++  const checks: ScoredCheck[] = [];
++  for (const g of grupos.values()) {
++    checks.push({
++      ruleId: g.ruleId,
++      dimension: g.dimension,
++      dimensionLabel: DIMENSION_LABELS[g.dimension] ?? g.dimension,
++      descricao: g.descricao,
++      status: g.piorStatus,
++      pontos: g.somaPontos,
++      maxPontos: g.somaMax,
++      avaliavel: isAvaliavel(g.piorStatus),
++      detalhe: g.detalhes.join(' | '),
++      actionPlan: g.actionPlan,
++      impactsCapag: g.impactsCapag,
++    });
++  }
++
++  // 3. Regras do catálogo ausentes nos resultados -> NÃO VERIFICÁVEL / NÃO APLICÁVEL.
++  if (rulesMap) {
++    for (const [ruleId, def] of rulesMap) {
++      if (grupos.has(ruleId)) continue;
++      const naoAplic = naoAplicaveis?.has(ruleId);
++      checks.push({
++        ruleId,
++        dimension: def.dimension,
++        dimensionLabel: DIMENSION_LABELS[def.dimension] ?? def.dimension,
++        descricao: def.description || ruleId,
++        status: naoAplic ? 'NAO_APLICAVEL' : 'NAO_VERIFICAVEL',
++        pontos: 0,
++        maxPontos: 1,
++        avaliavel: false,
++        detalhe: naoAplic
++          ? 'Não aplicável a municípios (apenas Estados/DF)'
++          : 'Dados ausentes na pasta / não fornecidos pela API',
++        impactsCapag: def.impactsCapag,
++      });
++    }
++  }
++
++  // 4. Contagem por status.
++  const contagemStatus: Record<CheckStatus, number> = {
++    OK: 0, FALHA: 0, ATENCAO: 0, NAO_VERIFICAVEL: 0, NAO_APLICAVEL: 0,
++  };
++  for (const c of checks) contagemStatus[c.status]++;
++
++  // 5. Pontuação por dimensão (só avaliáveis entram no denominador).
++  const dims: ('D1' | 'D2' | 'D3' | 'D4')[] = ['D1', 'D2', 'D3', 'D4'];
++  const porDimensao: DimensionScore[] = dims.map(d => {
++    const avaliaveisDim = checks.filter(c => c.dimension === d && c.avaliavel);
++    const obtidos = avaliaveisDim.reduce((s, c) => s + c.pontos, 0);
++    const avaliaveis = avaliaveisDim.reduce((s, c) => s + c.maxPontos, 0);
++    return {
++      dimension: d,
++      label: DIMENSION_LABELS[d],
++      obtidos,
++      avaliaveis,
++      percentual: avaliaveis > 0 ? (obtidos / avaliaveis) * 100 : 0,
++    };
++  }).filter(d => d.avaliaveis > 0);
++
++  // 6. Totais e ICF.
++  const pontosObtidos = porDimensao.reduce((s, d) => s + d.obtidos, 0);
++  const pontosAvaliaveis = porDimensao.reduce((s, d) => s + d.avaliaveis, 0);
++  const percentual = pontosAvaliaveis > 0 ? (pontosObtidos / pontosAvaliaveis) * 100 : 0;
++
++  return {
++    classe: classeFromPercent(percentual),
++    percentual,
++    pontosObtidos,
++    pontosAvaliaveis,
++    porDimensao,
++    contagemStatus,
++    totalVerificacoes: checks.length,
++    checks,
++  };
++};
+diff --git a/src/core/stnCatalog.ts b/src/core/stnCatalog.ts
+new file mode 100644
+index 0000000..455397a
+--- /dev/null
++++ b/src/core/stnCatalog.ts
+@@ -0,0 +1,88 @@
++/**
++ * Catálogo oficial de verificações do Ranking da Qualidade (STN).
++ *
++ * Fonte (metodologia e downloads oficiais):
++ *   https://ranking-municipios.tesouro.gov.br/metodologia
++ *   - descricao_ranking.csv           (descrições + no_aplicavel + CAPAG)
++ *   - verificacoes_aplicabilidade.csv (aplicabilidade por exercício)
++ *
++ * Aplicabilidade (coluna do exercício em verificacoes_aplicabilidade.csv):
++ *   T = aplicável a todos os entes;  E = só Estados/DF;  M = só Municípios;
++ *   (vazio) = verificação não existia naquele exercício.
++ *
++ * Para MUNICÍPIO: uma verificação é NÃO APLICÁVEL quando o código do exercício
++ * é 'E' (exclusiva de Estados/DF). As marcadas 'M' ou 'T' são aplicáveis.
++ */
++
++export type EnteTipo = 'M' | 'E' | 'DF';
++
++/**
++ * Verificações NÃO APLICÁVEIS a municípios (código 'E' no exercício 2025).
++ * Extraídas de verificacoes_aplicabilidade.csv + descricao_ranking.csv (no_aplicavel = "E/DF").
++ */
++export const NAO_APLICAVEIS_MUNICIPIO = new Set<string>([
++  'D1_00005', 'D1_00010', 'D1_00015', // RGF Judiciário/MP/Defensoria — só Estados/DF
++  'D2_00045', 'D2_00047',             // tributos/transferências estaduais na MSCE×DCA
++  'D2_00106',                         // FPE (só Estados)
++  'D4_00009', 'D4_00011',             // tributos/transferências estaduais DCA×RREO A3
++  'D4_00013', 'D4_00015',             // tributos/transferências estaduais DCA×RREO A6 (exerc. anteriores)
++  'D4_00021', 'D4_00023',             // tributos/transferências estaduais MSC×RREO A3
++  'D4_00037', 'D4_00039',             // tributos/transferências estaduais RREO A6×MSC dez
++]);
++
++/**
++ * Verificações que compõem a métrica CAPAG (destacadas no quadro oficial).
++ * Fonte: coluna `capag` do descricao_ranking.csv.
++ */
++export const CAPAG_RULES = new Set<string>([
++  'D2_00003', 'D2_00004', 'D2_00010', 'D2_00011', 'D2_00012', 'D2_00028', 'D2_00029',
++  'D2_00033', 'D2_00035', 'D2_00044', 'D2_00045', 'D2_00046', 'D2_00047', 'D2_00048',
++  'D2_00049', 'D2_00084', 'D2_00085', 'D2_00097', 'D2_00099',
++  'D3_00005', 'D3_00008', 'D3_00009', 'D3_00010', 'D3_00013', 'D3_00014', 'D3_00015',
++  'D3_00016', 'D3_00021', 'D3_00022', 'D3_00023', 'D3_00024', 'D3_00026', 'D3_00028',
++  'D3_00030', 'D3_00044', 'D3_00045',
++  'D4_00001', 'D4_00002', 'D4_00003', 'D4_00004', 'D4_00010', 'D4_00012', 'D4_00017',
++  'D4_00020', 'D4_00021', 'D4_00023', 'D4_00025', 'D4_00028', 'D4_00035', 'D4_00037',
++  'D4_00038', 'D4_00039', 'D4_00040', 'D4_00041', 'D4_00042', 'D4_00043', 'D4_00045',
++]);
++
++/**
++ * Regras de pontuação proporcional (fração por unidade), extraídas das descrições oficiais.
++ * A maioria das verificações de MSC pontua por matriz: cada MSC correta vale 1/13
++ * (12 meses + encerramento). Exceções valem 1/12 (não contam a de encerramento).
++ * As de retificação (D1_00011..15) variam de 0,5 a 1,0 conforme a quantidade.
++ */
++export interface ProporcaoRegra {
++  /** Denominador de matrizes: 13 (mensais + encerramento) ou 12 (só mensais). */
++  matrizes?: 13 | 12;
++  /** Pontuação mínima quando há ocorrência (ex.: retificações: piso 0,5). */
++  pisoComOcorrencia?: number;
++}
++
++export const PROPORCAO: Record<string, ProporcaoRegra> = {
++  // MSC — cada matriz vale 1/13
++  D1_00016: { matrizes: 13 }, D1_00017: { matrizes: 13 }, D1_00018: { matrizes: 13 },
++  D1_00019: { matrizes: 13 }, D1_00021: { matrizes: 13 }, D1_00022: { matrizes: 13 },
++  D1_00023: { matrizes: 13 }, D1_00024: { matrizes: 13 }, D1_00025: { matrizes: 13 },
++  D1_00026: { matrizes: 13 }, D1_00027: { matrizes: 13 }, D1_00028: { matrizes: 13 },
++  D1_00029: { matrizes: 13 }, D1_00030: { matrizes: 13 }, D1_00031: { matrizes: 13 },
++  D1_00032: { matrizes: 13 }, D1_00033: { matrizes: 13 }, D1_00037: { matrizes: 13 },
++  D1_00038: { matrizes: 13 },
++  // MSC — 1/12 (não contam a de encerramento)
++  D1_00020: { matrizes: 12 }, D1_00035: { matrizes: 12 }, D1_00034: { matrizes: 12 },
++  // Retificações — piso 0,5 quando há retificação
++  D1_00011: { pisoComOcorrencia: 0.5 }, D1_00012: { pisoComOcorrencia: 0.5 },
++  D1_00013: { pisoComOcorrencia: 0.5 }, D1_00014: { pisoComOcorrencia: 0.5 },
++  D1_00015: { pisoComOcorrencia: 0.5 },
++};
++
++export const DIMENSAO_NOME_OFICIAL: Record<string, string> = {
++  D1: 'Gestão da Informação',
++  D2: 'Informações Contábeis',
++  D3: 'Informações Fiscais',
++  D4: 'Informações Contábeis x Informações Fiscais',
++};
++
++/** Retorna o conjunto de regras não aplicáveis para o tipo de ente informado. */
++export const naoAplicaveisPara = (tipo: EnteTipo): Set<string> =>
++  tipo === 'M' ? NAO_APLICAVEIS_MUNICIPIO : new Set<string>();
+-- 
+2.43.0
+

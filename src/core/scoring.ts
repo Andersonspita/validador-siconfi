@@ -1,5 +1,8 @@
 import { ValidationResult, RuleDefinition } from './types';
+<<<<<<< HEAD
 import { DIMENSAO_NOME_OFICIAL, CAPAG_RULES, NAO_APLICAVEIS_MUNICIPIO } from './stnCatalog';
+=======
+>>>>>>> e101a96cfa07f08cc6e8f2b75c0a15d153bdc75a
 
 /**
  * Modelo de pontuação e ranking do "Verificador Siconfi" (metodologia
@@ -54,7 +57,16 @@ export interface ScoreSummary {
   checks: ScoredCheck[];
 }
 
+<<<<<<< HEAD
 const DIMENSION_LABELS: Record<string, string> = DIMENSAO_NOME_OFICIAL;
+=======
+const DIMENSION_LABELS: Record<string, string> = {
+  D1: 'Gestão da Informação',
+  D2: 'Contábil',
+  D3: 'Fiscal',
+  D4: 'Contábil x Fiscal',
+};
+>>>>>>> e101a96cfa07f08cc6e8f2b75c0a15d153bdc75a
 
 export const STATUS_LABELS: Record<CheckStatus, string> = {
   OK: 'OK',
@@ -142,8 +154,12 @@ export const buildScoreSummary = (
   results: ValidationResult[],
   opts: BuildScoreOptions = {}
 ): ScoreSummary => {
+<<<<<<< HEAD
   const { rulesMap } = opts;
   const naoAplicaveis = opts.naoAplicaveis ?? NAO_APLICAVEIS_MUNICIPIO;
+=======
+  const { rulesMap, naoAplicaveis } = opts;
+>>>>>>> e101a96cfa07f08cc6e8f2b75c0a15d153bdc75a
 
   // 1. Agrupa resultados por ruleId, somando pontos/máximos entre períodos.
   interface Acc {
@@ -166,11 +182,15 @@ export const buildScoreSummary = (
   const grupos = new Map<string, Acc>();
 
   for (const r of results) {
+<<<<<<< HEAD
     // Regra não aplicável ao ente (ex.: exclusiva de Estados/DF) não pontua,
     // mesmo que o motor tenha produzido um resultado para ela.
     if (naoAplicaveis.has(r.ruleId)) continue;
     const status = severityToStatus(r);
     const capag = CAPAG_RULES.has(r.ruleId) || r.impactsCapag;
+=======
+    const status = severityToStatus(r);
+>>>>>>> e101a96cfa07f08cc6e8f2b75c0a15d153bdc75a
     const g = grupos.get(r.ruleId);
     const pts = pontosDoResultado(status);
     if (!g) {
@@ -183,7 +203,11 @@ export const buildScoreSummary = (
         piorStatus: status,
         detalhes: [r.message],
         actionPlan: r.actionPlan,
+<<<<<<< HEAD
         impactsCapag: capag,
+=======
+        impactsCapag: r.impactsCapag,
+>>>>>>> e101a96cfa07f08cc6e8f2b75c0a15d153bdc75a
       });
     } else {
       g.somaPontos += pts;

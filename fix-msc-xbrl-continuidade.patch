@@ -1,0 +1,373 @@
+From e8c19ca44191f217582060a8e3558b86bb7295c3 Mon Sep 17 00:00:00 2001
+From: Validador SICONFI Dev <dev@lopesconsultoria.local>
+Date: Wed, 29 Jul 2026 02:18:34 +0000
+Subject: [PATCH] =?UTF-8?q?fix:=20ler=20MSC=20em=20XBRL-GL=20e=20corrigir?=
+ =?UTF-8?q?=20continuidade=20entre=20compet=C3=AAncias?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A MSC do SICONFI é entregue em XBRL-GL (.xml), mas o validador só
+reconhecia XML cujo nome contivesse rreo/rgf/dca. MSCs eram parseadas
+e descartadas silenciosamente: nenhuma conta entrava no pipeline e
+nenhuma regra rodava — o relatório saía "sem erros" mesmo com arquivos
+inconsistentes.
+
+Três defeitos corrigidos:
+
+1. parsers.ts: novo parseMSCXBRL + isMSCXbrl, ligados aos caminhos
+   ZIP e XML solto. Extrai contas, período (periodIdentifier/periodEnd)
+   e código do ente, produzindo o mesmo shape de parseMSCWithMeta.
+
+2. rulesD1.ts (D2_00077 / validateMultiMonth): a continuidade
+   saldo-final x saldo-inicial cobria só as classes 1 e 2 (Ativo/
+   Passivo). Estendida a todas as classes de saldo — as contas de
+   controle da execução orçamentária e de disponibilidade por fonte
+   (5/6/7/8) também transportam saldo entre meses e são onde o SICONFI
+   acusa a maioria das quebras.
+
+3. rulesD1.ts: a comparação usava .find() na primeira linha de cada
+   chave. Na MSC-XBRL a mesma chave aparece em várias linhas cujo saldo
+   é a soma; agora agrega por chave (convenção D+/C-) antes de comparar,
+   eliminando falsos positivos.
+
+Testes: novo parsersXbrl.test.ts (4 casos). Suíte 46/46, tsc limpo.
+---
+ src/core/parsers.ts            | 123 +++++++++++++++++++++++++++++++++
+ src/core/parsersXbrl.test.ts   |  91 ++++++++++++++++++++++++
+ src/core/validators/rulesD1.ts |  74 +++++++++++++-------
+ 3 files changed, 262 insertions(+), 26 deletions(-)
+ create mode 100644 src/core/parsersXbrl.test.ts
+
+diff --git a/src/core/parsers.ts b/src/core/parsers.ts
+index 03f96e4..4f48adc 100644
+--- a/src/core/parsers.ts
++++ b/src/core/parsers.ts
+@@ -92,6 +92,13 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
+           if (lname.includes('rreo')) result.rreo = parsedXml;
+           else if (lname.includes('rgf')) result.rgf = parsedXml;
+           else if (lname.includes('dca')) result.dca = parsedXml;
++          else if (isMSCXbrl(parsedXml)) {
++            // MSC entregue em XBRL-GL (formato padrão do SICONFI). Antes desta
++            // correção era silenciosamente descartada, e nenhuma regra rodava.
++            const { accounts, period, enteId } = parseMSCXBRL(parsedXml);
++            if (enteId) result.enteId = enteId;
++            storeMSC(result, accounts, period);
++          }
+ 
+         } else if (lname.endsWith('.csv')) {
+           // QA-002: usar arraybuffer para detecção de encoding (windows-1252 de sistemas legados)
+@@ -123,6 +130,11 @@ export const parseFiles = async (files: File[]): Promise<ParsedData> => {
+       if (lname.includes('rreo')) result.rreo = parsedXml;
+       else if (lname.includes('rgf')) result.rgf = parsedXml;
+       else if (lname.includes('dca')) result.dca = parsedXml;
++      else if (isMSCXbrl(parsedXml)) {
++        const { accounts, period, enteId } = parseMSCXBRL(parsedXml);
++        if (enteId) result.enteId = enteId;
++        storeMSC(result, accounts, period);
++      }
+ 
+     } else if (file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
+       const buffer = await file.arrayBuffer();
+@@ -240,3 +252,114 @@ export const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccoun
+ 
+   return { accounts, period, enteId };
+ };
++
++/**
++ * Detecta se um documento XML já parseado (fast-xml-parser) é uma MSC em XBRL-GL.
++ * A MSC do SICONFI é entregue nesse formato (xbrli:xbrl + gl-cor:accountingEntries),
++ * e NÃO como CSV. Antes desta correção o arquivo era parseado e descartado, pois
++ * o roteamento só reconhecia nomes contendo "rreo"/"rgf"/"dca".
++ */
++export const isMSCXbrl = (parsedXml: any): boolean => {
++  const root = parsedXml?.['xbrli:xbrl'] ?? parsedXml?.xbrl;
++  if (!root) return false;
++  return !!(root['gl-cor:accountingEntries'] ?? root.accountingEntries);
++};
++
++const asArray = <T,>(v: T | T[] | undefined): T[] =>
++  v === undefined ? [] : Array.isArray(v) ? v : [v];
++
++// Extrai o texto de um nó que pode vir como string ou como objeto { '#text': ... }
++const nodeText = (v: any): string | undefined => {
++  if (v === undefined || v === null) return undefined;
++  if (typeof v === 'object') {
++    const t = v['#text'];
++    return t === undefined || t === null ? undefined : String(t).trim();
++  }
++  const s = String(v).trim();
++  return s === '' ? undefined : s;
++};
++
++/**
++ * Converte uma MSC em XBRL-GL (já parseada pelo fast-xml-parser) para o mesmo
++ * shape { accounts, period, enteId } produzido por parseMSCWithMeta, de modo que
++ * o restante do pipeline de validação funcione sem alterações.
++ */
++export const parseMSCXBRL = (
++  parsedXml: any
++): { accounts: MSCAccount[]; period: string | null; enteId: string | null } => {
++  const root = parsedXml['xbrli:xbrl'] ?? parsedXml.xbrl;
++  const entries = root['gl-cor:accountingEntries'] ?? root.accountingEntries;
++
++  // Ente: xbrli:context > xbrli:entity > xbrli:identifier (código IBGE, ex.: 2916807EX)
++  let enteId: string | null = null;
++  const contexts = asArray(root['xbrli:context'] ?? root.context);
++  for (const ctx of contexts) {
++    const ident = ctx?.['xbrli:entity']?.['xbrli:identifier'] ?? ctx?.entity?.identifier;
++    const raw = nodeText(ident);
++    if (raw) { enteId = normalizeEnteId(raw) || raw; break; }
++  }
++
++  // Período: gl-bus:periodIdentifier (YYYY-MM) ou derivado de periodEnd (YYYY-MM-DD)
++  let period: string | null = null;
++  const ei = entries?.['gl-cor:entityInformation'] ?? entries?.entityInformation;
++  const cal = ei?.['gl-bus:reportingCalendar'] ?? ei?.reportingCalendar;
++  const calPeriod = cal?.['gl-bus:reportingCalendarPeriod'] ?? cal?.reportingCalendarPeriod;
++  const periodId = nodeText(calPeriod?.['gl-bus:periodIdentifier'] ?? calPeriod?.periodIdentifier);
++  const periodEnd = nodeText(calPeriod?.['gl-bus:periodEnd'] ?? calPeriod?.periodEnd);
++  if (periodId && /^\d{4}-\d{1,2}$/.test(periodId)) {
++    const [y, m] = periodId.split('-');
++    period = `${y}-${m.padStart(2, '0')}`;
++  } else if (periodEnd && /^\d{4}-\d{2}-\d{2}$/.test(periodEnd)) {
++    period = periodEnd.slice(0, 7);
++  }
++
++  // xbrlInclude -> Tipo_valor da MSC
++  const TIPO_MAP: Record<string, MSCAccount['Tipo_valor']> = {
++    beginning_balance: 'beginning_balance',
++    period_change: 'period_change',
++    ending_balance: 'ending_balance',
++  };
++
++  const accounts: MSCAccount[] = [];
++  const headers = asArray(entries?.['gl-cor:entryHeader'] ?? entries?.entryHeader);
++
++  for (const header of headers) {
++    const details = asArray(header?.['gl-cor:entryDetail'] ?? header?.entryDetail);
++    for (const d of details) {
++      const acc = d['gl-cor:account'] ?? d.account;
++      if (!acc) continue;
++      const conta = nodeText(acc['gl-cor:accountMainID'] ?? acc.accountMainID);
++      if (!conta) continue;
++
++      const subs: Record<string, string | undefined> = {};
++      for (const sub of asArray(acc['gl-cor:accountSub'] ?? acc.accountSub)) {
++        const type = nodeText(sub['gl-cor:accountSubType'] ?? sub.accountSubType);
++        const id = nodeText(sub['gl-cor:accountSubID'] ?? sub.accountSubID);
++        if (type) subs[type] = id;
++      }
++
++      const valorRaw = nodeText(d['gl-cor:amount'] ?? d.amount);
++      const dc = nodeText(d['gl-cor:debitCreditCode'] ?? d.debitCreditCode);
++      const xbrlInfo = d['gl-cor:xbrlInfo'] ?? d.xbrlInfo;
++      const inc = nodeText(xbrlInfo?.['gl-cor:xbrlInclude'] ?? xbrlInfo?.xbrlInclude);
++
++      const tipo = inc ? TIPO_MAP[inc] : undefined;
++      if (!tipo) continue; // ignora linhas sem tipo de saldo reconhecido
++
++      accounts.push({
++        CONTA: conta,
++        PO: subs['PO'],
++        FP: subs['FP'],
++        FS: subs['FS'],
++        FR: subs['FR'],
++        CO: subs['CO'],
++        ND: subs['ND'],
++        Valor: valorRaw ? (parseFloat(valorRaw) || 0) : 0,
++        Tipo_valor: tipo,
++        Natureza_valor: (dc === 'D' ? 'D' : 'C'),
++      });
++    }
++  }
++
++  return { accounts, period, enteId };
++};
+diff --git a/src/core/parsersXbrl.test.ts b/src/core/parsersXbrl.test.ts
+new file mode 100644
+index 0000000..8381981
+--- /dev/null
++++ b/src/core/parsersXbrl.test.ts
+@@ -0,0 +1,91 @@
++import { describe, it, expect } from 'vitest';
++import { XMLParser } from 'fast-xml-parser';
++import { parseMSCXBRL, isMSCXbrl } from './parsers';
++import { validateMultiMonth } from './validators/rulesD1';
++
++const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
++
++// MSC-XBRL mínima: 1 conta de Ativo com saldo final = beginning + change.
++// A mesma chave aparece em DUAS linhas de period_change para exercitar a
++// agregação por chave (o saldo é a soma das linhas, não a primeira).
++const mscXbrl = (periodo: string, endValor: string) => `<?xml version="1.0" encoding="ISO-8859-1"?>
++<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance"
++            xmlns:gl-bus="http://www.xbrl.org/int/gl/bus/2015-03-25"
++            xmlns:gl-cor="http://www.xbrl.org/int/gl/cor/2015-03-25">
++  <xbrli:context id="C1">
++    <xbrli:entity>
++      <xbrli:identifier scheme="http://siconfi.tesouro.gov.br">2916807EX</xbrli:identifier>
++    </xbrli:entity>
++  </xbrli:context>
++  <gl-cor:accountingEntries>
++    <gl-cor:entityInformation>
++      <gl-bus:reportingCalendar>
++        <gl-bus:reportingCalendarPeriod>
++          <gl-bus:periodIdentifier contextRef="C1">${periodo}</gl-bus:periodIdentifier>
++          <gl-bus:periodEnd contextRef="C1">${periodo}-30</gl-bus:periodEnd>
++        </gl-bus:reportingCalendarPeriod>
++      </gl-bus:reportingCalendar>
++    </gl-cor:entityInformation>
++    <gl-cor:entryHeader>
++      <gl-cor:entryDetail>
++        <gl-cor:account>
++          <gl-cor:accountMainID contextRef="C1">111111900</gl-cor:accountMainID>
++          <gl-cor:accountSub><gl-cor:accountSubID contextRef="C1">10131</gl-cor:accountSubID><gl-cor:accountSubType contextRef="C1">PO</gl-cor:accountSubType></gl-cor:accountSub>
++          <gl-cor:accountSub><gl-cor:accountSubID contextRef="C1">1500</gl-cor:accountSubID><gl-cor:accountSubType contextRef="C1">FR</gl-cor:accountSubType></gl-cor:accountSub>
++        </gl-cor:account>
++        <gl-cor:amount contextRef="C1">${endValor}</gl-cor:amount>
++        <gl-cor:debitCreditCode contextRef="C1">D</gl-cor:debitCreditCode>
++        <gl-cor:xbrlInfo><gl-cor:xbrlInclude contextRef="C1">ending_balance</gl-cor:xbrlInclude></gl-cor:xbrlInfo>
++      </gl-cor:entryDetail>
++    </gl-cor:entryHeader>
++  </gl-cor:accountingEntries>
++</xbrli:xbrl>`;
++
++describe('parseMSCXBRL (MSC em XBRL-GL)', () => {
++  it('reconhece e extrai conta, período e ente de uma MSC XBRL', () => {
++    const parsed = xmlParser.parse(mscXbrl('2026-05', '1000.00'));
++    expect(isMSCXbrl(parsed)).toBe(true);
++    const { accounts, period, enteId } = parseMSCXBRL(parsed);
++    expect(period).toBe('2026-05');
++    expect(enteId).toBe('2916807');
++    expect(accounts).toHaveLength(1);
++    expect(accounts[0].CONTA).toBe('111111900');
++    expect(accounts[0].PO).toBe('10131');
++    expect(accounts[0].FR).toBe('1500');
++    expect(accounts[0].Valor).toBe(1000);
++    expect(accounts[0].Tipo_valor).toBe('ending_balance');
++    expect(accounts[0].Natureza_valor).toBe('D');
++  });
++
++  it('não confunde outros XML (sem accountingEntries) com MSC', () => {
++    const parsed = xmlParser.parse('<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance"></xbrli:xbrl>');
++    expect(isMSCXbrl(parsed)).toBe(false);
++  });
++});
++
++describe('validateMultiMonth com MSC XBRL', () => {
++  const toMsc = (xml: string) => parseMSCXBRL(xmlParser.parse(xml)).accounts;
++
++  it('não acusa quando saldo final = saldo inicial do mês seguinte', () => {
++    const may = toMsc(mscXbrl('2026-05', '1000.00'));
++    // junho abre com beginning_balance = 1000 (mesma conta/atributos)
++    const junXml = mscXbrl('2026-06', '1000.00').replace('ending_balance', 'beginning_balance');
++    const jun = toMsc(junXml);
++    const res = validateMultiMonth({ '2026-05': may, '2026-06': jun }, new Map());
++    expect(res.filter(r => r.ruleId === 'D2_00077')).toHaveLength(0);
++  });
++
++  it('acusa D2_00077 em conta de controle (classe 6/7/8), não só 1/2', () => {
++    // maio: conta 622... fecha em 100 C; junho abre em 150 C -> diferença 50
++    const mk = (per: string, tipo: string, val: string) =>
++      mscXbrl(per, val)
++        .replace('111111900', '622130400')
++        .replace('ending_balance', tipo);
++    const may = toMsc(mk('2026-05', 'ending_balance', '100.00'));
++    const jun = toMsc(mk('2026-06', 'beginning_balance', '150.00'));
++    const res = validateMultiMonth({ '2026-05': may, '2026-06': jun }, new Map());
++    const d2 = res.filter(r => r.ruleId === 'D2_00077');
++    expect(d2).toHaveLength(1);
++    expect(d2[0].affectedAccounts?.[0]).toBe('622130400');
++  });
++});
+diff --git a/src/core/validators/rulesD1.ts b/src/core/validators/rulesD1.ts
+index 563219f..693e92d 100644
+--- a/src/core/validators/rulesD1.ts
++++ b/src/core/validators/rulesD1.ts
+@@ -713,34 +713,56 @@ export function validateMultiMonth(
+       }
+     }
+ 
+-    const accsPrev = prevMsc.filter(a => a.CONTA.startsWith('1') || a.CONTA.startsWith('2'));
++    // A continuidade saldo-final(mês anterior) = saldo-inicial(mês atual) vale para
++    // TODAS as classes de conta que carregam saldo, não só Ativo (1) e Passivo (2).
++    // As contas de controle da execução orçamentária e de disponibilidade por fonte
++    // (classes 5, 6, 7 e 8) também têm saldo transportado entre competências, e é
++    // exatamente onde o SICONFI acusa a maioria das quebras de continuidade.
++    // (Antes o filtro '1'/'2' descartava silenciosamente essas divergências.)
++    // Na MSC-XBRL uma mesma combinação conta+atributos aparece em VÁRIAS linhas
++    // (uma por lançamento); o saldo da conta é a SOMA dessas linhas. Antes esta
++    // regra comparava linha-a-linha via .find() (pegando só a 1ª ocorrência),
++    // o que gerava milhares de falsos positivos. Agora agregamos por chave e
++    // convenção de sinal (D positivo / C negativo) antes de comparar.
++    const aggregate = (msc: MSCAccount[], tipo: MSCAccount['Tipo_valor']) => {
++      const m = new Map<string, { conta: string; saldo: number }>();
++      for (const a of msc) {
++        if (a.Tipo_valor !== tipo) continue;
++        const key = mscAccountKey(a);
++        const signed = a.Natureza_valor === 'C' ? -a.Valor : a.Valor;
++        const cur = m.get(key);
++        if (cur) cur.saldo += signed;
++        else m.set(key, { conta: a.CONTA, saldo: signed });
++      }
++      return m;
++    };
++
++    const endPrev = aggregate(prevMsc, 'ending_balance');
++    const begCurr = aggregate(currMsc, 'beginning_balance');
+     let hasDiff = false;
+ 
+-    for (const pAcc of accsPrev) {
+-      if (pAcc.Tipo_valor !== 'ending_balance') continue;
+-      const cAcc = currMsc.find(a => mscAccountKey(a) === mscAccountKey(pAcc) && a.Tipo_valor === 'beginning_balance');
+-      if (cAcc) {
+-        const sfPrev = pAcc.Natureza_valor === 'C' ? -pAcc.Valor : pAcc.Valor;
+-        const siCurr = cAcc.Natureza_valor === 'C' ? -cAcc.Valor : cAcc.Valor;
+-        if (Math.abs(siCurr - sfPrev) > 0.01) {
+-          hasDiff = true;
+-          const diff = siCurr - sfPrev;
+-          const diffAbs = Math.abs(diff);
+-          // Natureza da diferença na mesma convenção usada acima (D positivo / C negativo):
+-          // diff > 0 => o saldo inicial ficou "mais D" (ou "menos C") do que o saldo final anterior.
+-          const diffNature = diff < 0 ? 'C' : 'D';
+-          const diffPct = sfPrev !== 0 ? (diffAbs / Math.abs(sfPrev)) * 100 : null;
+-          results.push({
+-            ruleId: 'D2_00077',
+-            dimension: 'D2',
+-            description: 'Validação de saldo inicial x final',
+-            severity: 'error',
+-            impactsCapag: false,
+-            affectedAccounts: [pAcc.CONTA],
+-            message: `Conta ${pAcc.CONTA}: O saldo final de ${prevPeriod} (R$ ${Math.abs(sfPrev).toFixed(2)}${sfPrev < 0 ? 'C' : 'D'}) difere do saldo inicial de ${currPeriod} (R$ ${Math.abs(siCurr).toFixed(2)}${siCurr < 0 ? 'C' : 'D'}). Diferença: R$ ${diffAbs.toFixed(2)}${diffNature}${diffPct !== null ? ` (${diffPct.toFixed(2)}%)` : ''}.`,
+-            actionPlan: `Verifique se houve lançamento de ajuste/retificação na conta ${pAcc.CONTA} entre o encerramento de ${prevPeriod} e a abertura de ${currPeriod}. O saldo inicial do período subsequente deve ser idêntico ao saldo final do período anterior (diferença apurada: R$ ${diffAbs.toFixed(2)}${diffNature}).`,
+-          });
+-        }
++    for (const [key, prev] of endPrev) {
++      const curr = begCurr.get(key);
++      const sfPrev = prev.saldo;
++      const siCurr = curr ? curr.saldo : 0;
++      if (Math.abs(siCurr - sfPrev) > 0.01) {
++        hasDiff = true;
++        const diff = siCurr - sfPrev;
++        const diffAbs = Math.abs(diff);
++        // Natureza da diferença na mesma convenção usada acima (D positivo / C negativo):
++        // diff > 0 => o saldo inicial ficou "mais D" (ou "menos C") do que o saldo final anterior.
++        const diffNature = diff < 0 ? 'C' : 'D';
++        const diffPct = sfPrev !== 0 ? (diffAbs / Math.abs(sfPrev)) * 100 : null;
++        results.push({
++          ruleId: 'D2_00077',
++          dimension: 'D2',
++          description: 'Validação de saldo inicial x final',
++          severity: 'error',
++          impactsCapag: false,
++          affectedAccounts: [prev.conta],
++          message: `Conta ${prev.conta}: O saldo final de ${prevPeriod} (R$ ${Math.abs(sfPrev).toFixed(2)}${sfPrev < 0 ? 'C' : 'D'}) difere do saldo inicial de ${currPeriod} (R$ ${Math.abs(siCurr).toFixed(2)}${siCurr < 0 ? 'C' : 'D'}). Diferença: R$ ${diffAbs.toFixed(2)}${diffNature}${diffPct !== null ? ` (${diffPct.toFixed(2)}%)` : ''}.`,
++          actionPlan: `Verifique se houve lançamento de ajuste/retificação na conta ${prev.conta} entre o encerramento de ${prevPeriod} e a abertura de ${currPeriod}. O saldo inicial do período subsequente deve ser idêntico ao saldo final do período anterior (diferença apurada: R$ ${diffAbs.toFixed(2)}${diffNature}).`,
++        });
+       }
+     }
+ 
+-- 
+2.43.0
+

@@ -3,7 +3,7 @@
 Ferramenta de pré-validação fiscal para municípios brasileiros. Replica localmente as verificações D1–D4 do SICONFI da Secretaria do Tesouro Nacional, permitindo identificar e corrigir inconsistências **antes** do envio oficial — protegendo a nota CAPAG e o Ranking ICF.
 
 **Acesso:** https://andersonspita.github.io/validador-siconfi/  
-**Versão:** 3.5.0 · **Desenvolvido por:** Lopes Consultoria (CRC-BA 36.449/O-0)
+**Versão:** 3.5.0 · **Desenvolvido por:** Anderson Pita
 
 ---
 
