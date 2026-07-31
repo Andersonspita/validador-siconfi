@@ -28,3 +28,7 @@ temp_zip/
 # Environment Variables
 .env
 .env.*
+
+*.patch
+/scoring.ts
+/rankingReport.ts
