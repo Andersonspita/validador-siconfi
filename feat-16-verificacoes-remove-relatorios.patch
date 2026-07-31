@@ -1,0 +1,727 @@
+From 85203a12aa904b5400832e5fdc4637bb697e9f3c Mon Sep 17 00:00:00 2001
+From: Validador SICONFI Dev <dev@lopesconsultoria.local>
+Date: Fri, 31 Jul 2026 20:55:44 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20implementa=2016=20verifica=C3=A7=C3=B5e?=
+ =?UTF-8?q?s=20e=20remove=202=20relat=C3=B3rios=20do=20dashboard?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Cobertura do motor (aplicáveis a município): 132/195 (67,7%) -> 148/195 (75,9%).
+
+Verificações implementadas (16):
+- D1 servidor (via API Siconfi já consumida): D1_00003/00004 (homologação
+  RGF por poder), D1_00006/00008/00009 (tempestividade x prazo legal),
+  D1_00011/00013/00014 (retificações). Substituem o stub genérico anterior.
+  Novos helpers em siconfiApi.ts: homologacaoDoPoder, homologacoesForaPrazo,
+  prazoLegal, contarRetificacoes.
+- D1 MSC: D1_00039/00040 (fonte condicionada 9xx em despesa/receita),
+  D1_00044 (Restos a Pagar sem IC de Ano de Inscrição). Exigiu capturar o
+  atributo AI no parser CSV e no tipo MSCAccount.
+- D2 MSC mensal: D2_00082 (depreciação mensal de bens móveis), D2_00086/
+  00087 (VPD material/serviços), D2_00088 (VPA transferências).
+- D3: D3_00047 (Reserva Orçamentária do RPPS, Anexo 04 x 06) + extractors.
+
+Não implementadas por dependerem de dados de fim de exercício (DCA/MSC
+dezembro) ou fonte externa: D3_00048/00049 (inativos ASPS/MDE), demais 47
+faltantes catalogados na planilha de gap.
+
+Dashboard: removidos os botões "Gerar Relatório Oficial (PDF)" e "Relatório
+Técnico (Resumo Executivo)" e seus imports; módulos pdfGenerator/
+relatorioTecnico mantidos no código.
+
+Testes: +17 (D1 MSC, D2 mensal, helpers da API). Suíte 66/66, tsc e build
+limpos.
+---
+ src/components/ReportDashboard.tsx  |  12 +--
+ src/core/parsers.ts                 |   2 +
+ src/core/types.ts                   |   2 +
+ src/core/validators/rulesD1.test.ts |  38 ++++++++
+ src/core/validators/rulesD1.ts      | 144 ++++++++++++++++++++++++++--
+ src/core/validators/rulesD2.test.ts |  50 ++++++++++
+ src/core/validators/rulesD2.ts      |  56 +++++++++++
+ src/core/validators/rulesD3.ts      |  10 ++
+ src/core/xmlExtractors.ts           |  11 +++
+ src/services/siconfiApi.test.ts     |  80 ++++++++++++++++
+ src/services/siconfiApi.ts          | 108 +++++++++++++++++++++
+ 11 files changed, 493 insertions(+), 20 deletions(-)
+ create mode 100644 src/services/siconfiApi.test.ts
+
+diff --git a/src/components/ReportDashboard.tsx b/src/components/ReportDashboard.tsx
+index d515816..a279ebc 100644
+--- a/src/components/ReportDashboard.tsx
++++ b/src/components/ReportDashboard.tsx
+@@ -2,12 +2,10 @@ import { useEffect, useState } from 'react';
+ import { parseFiles } from '../core/parsers';
+ import { runValidations } from '../core/validatorEngine';
+ import { ValidationResult, RuleDefinition } from '../core/types';
+-import { generatePDF } from '../core/pdfGenerator';
+-import { generateRelatorioTecnicoPDF } from '../core/relatorioTecnico';
+ import { buildScoreSummary } from '../core/scoring';
+ import { buildRankingHtml, buildPlanoAcaoHtml, RankingReportMeta } from '../core/rankingReport';
+ import Papa from 'papaparse';
+-import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3, ClipboardList } from 'lucide-react';
++import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Lightbulb, BarChart3 } from 'lucide-react';
+ import ReportView from './ReportView';
+ import CAPAGPanel from './CAPAGPanel';
+ import { MSCAccount } from '../core/types';
+@@ -181,14 +179,6 @@ export default function ReportDashboard({ files, rulesMap, onReset, onResultsRea
+               <Download size={20} />
+               Exportar CSV
+             </button>
+-            <button onClick={() => generatePDF(filteredResults, reportMeta)} className="export-btn glass-panel print-btn">
+-              <Printer size={20} />
+-              Gerar Relatório Oficial (PDF)
+-            </button>
+-            <button onClick={() => generateRelatorioTecnicoPDF(filteredResults, reportMeta)} className="export-btn glass-panel print-btn">
+-              <ClipboardList size={20} />
+-              Relatório Técnico (Resumo Executivo)
+-            </button>
+             <button onClick={openRanking} className="export-btn glass-panel print-btn">
+               <BarChart3 size={20} />
+               Ranking da Qualidade (STN)
+diff --git a/src/core/parsers.ts b/src/core/parsers.ts
+index 03f96e4..003d9f6 100644
+--- a/src/core/parsers.ts
++++ b/src/core/parsers.ts
+@@ -204,6 +204,7 @@ export const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccoun
+           let fr = findIcByTipo('FR') ?? getVal('FR');
+           let co = findIcByTipo('CO') ?? getVal('CO');
+           let nd = findIcByTipo('ND') ?? getVal('ND');
++          const ai = findIcByTipo('AI') ?? getVal('AI');
+ 
+           const hasTipoCols = Object.keys(row).some(k => k.toUpperCase().startsWith('TIPO') && k.toUpperCase() !== 'TIPO_VALOR');
+ 
+@@ -228,6 +229,7 @@ export const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccoun
+             FR: fr,
+             CO: co,
+             ND: nd,
++            AI: ai,
+             Valor: parseValor(valorRaw),
+             Tipo_valor: tipoRaw as MSCAccount['Tipo_valor'],
+             Natureza_valor: naturezaRaw as MSCAccount['Natureza_valor'],
+diff --git a/src/core/types.ts b/src/core/types.ts
+index 18fb366..a016a66 100644
+--- a/src/core/types.ts
++++ b/src/core/types.ts
+@@ -85,6 +85,8 @@ export interface MSCAccount {
+   FR?: string;
+   CO?: string;
+   ND?: string;
++  /** AI — Ano de Inscrição (informação complementar de Restos a Pagar). */
++  AI?: string;
+   Valor: number;
+   Tipo_valor: 'beginning_balance' | 'period_change' | 'ending_balance';
+   Natureza_valor: 'D' | 'C';
+diff --git a/src/core/validators/rulesD1.test.ts b/src/core/validators/rulesD1.test.ts
+index 209155b..b706f9a 100644
+--- a/src/core/validators/rulesD1.test.ts
++++ b/src/core/validators/rulesD1.test.ts
+@@ -306,3 +306,41 @@ describe('D1_00001 — homologação via API do Siconfi', () => {
+     expect(d1?.message).toMatch(/Câmara.*(RREO|DCA).*consolidado.*Executivo/s);
+   });
+ });
++
++// ─── D1_00039 / D1_00040: fontes condicionadas (9xx) ─────────────────────────
++
++describe('D1_00039 / D1_00040 — fontes condicionadas (9xx)', () => {
++  it('D1_00039 alerta despesa orçamentária em FR 9xx', () => {
++    const msc: MSCAccount[] = [acc({ CONTA: '622130400', Valor: 1000, FR: '9500', Tipo_valor: 'period_change' })];
++    const results = validateD1_MSC(msc, new Map());
++    expect(results.find(r => r.ruleId === 'D1_00039')).toBeDefined();
++  });
++
++  it('D1_00039 não alerta quando FR é definitiva (não 9xx)', () => {
++    const msc: MSCAccount[] = [acc({ CONTA: '622130400', Valor: 1000, FR: '1500', Tipo_valor: 'period_change' })];
++    const results = validateD1_MSC(msc, new Map());
++    expect(results.find(r => r.ruleId === 'D1_00039')).toBeUndefined();
++  });
++
++  it('D1_00040 alerta receita orçamentária em FR 9xx', () => {
++    const msc: MSCAccount[] = [acc({ CONTA: '621130000', Valor: 500, FR: '9001', Tipo_valor: 'period_change' })];
++    const results = validateD1_MSC(msc, new Map());
++    expect(results.find(r => r.ruleId === 'D1_00040')).toBeDefined();
++  });
++});
++
++// ─── D1_00044: Restos a Pagar sem AI (Ano de Inscrição) ──────────────────────
++
++describe('D1_00044 — Restos a Pagar sem AI', () => {
++  it('alerta quando RP não tem o atributo AI', () => {
++    const msc: MSCAccount[] = [acc({ CONTA: '632110000', Valor: 2000 })]; // sem AI
++    const results = validateD1_MSC(msc, new Map());
++    expect(results.find(r => r.ruleId === 'D1_00044')).toBeDefined();
++  });
++
++  it('não alerta quando RP tem AI informado', () => {
++    const msc: MSCAccount[] = [acc({ CONTA: '632110000', Valor: 2000, AI: '2025' })];
++    const results = validateD1_MSC(msc, new Map());
++    expect(results.find(r => r.ruleId === 'D1_00044')).toBeUndefined();
++  });
++});
+diff --git a/src/core/validators/rulesD1.ts b/src/core/validators/rulesD1.ts
+index 563219f..39d9a6c 100644
+--- a/src/core/validators/rulesD1.ts
++++ b/src/core/validators/rulesD1.ts
+@@ -8,7 +8,10 @@ import {
+   PL_DEDUCAO_PREFIXES,
+   ORCAM_NATUREZA_EXCEPTION_PREFIXES,
+ } from '../pcaspRules';
+-import { getExtratoEntregas, buildPendenciasPorPoder, PendenciaPorPoder } from '../../services/siconfiApi';
++import {
++  getExtratoEntregas, buildPendenciasPorPoder, PendenciaPorPoder,
++  homologacaoDoPoder, homologacoesForaPrazo, contarRetificacoes,
++} from '../../services/siconfiApi';
+ 
+ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): Promise<ValidationResult[]> {
+   const results: ValidationResult[] = [];
+@@ -24,8 +27,10 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
+   if (!temDCA)  ausentes.push('DCA');
+ 
+   // Integracao Siconfi API para Tempestividade
++  let entregasApi: import('../../services/siconfiApi').ExtratoEntrega[] = [];
+   if (data.enteId && data.anoReferencia) {
+     const entregas = await getExtratoEntregas(data.enteId, data.anoReferencia);
++    entregasApi = entregas;
+ 
+     // Nem todo demonstrativo é "de cada Poder": pela LRF, o RGF é elaborado e
+     // publicado separadamente por cada Poder/Órgão (art. 20), mas o RREO é um
+@@ -168,19 +173,91 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
+     }
+   }
+ 
+-  // Regras de Servidor Siconfi (Homologação, Tempestividade e Retificações)
+-  const serverRules = [
+-    'D1_00002', 'D1_00003', 'D1_00004', 'D1_00005', 'D1_00006', 'D1_00007', 'D1_00008',
+-    'D1_00009', 'D1_00010', 'D1_00011', 'D1_00012', 'D1_00013', 'D1_00014', 'D1_00015'
+-  ];
+-  serverRules.forEach(ruleId => {
++  // ── Regras de Servidor Siconfi: implementadas via extrato da API ─────────────
++  const ano = data.anoReferencia ? parseInt(data.anoReferencia) : NaN;
++  const temApi = entregasApi.length > 0 && !isNaN(ano);
++
++  if (temApi) {
++    // D1_00003 — Homologação de todos os RGFs do Executivo
++    const h03 = homologacaoDoPoder(entregasApi, 'RGF', 'Executivo');
++    results.push(h03.pendentes.length === 0 && h03.total > 0
++      ? { ruleId: 'D1_00003', dimension: 'D1', description: 'Homologação de todos os RGFs do poder Executivo', severity: 'info', impactsCapag: false,
++          message: `RGFs do Executivo: ${h03.homologados}/${h03.total} período(s) homologado(s).` }
++      : { ruleId: 'D1_00003', dimension: 'D1', description: 'Homologação de todos os RGFs do poder Executivo', severity: h03.total === 0 ? 'info' : 'error', impactsCapag: false,
++          message: h03.total === 0 ? 'Sem RGFs do Executivo no extrato da API para o período.' : `RGFs do Executivo NÃO homologados: período(s) ${h03.pendentes.join(', ')}.`,
++          actionPlan: 'Homologue os RGFs pendentes do Poder Executivo no Siconfi.' });
++
++    // D1_00004 — Homologação de todos os RGFs do Legislativo
++    const h04 = homologacaoDoPoder(entregasApi, 'RGF', 'Legislativo');
++    results.push(h04.pendentes.length === 0 && h04.total > 0
++      ? { ruleId: 'D1_00004', dimension: 'D1', description: 'Homologação de todos os RGFs do poder Legislativo', severity: 'info', impactsCapag: false,
++          message: `RGFs do Legislativo: ${h04.homologados}/${h04.total} período(s) homologado(s).` }
++      : { ruleId: 'D1_00004', dimension: 'D1', description: 'Homologação de todos os RGFs do poder Legislativo', severity: h04.total === 0 ? 'info' : 'error', impactsCapag: false,
++          message: h04.total === 0 ? 'Sem RGFs do Legislativo no extrato da API para o período.' : `RGFs do Legislativo NÃO homologados: período(s) ${h04.pendentes.join(', ')}.`,
++          actionPlan: 'Alinhe com a Câmara a homologação dos RGFs pendentes no Siconfi.' });
++
++    // D1_00006 — Tempestividade dos RREOs
++    const fora06 = homologacoesForaPrazo(entregasApi, 'RREO', ano);
++    results.push(fora06.length === 0
++      ? { ruleId: 'D1_00006', dimension: 'D1', description: 'Tempestividade na homologação dos RREOs', severity: 'info', impactsCapag: false, message: 'RREOs homologados dentro do prazo.' }
++      : { ruleId: 'D1_00006', dimension: 'D1', description: 'Tempestividade na homologação dos RREOs', severity: 'error', impactsCapag: false,
++          message: `RREOs: ${fora06.length} homologação(ões) fora do prazo: ${fora06.map(f => `per. ${f.periodo} (${f.instituicao}: ${f.data} > prazo ${f.prazo})`).join('; ')}`,
++          actionPlan: 'Atrasos passados não são reversíveis; implantar calendário com alerta: RREO até 30 dias após cada bimestre.' });
++
++    // D1_00008 — Tempestividade dos RGFs do Executivo
++    const fora08 = homologacoesForaPrazo(entregasApi, 'RGF', ano, 'Executivo');
++    results.push(fora08.length === 0
++      ? { ruleId: 'D1_00008', dimension: 'D1', description: 'Tempestividade na homologação dos RGFs do Executivo', severity: 'info', impactsCapag: false, message: 'RGFs do Executivo homologados dentro do prazo.' }
++      : { ruleId: 'D1_00008', dimension: 'D1', description: 'Tempestividade na homologação dos RGFs do Executivo', severity: 'error', impactsCapag: false,
++          message: `RGFs do Executivo: ${fora08.length} fora do prazo: ${fora08.map(f => `per. ${f.periodo} (${f.instituicao}: ${f.data} > prazo ${f.prazo})`).join('; ')}`,
++          actionPlan: 'RGF do Executivo até 30 dias após o quadrimestre; implantar alerta de prazo.' });
++
++    // D1_00009 — Tempestividade dos RGFs do Legislativo
++    const fora09 = homologacoesForaPrazo(entregasApi, 'RGF', ano, 'Legislativo');
++    results.push(fora09.length === 0
++      ? { ruleId: 'D1_00009', dimension: 'D1', description: 'Tempestividade na homologação dos RGFs do Legislativo', severity: 'info', impactsCapag: false, message: 'RGFs do Legislativo homologados dentro do prazo.' }
++      : { ruleId: 'D1_00009', dimension: 'D1', description: 'Tempestividade na homologação dos RGFs do Legislativo', severity: 'error', impactsCapag: false,
++          message: `RGFs do Legislativo: ${fora09.length} fora do prazo: ${fora09.map(f => `per. ${f.periodo} (${f.instituicao}: ${f.data} > prazo ${f.prazo})`).join('; ')}`,
++          actionPlan: 'Alinhar com a Câmara o prazo do RGF (30 dias após o quadrimestre).' });
++
++    // D1_00011 — Retificações dos RREOs (piso 0,5 quando há retificação)
++    const ret11 = contarRetificacoes(entregasApi, 'RREO');
++    results.push(ret11 === 0
++      ? { ruleId: 'D1_00011', dimension: 'D1', description: 'Quantidade de retificações dos RREOs do exercício', severity: 'info', impactsCapag: false, message: 'RREOs: nenhum relatório retificado.' }
++      : { ruleId: 'D1_00011', dimension: 'D1', description: 'Quantidade de retificações dos RREOs do exercício', severity: 'warning', impactsCapag: false,
++          message: `RREOs: ${ret11} retificação(ões) no exercício.`, actionPlan: 'Retificações reduzem a pontuação; revise os dados antes de homologar.' });
++
++    // D1_00013 — Retificações dos RGFs do Executivo
++    const ret13 = contarRetificacoes(entregasApi, 'RGF', 'Executivo');
++    results.push(ret13 === 0
++      ? { ruleId: 'D1_00013', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Executivo', severity: 'info', impactsCapag: false, message: 'RGFs do Executivo: nenhum retificado.' }
++      : { ruleId: 'D1_00013', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Executivo', severity: 'warning', impactsCapag: false,
++          message: `RGFs do Executivo: ${ret13} retificação(ões).`, actionPlan: 'Revise os dados do RGF antes de homologar para evitar retificações.' });
++
++    // D1_00014 — Retificações dos RGFs do Legislativo
++    const ret14 = contarRetificacoes(entregasApi, 'RGF', 'Legislativo');
++    results.push(ret14 === 0
++      ? { ruleId: 'D1_00014', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Legislativo', severity: 'info', impactsCapag: false, message: 'RGFs do Legislativo: nenhum retificado.' }
++      : { ruleId: 'D1_00014', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Legislativo', severity: 'warning', impactsCapag: false,
++          message: `RGFs do Legislativo: ${ret14} retificação(ões).`, actionPlan: 'Alinhe com a Câmara a revisão do RGF antes da homologação.' });
++  }
++
++  // Regras que ainda dependem de dados não disponíveis offline/nesta fase:
++  // D1_00002/07/12 (DCA anual) e D1_00005/10/15 (Judiciário/MP/Defensoria — só Estados/DF).
++  const serverRulesPendentes = temApi
++    ? ['D1_00002', 'D1_00005', 'D1_00007', 'D1_00010', 'D1_00012', 'D1_00015']
++    : ['D1_00002', 'D1_00003', 'D1_00004', 'D1_00005', 'D1_00006', 'D1_00007', 'D1_00008',
++       'D1_00009', 'D1_00010', 'D1_00011', 'D1_00012', 'D1_00013', 'D1_00014', 'D1_00015'];
++  serverRulesPendentes.forEach(ruleId => {
+     results.push({
+       ruleId,
+       dimension: 'D1',
+-      description: 'Regra validada exclusivamente pelo servidor',
++      description: 'Regra validada pelo servidor Siconfi',
+       severity: 'info',
+       impactsCapag: false,
+-      message: `Esta regra refere-se a metadados do servidor do Siconfi (homologação, tempestividade ou retificações) e não pode ser validada offline apenas com os arquivos. Consulte o painel oficial para o status.`,
++      message: temApi
++        ? `Esta verificação depende da DCA (anual) ou é exclusiva de Estados/DF; não avaliável nesta fase do exercício.`
++        : `Não foi possível consultar o extrato da API do Siconfi (ente sem código IBGE ou API indisponível). Consulte o painel oficial.`,
+     });
+   });
+ 
+@@ -605,6 +682,55 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
+     });
+   }
+ 
++  // D1_00039: Despesas orçamentárias (62213) em fonte condicionada (FR iniciada em 9)
++  const despCondicionada = msc.filter(a =>
++    a.CONTA.startsWith('62213') && (a.FR ?? '').startsWith('9') && a.Valor !== 0);
++  if (despCondicionada.length > 0) {
++    results.push({
++      ruleId: 'D1_00039', dimension: 'D1',
++      description: 'Despesas orçamentárias em fontes de recursos condicionados (9xx)',
++      severity: 'warning', impactsCapag: false,
++      affectedAccounts: Array.from(new Set(despCondicionada.map(a => a.CONTA))),
++      detailedItems: despCondicionada.slice(0, 50).map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, valor: a.Valor, detalhe: `FR: ${a.FR} (condicionada)` })),
++      message: pm(`${despCondicionada.length} despesa(s) orçamentária(s) registrada(s) em fonte de recurso condicionada (9xx). Fontes 9xx não devem receber execução de despesa.`),
++      actionPlan: 'Reclassifique as despesas para a fonte de recurso definitiva; fontes 9xx (condicionadas) não comportam execução orçamentária.',
++    });
++  }
++
++  // D1_00040: Receitas orçamentárias (6211/6212/6213) em fonte condicionada (FR 9xx)
++  const recCondicionada = msc.filter(a =>
++    (a.CONTA.startsWith('6211') || a.CONTA.startsWith('6212') || a.CONTA.startsWith('6213')) &&
++    (a.FR ?? '').startsWith('9') && a.Valor !== 0);
++  if (recCondicionada.length > 0) {
++    results.push({
++      ruleId: 'D1_00040', dimension: 'D1',
++      description: 'Receitas orçamentárias em fontes de recursos condicionados (9xx)',
++      severity: 'warning', impactsCapag: false,
++      affectedAccounts: Array.from(new Set(recCondicionada.map(a => a.CONTA))),
++      detailedItems: recCondicionada.slice(0, 50).map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, valor: a.Valor, detalhe: `FR: ${a.FR} (condicionada)` })),
++      message: pm(`${recCondicionada.length} receita(s) orçamentária(s) registrada(s) em fonte de recurso condicionada (9xx).`),
++      actionPlan: 'Reclassifique as receitas para a fonte de recurso definitiva; fontes 9xx (condicionadas) não comportam execução orçamentária.',
++    });
++  }
++
++  // D1_00044: Restos a Pagar devem carregar a IC de Ano de Inscrição (AI)
++  // Contas de controle de RP (631x/632x) precisam do detalhamento AI.
++  const RP_PREFIXES = ['6311', '6312', '6313', '6314', '6321', '6322', '6327'];
++  const rpAccounts = msc.filter(a =>
++    RP_PREFIXES.some(p => a.CONTA.startsWith(p)) && a.Valor !== 0);
++  const rpSemAI = rpAccounts.filter(a => !a.AI || a.AI.trim() === '');
++  if (rpAccounts.length > 0 && rpSemAI.length > 0) {
++    results.push({
++      ruleId: 'D1_00044', dimension: 'D1',
++      description: 'Restos a Pagar sem informação complementar de Ano de Inscrição (AI)',
++      severity: 'warning', impactsCapag: false,
++      affectedAccounts: Array.from(new Set(rpSemAI.map(a => a.CONTA))),
++      detailedItems: rpSemAI.slice(0, 50).map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, valor: a.Valor, detalhe: 'sem AI (Ano de Inscrição)' })),
++      message: pm(`${rpSemAI.length} de ${rpAccounts.length} registro(s) de Restos a Pagar sem a IC de Ano de Inscrição (AI). O detalhamento do ano de inscrição é obrigatório para RP.`),
++      actionPlan: 'Inclua a informação complementar AI (Ano de Inscrição) nos registros de Restos a Pagar (contas 631x/632x) na geração da MSC.',
++    });
++  }
++
+   return results;
+ }
+ 
+diff --git a/src/core/validators/rulesD2.test.ts b/src/core/validators/rulesD2.test.ts
+index b3b0b5f..1f5fd77 100644
+--- a/src/core/validators/rulesD2.test.ts
++++ b/src/core/validators/rulesD2.test.ts
+@@ -126,3 +126,53 @@ describe('D2_00055 — amortização acumulada > ativo intangível', () => {
+     expect(results.find(r => r.ruleId === 'D2_00055')).toBeUndefined();
+   });
+ });
++
++// ─── D2_00082: depreciação mensal de bens móveis ─────────────────────────────
++
++describe('D2_00082 — depreciação mensal de bens móveis', () => {
++  it('alerta quando há bens móveis mas sem movimentação de depreciação', () => {
++    const msc: MSCAccount[] = [
++      acc({ CONTA: '123110100', Valor: 100000, Tipo_valor: 'ending_balance', Natureza_valor: 'D' }),
++    ];
++    const results = validateD2_MSC(data(msc), new Map());
++    expect(results.find(r => r.ruleId === 'D2_00082')).toBeDefined();
++  });
++
++  it('não alerta quando há movimentação mensal de depreciação', () => {
++    const msc: MSCAccount[] = [
++      acc({ CONTA: '123110100', Valor: 100000, Tipo_valor: 'ending_balance', Natureza_valor: 'D' }),
++      acc({ CONTA: '123810100', Valor: 500, Tipo_valor: 'period_change', Natureza_valor: 'C' }),
++    ];
++    const results = validateD2_MSC(data(msc), new Map());
++    expect(results.find(r => r.ruleId === 'D2_00082')).toBeUndefined();
++  });
++});
++
++// ─── D2_00086 / 087 / 088: VPD/VPA mensais ───────────────────────────────────
++
++describe('D2_00086/087/088 — VPD/VPA por competência', () => {
++  it('D2_00086 alerta despesa sem VPD de material de consumo', () => {
++    const msc: MSCAccount[] = [
++      acc({ CONTA: '622130000', Valor: 1000, Tipo_valor: 'period_change', Natureza_valor: 'C' }),
++    ];
++    const results = validateD2_MSC(data(msc), new Map());
++    expect(results.find(r => r.ruleId === 'D2_00086')).toBeDefined();
++  });
++
++  it('D2_00086 não alerta quando há VPD de material', () => {
++    const msc: MSCAccount[] = [
++      acc({ CONTA: '622130000', Valor: 1000, Tipo_valor: 'period_change', Natureza_valor: 'C' }),
++      acc({ CONTA: '331110000', Valor: 800, Tipo_valor: 'period_change', Natureza_valor: 'D' }),
++    ];
++    const results = validateD2_MSC(data(msc), new Map());
++    expect(results.find(r => r.ruleId === 'D2_00086')).toBeUndefined();
++  });
++
++  it('D2_00088 alerta receita de transferência sem VPA correspondente', () => {
++    const msc: MSCAccount[] = [
++      acc({ CONTA: '621310000', Valor: 5000, Tipo_valor: 'period_change', Natureza_valor: 'C' }),
++    ];
++    const results = validateD2_MSC(data(msc), new Map());
++    expect(results.find(r => r.ruleId === 'D2_00088')).toBeDefined();
++  });
++});
+diff --git a/src/core/validators/rulesD2.ts b/src/core/validators/rulesD2.ts
+index aba67aa..8f9c680 100644
+--- a/src/core/validators/rulesD2.ts
++++ b/src/core/validators/rulesD2.ts
+@@ -279,6 +279,62 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
+     }
+   }
+ 
++  // D2_00082: Depreciação/amortização/exaustão mensal de bens móveis (1.2.3.8.1.01/03/05)
++  // Se há saldo de bens móveis (1.2.3.x), deve haver movimentação mensal de depreciação.
++  const temBensMoveis = msc.some(a => a.CONTA.startsWith('12311') && a.Tipo_valor === 'ending_balance' && a.Valor > 0);
++  const temDeprecMov = msc.some(a =>
++    (a.CONTA.startsWith('123810100') || a.CONTA.startsWith('123810300') || a.CONTA.startsWith('123810500')) &&
++    a.Tipo_valor === 'period_change' && a.Valor !== 0);
++  if (temBensMoveis && !temDeprecMov) {
++    results.push({
++      ruleId: 'D2_00082', dimension: 'D2',
++      description: 'Depreciação de bens móveis sem movimentação mensal',
++      severity: 'warning', impactsCapag: false,
++      affectedAccounts: ['1.2.3.8.1.01', '1.2.3.8.1.03', '1.2.3.8.1.05'],
++      message: pm('Há saldo de bens móveis, mas nenhuma movimentação mensal de depreciação/amortização/exaustão (1.2.3.8.1.01/03/05). A depreciação deve ser reconhecida mensalmente por competência, não apenas no encerramento.'),
++      actionPlan: 'Executar a rotina mensal de depreciação (crédito em 1.2.3.8.1.01) — não deixar para lançar apenas no encerramento.',
++    });
++  }
++
++  // D2_00086: VPD com material de consumo (3.3.1.1) no período
++  const temVPDMaterial = msc.some(a => a.CONTA.startsWith('3311') && a.Tipo_valor === 'period_change' && a.Valor !== 0);
++  const temDespCorrente = msc.some(a => a.CONTA.startsWith('62213') && a.Tipo_valor === 'period_change' && a.Valor !== 0);
++  if (temDespCorrente && !temVPDMaterial) {
++    results.push({
++      ruleId: 'D2_00086', dimension: 'D2',
++      description: 'VPD com material de consumo ausente no período',
++      severity: 'warning', impactsCapag: false,
++      affectedAccounts: ['3.3.1.1'],
++      message: pm('Há execução de despesa no período, mas nenhuma VPD com material de consumo (3.3.1.1). Verifique o reconhecimento das variações patrimoniais diminutivas por competência.'),
++    });
++  }
++
++  // D2_00087: VPD com serviços (3.3.2) no período
++  const temVPDServicos = msc.some(a => a.CONTA.startsWith('332') && a.Tipo_valor === 'period_change' && a.Valor !== 0);
++  if (temDespCorrente && !temVPDServicos) {
++    results.push({
++      ruleId: 'D2_00087', dimension: 'D2',
++      description: 'VPD com serviços ausente no período',
++      severity: 'warning', impactsCapag: false,
++      affectedAccounts: ['3.3.2'],
++      message: pm('Há execução de despesa no período, mas nenhuma VPD com serviços (3.3.2). Verifique o reconhecimento das variações patrimoniais diminutivas por competência.'),
++    });
++  }
++
++  // D2_00088: VPA com transferências intergovernamentais (4.5.2) no período
++  const temVPATransf = msc.some(a => a.CONTA.startsWith('452') && a.Tipo_valor === 'period_change' && a.Valor !== 0);
++  const temReceitaTransf = msc.some(a =>
++    (a.CONTA.startsWith('62131') || a.CONTA.startsWith('62132')) && a.Tipo_valor === 'period_change' && a.Valor !== 0);
++  if (temReceitaTransf && !temVPATransf) {
++    results.push({
++      ruleId: 'D2_00088', dimension: 'D2',
++      description: 'VPA com transferências intergovernamentais ausente no período',
++      severity: 'warning', impactsCapag: false,
++      affectedAccounts: ['4.5.2'],
++      message: pm('Há receita de transferências no período, mas nenhuma VPA com transferências intergovernamentais (4.5.2). Verifique o reconhecimento das variações patrimoniais aumentativas por competência.'),
++    });
++  }
++
+   return results;
+ }
+ 
+diff --git a/src/core/validators/rulesD3.ts b/src/core/validators/rulesD3.ts
+index d723fb3..e3a3461 100644
+--- a/src/core/validators/rulesD3.ts
++++ b/src/core/validators/rulesD3.ts
+@@ -6,6 +6,7 @@ import {
+   getTotalReceitasRPPS_A04, getReceitasRPPS_A06, getRPPSExercAnt_A01, getRPPSExercAnt_A04,
+   getRPPSExercAnt_A06, getSuperavitFinanceiro_A01, getSuperavitFinanceiro_A06,
+   getReservaRPPS_A01, getReservaRPPS_A04, getReservaRPPS_A06,
++  getReservaOrcamentariaRPPS_A04, getReservaOrcamentariaRPPS_A06,
+   getReservaContingencia_A01, getReservaContingencia_A06, findNegativosRP_A07,
+   getDCL_RREO_A06, getDCL_RGF_A02, getTransfEmendasIndividuais_RGF_A01,
+   getTransfEmendasIndividuais_RGF_A02, getTransfEmendasIndividuais_RREO_A03,
+@@ -121,6 +122,15 @@ export function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition
+     false
+   ));
+ 
++  // D3_00047: Reserva Orçamentária do RPPS — Anexo 04 = Anexo 06 (Informações Adicionais)
++  results.push(...validatePairEquality(
++    'D3_00047', 'D3',
++    { label: 'RREO Anexo 04', val: getReservaOrcamentariaRPPS_A04(rreo) },
++    { label: 'RREO Anexo 06', val: getReservaOrcamentariaRPPS_A06(rreo) },
++    'Reserva Orçamentária do RPPS diverge entre os Anexos 04 e 06 do RREO.',
++    false
++  ));
++
+   // D3_00003 e D3_00027: Despesas (Dotação Atualizada, Empenhadas, Liquidadas) — Anexo 01 = Anexo 06
+   // Nota: A06 exclui RPPS; divergências podem ser esperadas em municípios com RPPS.
+   for (const [, a01val, a06val, label] of [
+diff --git a/src/core/xmlExtractors.ts b/src/core/xmlExtractors.ts
+index 397a468..2a9c1e8 100644
+--- a/src/core/xmlExtractors.ts
++++ b/src/core/xmlExtractors.ts
+@@ -268,6 +268,17 @@ export const getReservaRPPS_A04 = (rreo: any): number | null => {
+   return sheet ? findValueInSection(sheet, 'Reserva.*RPPS|RPPS.*Reserva', 'VALOR') : null;
+ };
+ 
++// D3_00047: Reserva Orçamentária do RPPS — Anexo 04 (quadro "RESERVA ORÇAMENTÁRIA DO RPPS")
++export const getReservaOrcamentariaRPPS_A04 = (rreo: any): number | null => {
++  const sheet = getSheet(rreo, ['RREO-Anexo 04', 'RREO Anexo 04']);
++  return sheet ? findValueInSection(sheet, 'RESERVA OR[ÇC]AMENT[AÁ]RIA.*RPPS', 'VALOR') : null;
++};
++
++// D3_00047: Reserva Orçamentária do RPPS — Anexo 06 (Informações Adicionais)
++export const getReservaOrcamentariaRPPS_A06 = (rreo: any): number | null =>
++  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RESERVA OR[ÇC]AMENT[AÁ]RIA.*RPPS');
++
++
+ // ─── RREO Anexo 06 (Resultado Primário/Nominal) ──────────────────────────────
+ 
+ // D3_00006: DCL no Anexo 06
+diff --git a/src/services/siconfiApi.test.ts b/src/services/siconfiApi.test.ts
+new file mode 100644
+index 0000000..ccff40c
+--- /dev/null
++++ b/src/services/siconfiApi.test.ts
+@@ -0,0 +1,80 @@
++import { describe, it, expect } from 'vitest';
++import {
++  homologacaoDoPoder, homologacoesForaPrazo, contarRetificacoes, prazoLegal,
++  ExtratoEntrega,
++} from './siconfiApi';
++
++const e = (p: Partial<ExtratoEntrega>): ExtratoEntrega => ({
++  exercicio: 2026, cod_ibge: '2908804', populacao: 15000,
++  instituicao: 'Prefeitura Municipal', entregavel: 'Relatório de Gestão Fiscal',
++  periodo: 1, periodicidade: 'Q', status_relatorio: 'HO',
++  data_status: '2026-05-15T10:00:00Z', forma_envio: 'online', tipo_relatorio: null,
++  ...p,
++});
++
++describe('homologacaoDoPoder', () => {
++  it('conta homologados e pendentes por poder', () => {
++    const entregas = [
++      e({ instituicao: 'Prefeitura Municipal', periodo: 1, status_relatorio: 'HO' }),
++      e({ instituicao: 'Prefeitura Municipal', periodo: 2, status_relatorio: null }),
++      e({ instituicao: 'Câmara de Vereadores', periodo: 1, status_relatorio: 'HO' }),
++    ];
++    const exec = homologacaoDoPoder(entregas, 'RGF', 'Executivo');
++    expect(exec.total).toBe(2);
++    expect(exec.pendentes).toEqual([2]);
++    const leg = homologacaoDoPoder(entregas, 'RGF', 'Legislativo');
++    expect(leg.total).toBe(1);
++    expect(leg.pendentes).toEqual([]);
++  });
++});
++
++describe('prazoLegal', () => {
++  it('RREO: 30 dias após o bimestre', () => {
++    // 1º bimestre termina em fev; prazo ~ 30/mar
++    const p = prazoLegal('RREO', 1, 2026)!;
++    expect(p.getMonth()).toBe(2); // março (0-based)
++  });
++  it('RGF: 30 dias após o quadrimestre', () => {
++    const p = prazoLegal('RGF', 1, 2026)!;
++    expect(p.getMonth()).toBe(4); // maio (0-based) = 30 dias após abr
++  });
++});
++
++describe('homologacoesForaPrazo', () => {
++  it('detecta homologação após o prazo', () => {
++    const entregas = [
++      // 1º quadrimestre: prazo ~30/mai; homologado em 01/jun => fora
++      e({ periodo: 1, status_relatorio: 'HO', data_status: '2026-06-01T12:00:00Z' }),
++    ];
++    const fora = homologacoesForaPrazo(entregas, 'RGF', 2026, 'Executivo');
++    expect(fora.length).toBe(1);
++    expect(fora[0].periodo).toBe(1);
++  });
++
++  it('não acusa quando dentro do prazo', () => {
++    const entregas = [
++      e({ periodo: 1, status_relatorio: 'HO', data_status: '2026-05-10T12:00:00Z' }),
++    ];
++    const fora = homologacoesForaPrazo(entregas, 'RGF', 2026, 'Executivo');
++    expect(fora.length).toBe(0);
++  });
++});
++
++describe('contarRetificacoes', () => {
++  it('conta por sinalização explícita em tipo_relatorio', () => {
++    const entregas = [
++      e({ periodo: 1, tipo_relatorio: 'Retificadora' }),
++      e({ periodo: 2, tipo_relatorio: null }),
++    ];
++    expect(contarRetificacoes(entregas, 'RGF')).toBe(1);
++  });
++
++  it('conta por múltiplos registros homologados do mesmo período', () => {
++    const entregas = [
++      e({ periodo: 1, status_relatorio: 'HO' }),
++      e({ periodo: 1, status_relatorio: 'HO' }),
++      e({ periodo: 1, status_relatorio: 'HO' }),
++    ];
++    expect(contarRetificacoes(entregas, 'RGF')).toBe(2); // 3 registros = 2 retificações
++  });
++});
+diff --git a/src/services/siconfiApi.ts b/src/services/siconfiApi.ts
+index ca98390..843f6b6 100644
+--- a/src/services/siconfiApi.ts
++++ b/src/services/siconfiApi.ts
+@@ -130,6 +130,114 @@ export interface SiconfiApiResponse {
+   count: number;
+ }
+ 
++/**
++ * Homologação de um tipo de demonstrativo POR PODER específico.
++ * Usado por D1_00003 (RGF Executivo) e D1_00004 (RGF Legislativo): retorna se
++ * TODOS os períodos exigíveis daquele tipo estão homologados para o poder dado.
++ */
++export function homologacaoDoPoder(
++  entregas: ExtratoEntrega[],
++  sigla: string,
++  poder: Poder
++): { total: number; homologados: number; pendentes: number[] } {
++  const doTipo = entregas.filter(
++    e => isEntregavelDoTipo(e.entregavel, sigla) && classificarPoder(e.instituicao) === poder
++  );
++  const pendentes: number[] = [];
++  for (const e of doTipo) {
++    if (!isHomologado(e.status_relatorio)) pendentes.push(e.periodo);
++  }
++  return { total: doTipo.length, homologados: doTipo.length - pendentes.length, pendentes };
++}
++
++/**
++ * Prazos legais de homologação (dia/mês limite após o fim do período).
++ * RREO: 30 dias após o bimestre. RGF: 30 dias após o quadrimestre (município).
++ * Base: LRF art. 52 e 55; MDF. Datas aproximadas por período do exercício `ano`.
++ */
++export function prazoLegal(sigla: string, periodo: number, ano: number): Date | null {
++  if (sigla === 'RREO') {
++    // bimestre N termina no fim do mês 2N; prazo = fim do mês seguinte
++    const fimBimestreMes = periodo * 2; // 1->fev, 2->abr, ...
++    return new Date(ano, fimBimestreMes, 30); // mês index = fimBimestreMes (0-based => mês seguinte)
++  }
++  if (sigla === 'RGF') {
++    // quadrimestre N termina no fim do mês 4N; prazo = 30 dias depois
++    const fimQuadriMes = periodo * 4; // 1->abr, 2->ago, 3->dez
++    return new Date(ano, fimQuadriMes, 30);
++  }
++  if (sigla === 'DCA') {
++    return new Date(ano + 1, 3, 30); // 30/abr do exercício seguinte
++  }
++  return null;
++}
++
++/**
++ * Homologações fora do prazo para um tipo/poder. Compara data_status (data da
++ * homologação) com o prazo legal do período. Usado por D1_00006/07/08/09.
++ */
++export function homologacoesForaPrazo(
++  entregas: ExtratoEntrega[],
++  sigla: string,
++  ano: number,
++  poder?: Poder
++): { periodo: number; instituicao: string; data: string; prazo: string }[] {
++  const doTipo = entregas.filter(e => {
++    if (!isEntregavelDoTipo(e.entregavel, sigla)) return false;
++    if (poder && classificarPoder(e.instituicao) !== poder) return false;
++    return isHomologado(e.status_relatorio);
++  });
++  const fora: { periodo: number; instituicao: string; data: string; prazo: string }[] = [];
++  for (const e of doTipo) {
++    const prazo = prazoLegal(sigla, e.periodo, ano);
++    if (!prazo || !e.data_status) continue;
++    const dataHomolog = new Date(e.data_status);
++    if (isNaN(dataHomolog.getTime())) continue;
++    if (dataHomolog > prazo) {
++      fora.push({
++        periodo: e.periodo,
++        instituicao: e.instituicao,
++        data: dataHomolog.toLocaleDateString('pt-BR'),
++        prazo: prazo.toLocaleDateString('pt-BR'),
++      });
++    }
++  }
++  return fora;
++}
++
++/**
++ * Conta retificações de um tipo/poder. A API marca retificações em
++ * `tipo_relatorio` (ex.: contém "retificad") ou por múltiplos registros
++ * homologados do mesmo período. Usado por D1_00011/12/13/14.
++ */
++export function contarRetificacoes(
++  entregas: ExtratoEntrega[],
++  sigla: string,
++  poder?: Poder
++): number {
++  const doTipo = entregas.filter(e => {
++    if (!isEntregavelDoTipo(e.entregavel, sigla)) return false;
++    if (poder && classificarPoder(e.instituicao) !== poder) return false;
++    return true;
++  });
++  // Sinalização explícita de retificação no tipo_relatorio
++  const explicit = doTipo.filter(
++    e => (e.tipo_relatorio ?? '').toLowerCase().includes('retificad')
++  ).length;
++  if (explicit > 0) return explicit;
++  // Fallback: períodos com mais de um registro homologado = retificados
++  const porPeriodo = new Map<number, number>();
++  for (const e of doTipo) {
++    if (isHomologado(e.status_relatorio)) {
++      porPeriodo.set(e.periodo, (porPeriodo.get(e.periodo) ?? 0) + 1);
++    }
++  }
++  let retif = 0;
++  for (const n of porPeriodo.values()) if (n > 1) retif += n - 1;
++  return retif;
++}
++
++
+ // CORS Proxy options - useful para rodar a aplicação local ou em páginas estáticas
+ const PROXY_URL = 'https://corsproxy.io/?';
+ 
+-- 
+2.43.0
+
