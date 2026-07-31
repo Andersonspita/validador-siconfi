@@ -130,6 +130,114 @@ export interface SiconfiApiResponse {
   count: number;
 }
 
+/**
+ * Homologação de um tipo de demonstrativo POR PODER específico.
+ * Usado por D1_00003 (RGF Executivo) e D1_00004 (RGF Legislativo): retorna se
+ * TODOS os períodos exigíveis daquele tipo estão homologados para o poder dado.
+ */
+export function homologacaoDoPoder(
+  entregas: ExtratoEntrega[],
+  sigla: string,
+  poder: Poder
+): { total: number; homologados: number; pendentes: number[] } {
+  const doTipo = entregas.filter(
+    e => isEntregavelDoTipo(e.entregavel, sigla) && classificarPoder(e.instituicao) === poder
+  );
+  const pendentes: number[] = [];
+  for (const e of doTipo) {
+    if (!isHomologado(e.status_relatorio)) pendentes.push(e.periodo);
+  }
+  return { total: doTipo.length, homologados: doTipo.length - pendentes.length, pendentes };
+}
+
+/**
+ * Prazos legais de homologação (dia/mês limite após o fim do período).
+ * RREO: 30 dias após o bimestre. RGF: 30 dias após o quadrimestre (município).
+ * Base: LRF art. 52 e 55; MDF. Datas aproximadas por período do exercício `ano`.
+ */
+export function prazoLegal(sigla: string, periodo: number, ano: number): Date | null {
+  if (sigla === 'RREO') {
+    // bimestre N termina no fim do mês 2N; prazo = fim do mês seguinte
+    const fimBimestreMes = periodo * 2; // 1->fev, 2->abr, ...
+    return new Date(ano, fimBimestreMes, 30); // mês index = fimBimestreMes (0-based => mês seguinte)
+  }
+  if (sigla === 'RGF') {
+    // quadrimestre N termina no fim do mês 4N; prazo = 30 dias depois
+    const fimQuadriMes = periodo * 4; // 1->abr, 2->ago, 3->dez
+    return new Date(ano, fimQuadriMes, 30);
+  }
+  if (sigla === 'DCA') {
+    return new Date(ano + 1, 3, 30); // 30/abr do exercício seguinte
+  }
+  return null;
+}
+
+/**
+ * Homologações fora do prazo para um tipo/poder. Compara data_status (data da
+ * homologação) com o prazo legal do período. Usado por D1_00006/07/08/09.
+ */
+export function homologacoesForaPrazo(
+  entregas: ExtratoEntrega[],
+  sigla: string,
+  ano: number,
+  poder?: Poder
+): { periodo: number; instituicao: string; data: string; prazo: string }[] {
+  const doTipo = entregas.filter(e => {
+    if (!isEntregavelDoTipo(e.entregavel, sigla)) return false;
+    if (poder && classificarPoder(e.instituicao) !== poder) return false;
+    return isHomologado(e.status_relatorio);
+  });
+  const fora: { periodo: number; instituicao: string; data: string; prazo: string }[] = [];
+  for (const e of doTipo) {
+    const prazo = prazoLegal(sigla, e.periodo, ano);
+    if (!prazo || !e.data_status) continue;
+    const dataHomolog = new Date(e.data_status);
+    if (isNaN(dataHomolog.getTime())) continue;
+    if (dataHomolog > prazo) {
+      fora.push({
+        periodo: e.periodo,
+        instituicao: e.instituicao,
+        data: dataHomolog.toLocaleDateString('pt-BR'),
+        prazo: prazo.toLocaleDateString('pt-BR'),
+      });
+    }
+  }
+  return fora;
+}
+
+/**
+ * Conta retificações de um tipo/poder. A API marca retificações em
+ * `tipo_relatorio` (ex.: contém "retificad") ou por múltiplos registros
+ * homologados do mesmo período. Usado por D1_00011/12/13/14.
+ */
+export function contarRetificacoes(
+  entregas: ExtratoEntrega[],
+  sigla: string,
+  poder?: Poder
+): number {
+  const doTipo = entregas.filter(e => {
+    if (!isEntregavelDoTipo(e.entregavel, sigla)) return false;
+    if (poder && classificarPoder(e.instituicao) !== poder) return false;
+    return true;
+  });
+  // Sinalização explícita de retificação no tipo_relatorio
+  const explicit = doTipo.filter(
+    e => (e.tipo_relatorio ?? '').toLowerCase().includes('retificad')
+  ).length;
+  if (explicit > 0) return explicit;
+  // Fallback: períodos com mais de um registro homologado = retificados
+  const porPeriodo = new Map<number, number>();
+  for (const e of doTipo) {
+    if (isHomologado(e.status_relatorio)) {
+      porPeriodo.set(e.periodo, (porPeriodo.get(e.periodo) ?? 0) + 1);
+    }
+  }
+  let retif = 0;
+  for (const n of porPeriodo.values()) if (n > 1) retif += n - 1;
+  return retif;
+}
+
+
 // CORS Proxy options - useful para rodar a aplicação local ou em páginas estáticas
 const PROXY_URL = 'https://corsproxy.io/?';
 

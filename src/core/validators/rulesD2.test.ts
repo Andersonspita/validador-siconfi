@@ -126,3 +126,53 @@ describe('D2_00055 — amortização acumulada > ativo intangível', () => {
     expect(results.find(r => r.ruleId === 'D2_00055')).toBeUndefined();
   });
 });
+
+// ─── D2_00082: depreciação mensal de bens móveis ─────────────────────────────
+
+describe('D2_00082 — depreciação mensal de bens móveis', () => {
+  it('alerta quando há bens móveis mas sem movimentação de depreciação', () => {
+    const msc: MSCAccount[] = [
+      acc({ CONTA: '123110100', Valor: 100000, Tipo_valor: 'ending_balance', Natureza_valor: 'D' }),
+    ];
+    const results = validateD2_MSC(data(msc), new Map());
+    expect(results.find(r => r.ruleId === 'D2_00082')).toBeDefined();
+  });
+
+  it('não alerta quando há movimentação mensal de depreciação', () => {
+    const msc: MSCAccount[] = [
+      acc({ CONTA: '123110100', Valor: 100000, Tipo_valor: 'ending_balance', Natureza_valor: 'D' }),
+      acc({ CONTA: '123810100', Valor: 500, Tipo_valor: 'period_change', Natureza_valor: 'C' }),
+    ];
+    const results = validateD2_MSC(data(msc), new Map());
+    expect(results.find(r => r.ruleId === 'D2_00082')).toBeUndefined();
+  });
+});
+
+// ─── D2_00086 / 087 / 088: VPD/VPA mensais ───────────────────────────────────
+
+describe('D2_00086/087/088 — VPD/VPA por competência', () => {
+  it('D2_00086 alerta despesa sem VPD de material de consumo', () => {
+    const msc: MSCAccount[] = [
+      acc({ CONTA: '622130000', Valor: 1000, Tipo_valor: 'period_change', Natureza_valor: 'C' }),
+    ];
+    const results = validateD2_MSC(data(msc), new Map());
+    expect(results.find(r => r.ruleId === 'D2_00086')).toBeDefined();
+  });
+
+  it('D2_00086 não alerta quando há VPD de material', () => {
+    const msc: MSCAccount[] = [
+      acc({ CONTA: '622130000', Valor: 1000, Tipo_valor: 'period_change', Natureza_valor: 'C' }),
+      acc({ CONTA: '331110000', Valor: 800, Tipo_valor: 'period_change', Natureza_valor: 'D' }),
+    ];
+    const results = validateD2_MSC(data(msc), new Map());
+    expect(results.find(r => r.ruleId === 'D2_00086')).toBeUndefined();
+  });
+
+  it('D2_00088 alerta receita de transferência sem VPA correspondente', () => {
+    const msc: MSCAccount[] = [
+      acc({ CONTA: '621310000', Valor: 5000, Tipo_valor: 'period_change', Natureza_valor: 'C' }),
+    ];
+    const results = validateD2_MSC(data(msc), new Map());
+    expect(results.find(r => r.ruleId === 'D2_00088')).toBeDefined();
+  });
+});

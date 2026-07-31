@@ -268,6 +268,17 @@ export const getReservaRPPS_A04 = (rreo: any): number | null => {
   return sheet ? findValueInSection(sheet, 'Reserva.*RPPS|RPPS.*Reserva', 'VALOR') : null;
 };
 
+// D3_00047: Reserva Orçamentária do RPPS — Anexo 04 (quadro "RESERVA ORÇAMENTÁRIA DO RPPS")
+export const getReservaOrcamentariaRPPS_A04 = (rreo: any): number | null => {
+  const sheet = getSheet(rreo, ['RREO-Anexo 04', 'RREO Anexo 04']);
+  return sheet ? findValueInSection(sheet, 'RESERVA OR[ÇC]AMENT[AÁ]RIA.*RPPS', 'VALOR') : null;
+};
+
+// D3_00047: Reserva Orçamentária do RPPS — Anexo 06 (Informações Adicionais)
+export const getReservaOrcamentariaRPPS_A06 = (rreo: any): number | null =>
+  extractFromReport(rreo, ['RREO-Anexo 06', 'RREO Anexo 06'], 'RESERVA OR[ÇC]AMENT[AÁ]RIA.*RPPS');
+
+
 // ─── RREO Anexo 06 (Resultado Primário/Nominal) ──────────────────────────────
 
 // D3_00006: DCL no Anexo 06

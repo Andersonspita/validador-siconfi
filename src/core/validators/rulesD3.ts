@@ -6,6 +6,7 @@ import {
   getTotalReceitasRPPS_A04, getReceitasRPPS_A06, getRPPSExercAnt_A01, getRPPSExercAnt_A04,
   getRPPSExercAnt_A06, getSuperavitFinanceiro_A01, getSuperavitFinanceiro_A06,
   getReservaRPPS_A01, getReservaRPPS_A04, getReservaRPPS_A06,
+  getReservaOrcamentariaRPPS_A04, getReservaOrcamentariaRPPS_A06,
   getReservaContingencia_A01, getReservaContingencia_A06, findNegativosRP_A07,
   getDCL_RREO_A06, getDCL_RGF_A02, getTransfEmendasIndividuais_RGF_A01,
   getTransfEmendasIndividuais_RGF_A02, getTransfEmendasIndividuais_RREO_A03,
@@ -118,6 +119,15 @@ export function validateD3_RREO(rreo: any, _rulesMap: Map<string, RuleDefinition
     { label: 'RREO Anexo 01', val: getReservaContingencia_A01(rreo) },
     { label: 'RREO Anexo 06', val: getReservaContingencia_A06(rreo) },
     'Reserva de Contingência diverge entre os Anexos 01 e 06 do RREO.',
+    false
+  ));
+
+  // D3_00047: Reserva Orçamentária do RPPS — Anexo 04 = Anexo 06 (Informações Adicionais)
+  results.push(...validatePairEquality(
+    'D3_00047', 'D3',
+    { label: 'RREO Anexo 04', val: getReservaOrcamentariaRPPS_A04(rreo) },
+    { label: 'RREO Anexo 06', val: getReservaOrcamentariaRPPS_A06(rreo) },
+    'Reserva Orçamentária do RPPS diverge entre os Anexos 04 e 06 do RREO.',
     false
   ));
 

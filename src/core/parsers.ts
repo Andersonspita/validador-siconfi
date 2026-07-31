@@ -216,6 +216,7 @@ export const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccoun
           let fr = findIcByTipo('FR') ?? getVal('FR');
           let co = findIcByTipo('CO') ?? getVal('CO');
           let nd = findIcByTipo('ND') ?? getVal('ND');
+          const ai = findIcByTipo('AI') ?? getVal('AI');
 
           const hasTipoCols = Object.keys(row).some(k => k.toUpperCase().startsWith('TIPO') && k.toUpperCase() !== 'TIPO_VALOR');
 
@@ -240,6 +241,7 @@ export const parseMSCWithMeta = (csvText: string): { accounts: Promise<MSCAccoun
             FR: fr,
             CO: co,
             ND: nd,
+            AI: ai,
             Valor: parseValor(valorRaw),
             Tipo_valor: tipoRaw as MSCAccount['Tipo_valor'],
             Natureza_valor: naturezaRaw as MSCAccount['Natureza_valor'],

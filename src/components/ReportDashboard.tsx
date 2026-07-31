@@ -2,12 +2,10 @@ import { useEffect, useState } from 'react';
 import { parseFiles } from '../core/parsers';
 import { runValidations } from '../core/validatorEngine';
 import { ValidationResult, RuleDefinition } from '../core/types';
-import { generatePDF } from '../core/pdfGenerator';
-import { generateRelatorioTecnicoPDF } from '../core/relatorioTecnico';
 import { buildScoreSummary } from '../core/scoring';
 import { buildRankingHtml, buildPlanoAcaoHtml, RankingReportMeta } from '../core/rankingReport';
 import Papa from 'papaparse';
-import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Printer, Lightbulb, BarChart3, ClipboardList } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert, Download, Lightbulb, BarChart3 } from 'lucide-react';
 import ReportView from './ReportView';
 import CAPAGPanel from './CAPAGPanel';
 import { MSCAccount } from '../core/types';
@@ -180,14 +178,6 @@ export default function ReportDashboard({ files, rulesMap, onReset, onResultsRea
             <button onClick={exportToCSV} className="export-btn glass-panel">
               <Download size={20} />
               Exportar CSV
-            </button>
-            <button onClick={() => generatePDF(filteredResults, reportMeta)} className="export-btn glass-panel print-btn">
-              <Printer size={20} />
-              Gerar Relatório Oficial (PDF)
-            </button>
-            <button onClick={() => generateRelatorioTecnicoPDF(filteredResults, reportMeta)} className="export-btn glass-panel print-btn">
-              <ClipboardList size={20} />
-              Relatório Técnico (Resumo Executivo)
             </button>
             <button onClick={openRanking} className="export-btn glass-panel print-btn">
               <BarChart3 size={20} />
