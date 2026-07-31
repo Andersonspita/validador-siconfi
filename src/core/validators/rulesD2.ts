@@ -279,6 +279,62 @@ export function validateD2_MSC(data: ParsedData, _rulesMap: Map<string, RuleDefi
     }
   }
 
+  // D2_00082: Depreciação/amortização/exaustão mensal de bens móveis (1.2.3.8.1.01/03/05)
+  // Se há saldo de bens móveis (1.2.3.x), deve haver movimentação mensal de depreciação.
+  const temBensMoveis = msc.some(a => a.CONTA.startsWith('12311') && a.Tipo_valor === 'ending_balance' && a.Valor > 0);
+  const temDeprecMov = msc.some(a =>
+    (a.CONTA.startsWith('123810100') || a.CONTA.startsWith('123810300') || a.CONTA.startsWith('123810500')) &&
+    a.Tipo_valor === 'period_change' && a.Valor !== 0);
+  if (temBensMoveis && !temDeprecMov) {
+    results.push({
+      ruleId: 'D2_00082', dimension: 'D2',
+      description: 'Depreciação de bens móveis sem movimentação mensal',
+      severity: 'warning', impactsCapag: false,
+      affectedAccounts: ['1.2.3.8.1.01', '1.2.3.8.1.03', '1.2.3.8.1.05'],
+      message: pm('Há saldo de bens móveis, mas nenhuma movimentação mensal de depreciação/amortização/exaustão (1.2.3.8.1.01/03/05). A depreciação deve ser reconhecida mensalmente por competência, não apenas no encerramento.'),
+      actionPlan: 'Executar a rotina mensal de depreciação (crédito em 1.2.3.8.1.01) — não deixar para lançar apenas no encerramento.',
+    });
+  }
+
+  // D2_00086: VPD com material de consumo (3.3.1.1) no período
+  const temVPDMaterial = msc.some(a => a.CONTA.startsWith('3311') && a.Tipo_valor === 'period_change' && a.Valor !== 0);
+  const temDespCorrente = msc.some(a => a.CONTA.startsWith('62213') && a.Tipo_valor === 'period_change' && a.Valor !== 0);
+  if (temDespCorrente && !temVPDMaterial) {
+    results.push({
+      ruleId: 'D2_00086', dimension: 'D2',
+      description: 'VPD com material de consumo ausente no período',
+      severity: 'warning', impactsCapag: false,
+      affectedAccounts: ['3.3.1.1'],
+      message: pm('Há execução de despesa no período, mas nenhuma VPD com material de consumo (3.3.1.1). Verifique o reconhecimento das variações patrimoniais diminutivas por competência.'),
+    });
+  }
+
+  // D2_00087: VPD com serviços (3.3.2) no período
+  const temVPDServicos = msc.some(a => a.CONTA.startsWith('332') && a.Tipo_valor === 'period_change' && a.Valor !== 0);
+  if (temDespCorrente && !temVPDServicos) {
+    results.push({
+      ruleId: 'D2_00087', dimension: 'D2',
+      description: 'VPD com serviços ausente no período',
+      severity: 'warning', impactsCapag: false,
+      affectedAccounts: ['3.3.2'],
+      message: pm('Há execução de despesa no período, mas nenhuma VPD com serviços (3.3.2). Verifique o reconhecimento das variações patrimoniais diminutivas por competência.'),
+    });
+  }
+
+  // D2_00088: VPA com transferências intergovernamentais (4.5.2) no período
+  const temVPATransf = msc.some(a => a.CONTA.startsWith('452') && a.Tipo_valor === 'period_change' && a.Valor !== 0);
+  const temReceitaTransf = msc.some(a =>
+    (a.CONTA.startsWith('62131') || a.CONTA.startsWith('62132')) && a.Tipo_valor === 'period_change' && a.Valor !== 0);
+  if (temReceitaTransf && !temVPATransf) {
+    results.push({
+      ruleId: 'D2_00088', dimension: 'D2',
+      description: 'VPA com transferências intergovernamentais ausente no período',
+      severity: 'warning', impactsCapag: false,
+      affectedAccounts: ['4.5.2'],
+      message: pm('Há receita de transferências no período, mas nenhuma VPA com transferências intergovernamentais (4.5.2). Verifique o reconhecimento das variações patrimoniais aumentativas por competência.'),
+    });
+  }
+
   return results;
 }
 

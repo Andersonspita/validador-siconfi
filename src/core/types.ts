@@ -85,6 +85,8 @@ export interface MSCAccount {
   FR?: string;
   CO?: string;
   ND?: string;
+  /** AI — Ano de Inscrição (informação complementar de Restos a Pagar). */
+  AI?: string;
   Valor: number;
   Tipo_valor: 'beginning_balance' | 'period_change' | 'ending_balance';
   Natureza_valor: 'D' | 'C';

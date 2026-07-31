@@ -306,3 +306,41 @@ describe('D1_00001 — homologação via API do Siconfi', () => {
     expect(d1?.message).toMatch(/Câmara.*(RREO|DCA).*consolidado.*Executivo/s);
   });
 });
+
+// ─── D1_00039 / D1_00040: fontes condicionadas (9xx) ─────────────────────────
+
+describe('D1_00039 / D1_00040 — fontes condicionadas (9xx)', () => {
+  it('D1_00039 alerta despesa orçamentária em FR 9xx', () => {
+    const msc: MSCAccount[] = [acc({ CONTA: '622130400', Valor: 1000, FR: '9500', Tipo_valor: 'period_change' })];
+    const results = validateD1_MSC(msc, new Map());
+    expect(results.find(r => r.ruleId === 'D1_00039')).toBeDefined();
+  });
+
+  it('D1_00039 não alerta quando FR é definitiva (não 9xx)', () => {
+    const msc: MSCAccount[] = [acc({ CONTA: '622130400', Valor: 1000, FR: '1500', Tipo_valor: 'period_change' })];
+    const results = validateD1_MSC(msc, new Map());
+    expect(results.find(r => r.ruleId === 'D1_00039')).toBeUndefined();
+  });
+
+  it('D1_00040 alerta receita orçamentária em FR 9xx', () => {
+    const msc: MSCAccount[] = [acc({ CONTA: '621130000', Valor: 500, FR: '9001', Tipo_valor: 'period_change' })];
+    const results = validateD1_MSC(msc, new Map());
+    expect(results.find(r => r.ruleId === 'D1_00040')).toBeDefined();
+  });
+});
+
+// ─── D1_00044: Restos a Pagar sem AI (Ano de Inscrição) ──────────────────────
+
+describe('D1_00044 — Restos a Pagar sem AI', () => {
+  it('alerta quando RP não tem o atributo AI', () => {
+    const msc: MSCAccount[] = [acc({ CONTA: '632110000', Valor: 2000 })]; // sem AI
+    const results = validateD1_MSC(msc, new Map());
+    expect(results.find(r => r.ruleId === 'D1_00044')).toBeDefined();
+  });
+
+  it('não alerta quando RP tem AI informado', () => {
+    const msc: MSCAccount[] = [acc({ CONTA: '632110000', Valor: 2000, AI: '2025' })];
+    const results = validateD1_MSC(msc, new Map());
+    expect(results.find(r => r.ruleId === 'D1_00044')).toBeUndefined();
+  });
+});

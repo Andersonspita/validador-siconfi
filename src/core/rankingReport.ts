@@ -92,16 +92,10 @@ const rowsByDimension = (checks: ScoredCheck[]): string => {
     parts.push(`<tr class="dimhead"><td colspan="5">${d} — ${esc(label)} (${group.length})</td></tr>`);
     for (const c of group) {
       const ptCell = c.avaliavel ? `${pts(c.pontos)} / ${pts(c.maxPontos)}` : '—';
-<<<<<<< HEAD
       const capagTag = c.impactsCapag ? ' <span class="stag" style="background:#5b3fa0;font-size:9px">CAPAG</span>' : '';
       parts.push(
         `<tr>
           <td class="id">${esc(c.ruleId)}${capagTag}</td>
-=======
-      parts.push(
-        `<tr>
-          <td class="id">${esc(c.ruleId)}</td>
->>>>>>> e101a96cfa07f08cc6e8f2b75c0a15d153bdc75a
           <td>${esc(c.descricao)}</td>
           <td>${statusTag(c.status)}</td>
           <td class="det">${esc(c.detalhe.length > 260 ? c.detalhe.slice(0, 260) + '…' : c.detalhe)}</td>
@@ -174,17 +168,11 @@ export const buildRankingHtml = (score: ScoreSummary, meta: RankingReportMeta = 
   <div class="foot">
     OK = regra atendida • FALHA = inconsistência encontrada • ATENÇÃO = conferência manual •
     NÃO VERIFICÁVEL = dados ausentes • NÃO APLICÁVEL = fora do escopo de municípios.
-<<<<<<< HEAD
     ICF = percentual de acertos nas verificações avaliáveis (metodologia simplificada do Ranking da
     Qualidade da Informação Contábil e Fiscal — STN). Faixas oficiais: A &gt; 95%, E &lt; 65%;
     B/C/D em degraus de 10 p.p. Pontuação proporcional nas verificações de MSC (cada matriz vale
     1/13, ou 1/12 quando não conta a de encerramento). Verificações CAPAG destacadas.
     Fonte: ranking-municipios.tesouro.gov.br/metodologia. Gerado pelo Validador Siconfi.
-=======
-    Pontuação estimada pela metodologia simplificada do Ranking (STN): percentual de acertos,
-    com pontuação proporcional nos checks mensais de MSC. Faixas A (&gt;95%) e E (&lt;65%) publicadas;
-    B/C/D estimadas em degraus de 10 p.p. Gerado pelo Validador Siconfi.
->>>>>>> e101a96cfa07f08cc6e8f2b75c0a15d153bdc75a
   </div>
 </div></body></html>`;
 };

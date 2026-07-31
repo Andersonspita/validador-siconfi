@@ -8,7 +8,10 @@ import {
   PL_DEDUCAO_PREFIXES,
   ORCAM_NATUREZA_EXCEPTION_PREFIXES,
 } from '../pcaspRules';
-import { getExtratoEntregas, buildPendenciasPorPoder, PendenciaPorPoder } from '../../services/siconfiApi';
+import {
+  getExtratoEntregas, buildPendenciasPorPoder, PendenciaPorPoder,
+  homologacaoDoPoder, homologacoesForaPrazo, contarRetificacoes,
+} from '../../services/siconfiApi';
 
 export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string, RuleDefinition>): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
@@ -24,8 +27,10 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
   if (!temDCA)  ausentes.push('DCA');
 
   // Integracao Siconfi API para Tempestividade
+  let entregasApi: import('../../services/siconfiApi').ExtratoEntrega[] = [];
   if (data.enteId && data.anoReferencia) {
     const entregas = await getExtratoEntregas(data.enteId, data.anoReferencia);
+    entregasApi = entregas;
 
     // Nem todo demonstrativo é "de cada Poder": pela LRF, o RGF é elaborado e
     // publicado separadamente por cada Poder/Órgão (art. 20), mas o RREO é um
@@ -168,19 +173,91 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
     }
   }
 
-  // Regras de Servidor Siconfi (Homologação, Tempestividade e Retificações)
-  const serverRules = [
-    'D1_00002', 'D1_00003', 'D1_00004', 'D1_00005', 'D1_00006', 'D1_00007', 'D1_00008',
-    'D1_00009', 'D1_00010', 'D1_00011', 'D1_00012', 'D1_00013', 'D1_00014', 'D1_00015'
-  ];
-  serverRules.forEach(ruleId => {
+  // ── Regras de Servidor Siconfi: implementadas via extrato da API ─────────────
+  const ano = data.anoReferencia ? parseInt(data.anoReferencia) : NaN;
+  const temApi = entregasApi.length > 0 && !isNaN(ano);
+
+  if (temApi) {
+    // D1_00003 — Homologação de todos os RGFs do Executivo
+    const h03 = homologacaoDoPoder(entregasApi, 'RGF', 'Executivo');
+    results.push(h03.pendentes.length === 0 && h03.total > 0
+      ? { ruleId: 'D1_00003', dimension: 'D1', description: 'Homologação de todos os RGFs do poder Executivo', severity: 'info', impactsCapag: false,
+          message: `RGFs do Executivo: ${h03.homologados}/${h03.total} período(s) homologado(s).` }
+      : { ruleId: 'D1_00003', dimension: 'D1', description: 'Homologação de todos os RGFs do poder Executivo', severity: h03.total === 0 ? 'info' : 'error', impactsCapag: false,
+          message: h03.total === 0 ? 'Sem RGFs do Executivo no extrato da API para o período.' : `RGFs do Executivo NÃO homologados: período(s) ${h03.pendentes.join(', ')}.`,
+          actionPlan: 'Homologue os RGFs pendentes do Poder Executivo no Siconfi.' });
+
+    // D1_00004 — Homologação de todos os RGFs do Legislativo
+    const h04 = homologacaoDoPoder(entregasApi, 'RGF', 'Legislativo');
+    results.push(h04.pendentes.length === 0 && h04.total > 0
+      ? { ruleId: 'D1_00004', dimension: 'D1', description: 'Homologação de todos os RGFs do poder Legislativo', severity: 'info', impactsCapag: false,
+          message: `RGFs do Legislativo: ${h04.homologados}/${h04.total} período(s) homologado(s).` }
+      : { ruleId: 'D1_00004', dimension: 'D1', description: 'Homologação de todos os RGFs do poder Legislativo', severity: h04.total === 0 ? 'info' : 'error', impactsCapag: false,
+          message: h04.total === 0 ? 'Sem RGFs do Legislativo no extrato da API para o período.' : `RGFs do Legislativo NÃO homologados: período(s) ${h04.pendentes.join(', ')}.`,
+          actionPlan: 'Alinhe com a Câmara a homologação dos RGFs pendentes no Siconfi.' });
+
+    // D1_00006 — Tempestividade dos RREOs
+    const fora06 = homologacoesForaPrazo(entregasApi, 'RREO', ano);
+    results.push(fora06.length === 0
+      ? { ruleId: 'D1_00006', dimension: 'D1', description: 'Tempestividade na homologação dos RREOs', severity: 'info', impactsCapag: false, message: 'RREOs homologados dentro do prazo.' }
+      : { ruleId: 'D1_00006', dimension: 'D1', description: 'Tempestividade na homologação dos RREOs', severity: 'error', impactsCapag: false,
+          message: `RREOs: ${fora06.length} homologação(ões) fora do prazo: ${fora06.map(f => `per. ${f.periodo} (${f.instituicao}: ${f.data} > prazo ${f.prazo})`).join('; ')}`,
+          actionPlan: 'Atrasos passados não são reversíveis; implantar calendário com alerta: RREO até 30 dias após cada bimestre.' });
+
+    // D1_00008 — Tempestividade dos RGFs do Executivo
+    const fora08 = homologacoesForaPrazo(entregasApi, 'RGF', ano, 'Executivo');
+    results.push(fora08.length === 0
+      ? { ruleId: 'D1_00008', dimension: 'D1', description: 'Tempestividade na homologação dos RGFs do Executivo', severity: 'info', impactsCapag: false, message: 'RGFs do Executivo homologados dentro do prazo.' }
+      : { ruleId: 'D1_00008', dimension: 'D1', description: 'Tempestividade na homologação dos RGFs do Executivo', severity: 'error', impactsCapag: false,
+          message: `RGFs do Executivo: ${fora08.length} fora do prazo: ${fora08.map(f => `per. ${f.periodo} (${f.instituicao}: ${f.data} > prazo ${f.prazo})`).join('; ')}`,
+          actionPlan: 'RGF do Executivo até 30 dias após o quadrimestre; implantar alerta de prazo.' });
+
+    // D1_00009 — Tempestividade dos RGFs do Legislativo
+    const fora09 = homologacoesForaPrazo(entregasApi, 'RGF', ano, 'Legislativo');
+    results.push(fora09.length === 0
+      ? { ruleId: 'D1_00009', dimension: 'D1', description: 'Tempestividade na homologação dos RGFs do Legislativo', severity: 'info', impactsCapag: false, message: 'RGFs do Legislativo homologados dentro do prazo.' }
+      : { ruleId: 'D1_00009', dimension: 'D1', description: 'Tempestividade na homologação dos RGFs do Legislativo', severity: 'error', impactsCapag: false,
+          message: `RGFs do Legislativo: ${fora09.length} fora do prazo: ${fora09.map(f => `per. ${f.periodo} (${f.instituicao}: ${f.data} > prazo ${f.prazo})`).join('; ')}`,
+          actionPlan: 'Alinhar com a Câmara o prazo do RGF (30 dias após o quadrimestre).' });
+
+    // D1_00011 — Retificações dos RREOs (piso 0,5 quando há retificação)
+    const ret11 = contarRetificacoes(entregasApi, 'RREO');
+    results.push(ret11 === 0
+      ? { ruleId: 'D1_00011', dimension: 'D1', description: 'Quantidade de retificações dos RREOs do exercício', severity: 'info', impactsCapag: false, message: 'RREOs: nenhum relatório retificado.' }
+      : { ruleId: 'D1_00011', dimension: 'D1', description: 'Quantidade de retificações dos RREOs do exercício', severity: 'warning', impactsCapag: false,
+          message: `RREOs: ${ret11} retificação(ões) no exercício.`, actionPlan: 'Retificações reduzem a pontuação; revise os dados antes de homologar.' });
+
+    // D1_00013 — Retificações dos RGFs do Executivo
+    const ret13 = contarRetificacoes(entregasApi, 'RGF', 'Executivo');
+    results.push(ret13 === 0
+      ? { ruleId: 'D1_00013', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Executivo', severity: 'info', impactsCapag: false, message: 'RGFs do Executivo: nenhum retificado.' }
+      : { ruleId: 'D1_00013', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Executivo', severity: 'warning', impactsCapag: false,
+          message: `RGFs do Executivo: ${ret13} retificação(ões).`, actionPlan: 'Revise os dados do RGF antes de homologar para evitar retificações.' });
+
+    // D1_00014 — Retificações dos RGFs do Legislativo
+    const ret14 = contarRetificacoes(entregasApi, 'RGF', 'Legislativo');
+    results.push(ret14 === 0
+      ? { ruleId: 'D1_00014', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Legislativo', severity: 'info', impactsCapag: false, message: 'RGFs do Legislativo: nenhum retificado.' }
+      : { ruleId: 'D1_00014', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Legislativo', severity: 'warning', impactsCapag: false,
+          message: `RGFs do Legislativo: ${ret14} retificação(ões).`, actionPlan: 'Alinhe com a Câmara a revisão do RGF antes da homologação.' });
+  }
+
+  // Regras que ainda dependem de dados não disponíveis offline/nesta fase:
+  // D1_00002/07/12 (DCA anual) e D1_00005/10/15 (Judiciário/MP/Defensoria — só Estados/DF).
+  const serverRulesPendentes = temApi
+    ? ['D1_00002', 'D1_00005', 'D1_00007', 'D1_00010', 'D1_00012', 'D1_00015']
+    : ['D1_00002', 'D1_00003', 'D1_00004', 'D1_00005', 'D1_00006', 'D1_00007', 'D1_00008',
+       'D1_00009', 'D1_00010', 'D1_00011', 'D1_00012', 'D1_00013', 'D1_00014', 'D1_00015'];
+  serverRulesPendentes.forEach(ruleId => {
     results.push({
       ruleId,
       dimension: 'D1',
-      description: 'Regra validada exclusivamente pelo servidor',
+      description: 'Regra validada pelo servidor Siconfi',
       severity: 'info',
       impactsCapag: false,
-      message: `Esta regra refere-se a metadados do servidor do Siconfi (homologação, tempestividade ou retificações) e não pode ser validada offline apenas com os arquivos. Consulte o painel oficial para o status.`,
+      message: temApi
+        ? `Esta verificação depende da DCA (anual) ou é exclusiva de Estados/DF; não avaliável nesta fase do exercício.`
+        : `Não foi possível consultar o extrato da API do Siconfi (ente sem código IBGE ou API indisponível). Consulte o painel oficial.`,
     });
   });
 
@@ -602,6 +679,55 @@ export function validateD1_MSC(msc: MSCAccount[], _rulesMap: Map<string, RuleDef
       }),
       message: pm(`${orcamInverted.length} conta(s) orçamentária(s) (classes 5/6) com natureza diferente do padrão PCASP.`),
       actionPlan: 'Verifique, no sistema contábil de origem, os lançamentos que geraram natureza invertida nessas contas orçamentárias. Cancelamentos/estornos legítimos podem justificar a inversão pontualmente; caso contrário, corrija o lançamento.',
+    });
+  }
+
+  // D1_00039: Despesas orçamentárias (62213) em fonte condicionada (FR iniciada em 9)
+  const despCondicionada = msc.filter(a =>
+    a.CONTA.startsWith('62213') && (a.FR ?? '').startsWith('9') && a.Valor !== 0);
+  if (despCondicionada.length > 0) {
+    results.push({
+      ruleId: 'D1_00039', dimension: 'D1',
+      description: 'Despesas orçamentárias em fontes de recursos condicionados (9xx)',
+      severity: 'warning', impactsCapag: false,
+      affectedAccounts: Array.from(new Set(despCondicionada.map(a => a.CONTA))),
+      detailedItems: despCondicionada.slice(0, 50).map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, valor: a.Valor, detalhe: `FR: ${a.FR} (condicionada)` })),
+      message: pm(`${despCondicionada.length} despesa(s) orçamentária(s) registrada(s) em fonte de recurso condicionada (9xx). Fontes 9xx não devem receber execução de despesa.`),
+      actionPlan: 'Reclassifique as despesas para a fonte de recurso definitiva; fontes 9xx (condicionadas) não comportam execução orçamentária.',
+    });
+  }
+
+  // D1_00040: Receitas orçamentárias (6211/6212/6213) em fonte condicionada (FR 9xx)
+  const recCondicionada = msc.filter(a =>
+    (a.CONTA.startsWith('6211') || a.CONTA.startsWith('6212') || a.CONTA.startsWith('6213')) &&
+    (a.FR ?? '').startsWith('9') && a.Valor !== 0);
+  if (recCondicionada.length > 0) {
+    results.push({
+      ruleId: 'D1_00040', dimension: 'D1',
+      description: 'Receitas orçamentárias em fontes de recursos condicionados (9xx)',
+      severity: 'warning', impactsCapag: false,
+      affectedAccounts: Array.from(new Set(recCondicionada.map(a => a.CONTA))),
+      detailedItems: recCondicionada.slice(0, 50).map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, valor: a.Valor, detalhe: `FR: ${a.FR} (condicionada)` })),
+      message: pm(`${recCondicionada.length} receita(s) orçamentária(s) registrada(s) em fonte de recurso condicionada (9xx).`),
+      actionPlan: 'Reclassifique as receitas para a fonte de recurso definitiva; fontes 9xx (condicionadas) não comportam execução orçamentária.',
+    });
+  }
+
+  // D1_00044: Restos a Pagar devem carregar a IC de Ano de Inscrição (AI)
+  // Contas de controle de RP (631x/632x) precisam do detalhamento AI.
+  const RP_PREFIXES = ['6311', '6312', '6313', '6314', '6321', '6322', '6327'];
+  const rpAccounts = msc.filter(a =>
+    RP_PREFIXES.some(p => a.CONTA.startsWith(p)) && a.Valor !== 0);
+  const rpSemAI = rpAccounts.filter(a => !a.AI || a.AI.trim() === '');
+  if (rpAccounts.length > 0 && rpSemAI.length > 0) {
+    results.push({
+      ruleId: 'D1_00044', dimension: 'D1',
+      description: 'Restos a Pagar sem informação complementar de Ano de Inscrição (AI)',
+      severity: 'warning', impactsCapag: false,
+      affectedAccounts: Array.from(new Set(rpSemAI.map(a => a.CONTA))),
+      detailedItems: rpSemAI.slice(0, 50).map(a => ({ conta: a.CONTA, po: a.PO, fr: a.FR, valor: a.Valor, detalhe: 'sem AI (Ano de Inscrição)' })),
+      message: pm(`${rpSemAI.length} de ${rpAccounts.length} registro(s) de Restos a Pagar sem a IC de Ano de Inscrição (AI). O detalhamento do ano de inscrição é obrigatório para RP.`),
+      actionPlan: 'Inclua a informação complementar AI (Ano de Inscrição) nos registros de Restos a Pagar (contas 631x/632x) na geração da MSC.',
     });
   }
 

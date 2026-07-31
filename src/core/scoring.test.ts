@@ -57,7 +57,6 @@ describe('buildScoreSummary', () => {
     expect(s.contagemStatus.NAO_APLICAVEL).toBe(1);
     expect(s.pontosAvaliaveis).toBe(0);
   });
-<<<<<<< HEAD
 
   it('usa catálogo oficial STN por padrão: D1_00005 não pontua para município', () => {
     // Sem passar naoAplicaveis -> usa o conjunto municipal oficial (D1_00005 é 'E').
@@ -79,6 +78,4 @@ describe('buildScoreSummary', () => {
     const check = s.checks.find(c => c.ruleId === 'D2_00081')!;
     expect(check.dimensionLabel).toBe('Informações Contábeis');
   });
-=======
->>>>>>> e101a96cfa07f08cc6e8f2b75c0a15d153bdc75a
 });
