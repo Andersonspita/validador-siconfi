@@ -1,47 +1,66 @@
 import React, { useCallback, useState } from 'react';
-import { UploadCloud, FileText, Shield, BarChart3, AlertCircle, CheckCircle2 } from 'lucide-react';
+import {
+  UploadCloud, AlertCircle, CheckCircle2, FileSpreadsheet, Receipt,
+  Wallet, FileUp, Shield, Bell
+} from 'lucide-react';
 import './Dropzone.css';
 
 interface DropzoneProps {
   onFilesDropped: (files: File[]) => void;
+  files?: File[];
+  onReset?: () => void;
+  onGoValidacoes?: () => void;
 }
 
 const ARQUIVOS_INFO = [
   {
+    key: 'msc',
     sigla: 'MSC',
-    nome: 'Matriz de Saldos Contábeis',
+    nome: 'MSC - Matriz de Saldos',
+    tag: 'Base Principal',
     formato: '.csv ou .zip',
-    obrigatorio: true,
+    match: (n: string) => n.includes('msc') || n.endsWith('.csv'),
+    icon: FileSpreadsheet,
     habilita: 'D1 + D2 + Relatórios de Execução',
-    cor: '#2563eb',
   },
   {
+    key: 'rreo',
     sigla: 'RREO',
-    nome: 'Rel. Resumido de Exec. Orçamentária',
+    nome: 'RREO (Anexos 1 a 14)',
+    tag: 'Cruzamento D3',
     formato: '.xls, .xlsx, .xml ou .zip',
-    obrigatorio: false,
+    match: (n: string) => n.includes('rreo'),
+    icon: Receipt,
     habilita: 'D3 + D4 (cruzamento com MSC)',
-    cor: '#16a34a',
   },
   {
+    key: 'rgf',
     sigla: 'RGF',
-    nome: 'Relatório de Gestão Fiscal',
+    nome: 'RGF (Poder Executivo)',
+    tag: 'Gestão Fiscal LRF',
     formato: '.xls, .xlsx, .xml ou .zip',
-    obrigatorio: false,
+    match: (n: string) => n.includes('rgf'),
+    icon: Wallet,
     habilita: 'D3 fiscal (RCL e DCL cruzados)',
-    cor: '#d97706',
   },
   {
+    key: 'dca',
     sigla: 'DCA',
-    nome: 'Declaração de Contas Anuais',
+    nome: 'DCA - Declaração Anual',
+    tag: 'Complementar',
     formato: '.xls, .xlsx, .xml ou .zip',
-    obrigatorio: false,
+    match: (n: string) => n.includes('dca'),
+    icon: FileUp,
     habilita: 'D2 avançado (MSC × DCA)',
-    cor: '#7c3aed',
   },
 ];
 
-export default function Dropzone({ onFilesDropped }: DropzoneProps) {
+function classifyFile(file: File) {
+  const n = file.name.toLowerCase();
+  return ARQUIVOS_INFO.find(a => a.match(n));
+}
+
+export default function Dropzone({ onFilesDropped, files = [], onReset, onGoValidacoes }: DropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +80,7 @@ export default function Dropzone({ onFilesDropped }: DropzoneProps) {
       f.name.endsWith('.xml') || f.name.endsWith('.xls') || f.name.endsWith('.xlsx')
     );
     if (validFiles.length === 0) {
-      setError('Por favor, envie arquivos nos formatos: CSV, ZIP, XML, XLS ou XLSX.');
+      setError('Envie arquivos nos formatos: CSV, ZIP, XML, XLS ou XLSX.');
       return;
     }
     setError(null);
@@ -78,86 +97,155 @@ export default function Dropzone({ onFilesDropped }: DropzoneProps) {
     if (e.target.files?.length) processFiles(e.target.files);
   };
 
+  const loadedByType = ARQUIVOS_INFO.map(a => {
+    const found = files.find(f => a.match(f.name.toLowerCase()));
+    return { ...a, file: found };
+  });
+
+  const loadedCount = loadedByType.filter(a => a.file).length;
+
   return (
     <div className="dropzone-container animate-fade-in">
-
-      {/* Área de upload */}
-      <div
-        className={`dropzone-area glass-panel ${isDragging ? 'dragging' : ''}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <UploadCloud className="upload-icon" size={56} />
-        <h3>Arraste e solte seus arquivos aqui</h3>
-        <p className="dropzone-sub">
-          Envie <strong>um ou mais arquivos juntos</strong> para cobertura máxima das validações.
-          Aceitos: <strong>CSV, ZIP, XML, XLS, XLSX</strong>.
-        </p>
-        <input
-          type="file"
-          multiple
-          accept=".csv,.zip,.xml,.xls,.xlsx"
-          id="file-upload"
-          className="file-input"
-          onChange={handleFileInput}
-        />
-        <label htmlFor="file-upload" className="upload-btn">
-          Selecionar Arquivos
-        </label>
-      </div>
-
-      {error && (
-        <div className="error-message">
-          <AlertCircle size={18} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Painel explicativo de cobertura */}
-      <div className="coverage-panel glass-panel">
-        <div className="coverage-header">
-          <BarChart3 size={18} className="coverage-header-icon" />
-          <span>Cobertura por arquivo — envie todos juntos para validação completa</span>
-        </div>
-        <div className="coverage-grid">
-          {ARQUIVOS_INFO.map(a => (
-            <div key={a.sigla} className="coverage-card">
-              <div className="coverage-card-top">
-                <span className="coverage-sigla" style={{ borderColor: a.cor, color: a.cor }}>{a.sigla}</span>
-                {a.obrigatorio
-                  ? <span className="coverage-badge coverage-badge-req">Obrigatório</span>
-                  : <span className="coverage-badge coverage-badge-opt">Opcional</span>
-                }
-              </div>
-              <p className="coverage-nome">{a.nome}</p>
-              <p className="coverage-formato">{a.formato}</p>
-              <div className="coverage-habilita">
-                <CheckCircle2 size={12} style={{ color: a.cor, flexShrink: 0, marginTop: 1 }} />
-                <span>Habilita: {a.habilita}</span>
-              </div>
+      {/* Alerta institucional */}
+      <section className="panel alert-bar">
+        <div className="alert-bar-left">
+          <div className="alert-icon">
+            <Bell size={22} />
+          </div>
+          <div>
+            <div className="alert-title-row">
+              <h2>Pré-validação Siconfi — remessa MSC / RREO / RGF / DCA</h2>
+              <span className="status-pill danger">Obrigatório</span>
             </div>
-          ))}
+            <p>
+              Carregue os demonstrativos para antecipar inconsistências D1–D4 antes da homologação no Siconfi.
+              O processamento ocorre <strong>somente no navegador</strong>.
+            </p>
+          </div>
         </div>
-        <p className="coverage-tip">
-          💡 <strong>Dica:</strong> selecione os quatro arquivos de uma vez na mesma janela de upload
-          — o sistema identifica cada um automaticamente pelo nome e executa todos os cruzamentos disponíveis.
-        </p>
-      </div>
+        <div className="alert-bar-actions">
+          {onReset && (
+            <button type="button" className="inst-btn" onClick={onReset}>
+              Nova carga
+            </button>
+          )}
+          {onGoValidacoes && (
+            <button type="button" className="inst-btn inst-btn-primary" onClick={onGoValidacoes}>
+              <Shield size={16} />
+              Ver Pré-Validação
+            </button>
+          )}
+        </div>
+      </section>
 
-      {/* Cards de features */}
-      <div className="features-grid">
-        <div className="feature-card glass-panel">
-          <Shield className="feature-icon" size={24} />
-          <h4>Processamento Local</h4>
-          <p>Seus dados são lidos apenas no seu navegador. Nenhum arquivo é enviado a servidores.</p>
+      {/* Matriz de carga */}
+      <section className="panel panel-pad carga-panel">
+        <div className="carga-header">
+          <div>
+            <h3>Matriz de Carga de Demonstrativos Fiscais</h3>
+            <p>Arquivos para cruzamento de consistência orçamentária e patrimonial (D1 a D4).</p>
+          </div>
+          <div className="carga-coverage">
+            <span>Arquivos detectados:</span>
+            <strong>{loadedCount}/4</strong>
+            {loadedCount > 0 && (
+              <span className="status-pill success">{Math.round((loadedCount / 4) * 100)}% carga</span>
+            )}
+          </div>
         </div>
-        <div className="feature-card glass-panel">
-          <FileText className="feature-icon capag" size={24} />
-          <h4>Foco no CAPAG</h4>
-          <p>Identificamos erros críticos que afetam a nota CAPAG e o Ranking ICF do município.</p>
+
+        <div
+          className={`dropzone-area ${isDragging ? 'dragging' : ''}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <UploadCloud size={36} className="upload-icon" />
+          <div className="dropzone-copy">
+            <strong>Arraste e solte os arquivos aqui</strong>
+            <span>Ou selecione MSC, RREO, RGF e DCA juntos — CSV, ZIP, XML, XLS, XLSX</span>
+          </div>
+          <input
+            type="file"
+            multiple
+            accept=".csv,.zip,.xml,.xls,.xlsx"
+            id="file-upload"
+            className="file-input"
+            onChange={handleFileInput}
+          />
+          <label htmlFor="file-upload" className="inst-btn inst-btn-primary">
+            Selecionar Arquivos
+          </label>
         </div>
-      </div>
+
+        {error && (
+          <div className="error-message">
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="coverage-grid">
+          {loadedByType.map(a => {
+            const Icon = a.icon;
+            const loaded = !!a.file;
+            return (
+              <div key={a.key} className={`coverage-card ${loaded ? 'loaded' : 'pending'}`}>
+                <div className="coverage-card-top">
+                  <span className="coverage-tag">{a.tag}</span>
+                  {loaded ? (
+                    <span className="status-inline success">
+                      <CheckCircle2 size={14} /> Processado
+                    </span>
+                  ) : (
+                    <span className="status-inline pending">Pendente</span>
+                  )}
+                </div>
+                <div className="coverage-title">
+                  <Icon size={18} />
+                  <span>{a.nome}</span>
+                </div>
+                {loaded && a.file ? (
+                  <>
+                    <div className="coverage-file" title={a.file.name}>{a.file.name}</div>
+                    <div className="coverage-foot">
+                      <span>{(a.file.size / (1024 * 1024)).toFixed(1)} MB</span>
+                      <span className="mono">{a.sigla}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="coverage-file muted">{a.habilita}</div>
+                    <div className="coverage-foot">
+                      <span>{a.formato}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="trust-strip">
+          <div className="trust-item">
+            <Shield size={18} />
+            <div>
+              <strong>Processamento local</strong>
+              <p>Dados fiscais não saem do navegador.</p>
+            </div>
+          </div>
+          <div className="trust-item">
+            <FileSpreadsheet size={18} />
+            <div>
+              <strong>Foco CAPAG / Ranking ICF</strong>
+              <p>Erros críticos destacados para correção antes da remessa.</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
+
+// export helper for other modules if needed
+export { classifyFile, ARQUIVOS_INFO };

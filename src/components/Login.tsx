@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
-import { ShieldCheck, Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
+import { Lock, Mail, Loader2, AlertCircle, Landmark, ShieldCheck } from 'lucide-react';
 import './Login.css';
 
 export default function Login() {
@@ -14,14 +14,14 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
       await signInWithEmailAndPassword(auth!, email, password);
     } catch (err: any) {
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError('E-mail ou senha incorretos.');
       } else if (err.code === 'auth/unauthorized-domain') {
-        setError('Domínio não autorizado no Firebase. Contate o administrador do sistema.');
+        setError('Domínio não autorizado no Firebase. Contate o administrador.');
       } else if (err.code === 'auth/too-many-requests') {
         setError('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
       } else if (err.code === 'auth/network-request-failed') {
@@ -35,14 +35,21 @@ export default function Login() {
   };
 
   return (
-    <div className="login-container">
-      <div className="login-card glass-panel animate-fade-in">
+    <div className="login-container animate-fade-in">
+      <div className="login-card panel">
         <div className="login-header">
-          <ShieldCheck size={48} className="login-logo" />
+          <div className="login-mark">
+            <Landmark size={22} />
+          </div>
           <h2>Acesso Restrito</h2>
-          <p>Insira suas credenciais para acessar o Validador Siconfi.</p>
+          <p>Credenciais institucionais para o ambiente de pré-validação Siconfi.</p>
         </div>
-        
+
+        <div className="login-secure">
+          <ShieldCheck size={14} />
+          <span>Processamento local · Dados fiscais não são enviados à nuvem</span>
+        </div>
+
         {error && (
           <div className="login-error">
             <AlertCircle size={16} />
@@ -52,37 +59,43 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="login-form">
           <div className="form-group">
-            <label>E-mail</label>
+            <label htmlFor="login-email">E-mail institucional</label>
             <div className="input-wrapper">
-              <Mail size={18} className="input-icon" />
-              <input 
-                type="email" 
+              <Mail size={16} className="input-icon" />
+              <input
+                id="login-email"
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu.email@prefeitura.gov.br" 
-                required 
+                placeholder="seu.email@prefeitura.gov.br"
+                required
               />
             </div>
           </div>
-          
+
           <div className="form-group">
-            <label>Senha</label>
+            <label htmlFor="login-password">Senha</label>
             <div className="input-wrapper">
-              <Lock size={18} className="input-icon" />
-              <input 
-                type="password" 
+              <Lock size={16} className="input-icon" />
+              <input
+                id="login-password"
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••" 
-                required 
+                placeholder="••••••••"
+                required
               />
             </div>
           </div>
-          
+
           <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? <Loader2 size={20} className="spin" /> : 'Entrar no Sistema'}
+            {loading ? <Loader2 size={18} className="spin" /> : 'Entrar no Sistema'}
           </button>
         </form>
+
+        <div className="login-foot">
+          Pré-validação local · Dados não saem do navegador
+        </div>
       </div>
     </div>
   );
