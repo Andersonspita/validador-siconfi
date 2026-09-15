@@ -36,17 +36,29 @@ describe('buildScoreSummary', () => {
     expect(s.classe).toBe('E');
   });
 
-  it('pondera checks mensais: 3 OK + 1 FALHA da mesma regra = 0,75', () => {
+  it('pondera checks mensais com PROPORCAO oficial (D1_00020 = 1/12)', () => {
     const results = [
       R('D1_00020', 'D1', 'info'), R('D1_00020', 'D1', 'info'),
       R('D1_00020', 'D1', 'info'), R('D1_00020', 'D1', 'error'),
     ];
     const s = buildScoreSummary(results);
     const check = s.checks.find(c => c.ruleId === 'D1_00020')!;
-    expect(check.maxPontos).toBe(4);
-    expect(check.pontos).toBe(3); // 3×1 + 1×0
-    // status representativo do grupo é o pior (FALHA)
+    // 3 OK → 3/12 = 0,25 ponto; max = 1
+    expect(check.maxPontos).toBe(1);
+    expect(check.pontos).toBeCloseTo(3 / 12, 5);
     expect(check.status).toBe('FALHA');
+  });
+
+  it('não pontua orientação/stub info como OK', () => {
+    const results: ValidationResult[] = [{
+      ruleId: 'D1_00099', dimension: 'D1', description: 'Stub',
+      severity: 'info', impactsCapag: false,
+      message: 'Esta regra não pode ser validada offline — requer consulta à API do Siconfi.',
+    }];
+    const s = buildScoreSummary(results);
+    const check = s.checks.find(c => c.ruleId === 'D1_00099')!;
+    expect(check.status).toBe('NAO_VERIFICAVEL');
+    expect(check.avaliavel).toBe(false);
   });
 
   it('marca regras não aplicáveis a municípios', () => {

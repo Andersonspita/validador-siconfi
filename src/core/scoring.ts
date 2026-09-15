@@ -1,5 +1,5 @@
 import { ValidationResult, RuleDefinition } from './types';
-import { DIMENSAO_NOME_OFICIAL, CAPAG_RULES, NAO_APLICAVEIS_MUNICIPIO } from './stnCatalog';
+import { DIMENSAO_NOME_OFICIAL, CAPAG_RULES, NAO_APLICAVEIS_MUNICIPIO, PROPORCAO } from './stnCatalog';
 
 /**
  * Modelo de pontuação e ranking do "Verificador Siconfi" (metodologia
@@ -83,6 +83,8 @@ export const CLASSE_COLORS: Record<Classe, string> = {
 
 /** Mapeia a severidade interna do motor para o status do ranking. */
 const severityToStatus = (r: ValidationResult): CheckStatus => {
+  // Orientações / stubs offline não pontuam como OK — ficam fora do denominador.
+  if (r.severity === 'info' && isOrientacaoNaoVerificavel(r)) return 'NAO_VERIFICAVEL';
   switch (r.severity) {
     case 'error':
       return 'FALHA';
@@ -92,6 +94,12 @@ const severityToStatus = (r: ValidationResult): CheckStatus => {
     default:
       return 'OK';
   }
+};
+
+/** Detecta infos que são orientação/limitação (não equivalem a "passou"). */
+export const isOrientacaoNaoVerificavel = (r: ValidationResult): boolean => {
+  const t = `${r.message} ${r.description} ${r.actionPlan ?? ''}`.toLowerCase();
+  return /não (foi )?poss[ií]vel|n[aã]o pode ser validada|orienta[cç][aã]o|metadados do servidor|valida[cç][aã]o offline|requer (acesso|consulta)|dados ausentes|n[aã]o verific[aá]vel|sem (acesso|dados) (para|da|do)|api do siconfi/.test(t);
 };
 
 const AVALIAVEIS: CheckStatus[] = ['OK', 'FALHA', 'ATENCAO'];
@@ -152,6 +160,8 @@ export const buildScoreSummary = (
     descricao: string;
     somaPontos: number;
     somaMax: number;
+    okCount: number;
+    resultCount: number;
     piorStatus: CheckStatus;
     detalhes: string[];
     actionPlan?: string;
@@ -170,16 +180,38 @@ export const buildScoreSummary = (
     // mesmo que o motor tenha produzido um resultado para ela.
     if (naoAplicaveis.has(r.ruleId)) continue;
     const status = severityToStatus(r);
+    // Orientações não formam grupo avaliável — só entram se forem o único sinal
+    if (status === 'NAO_VERIFICAVEL' && !grupos.has(r.ruleId)) {
+      // registra como NÃO VERIFICÁVEL sem pontuar
+      grupos.set(r.ruleId, {
+        ruleId: r.ruleId,
+        dimension: r.dimension,
+        descricao: r.description || rulesMap?.get(r.ruleId)?.description || r.message.slice(0, 80),
+        somaPontos: 0,
+        somaMax: 1,
+        okCount: 0,
+        resultCount: 1,
+        piorStatus: 'NAO_VERIFICAVEL',
+        detalhes: [r.message],
+        actionPlan: r.actionPlan,
+        impactsCapag: CAPAG_RULES.has(r.ruleId) || r.impactsCapag,
+      });
+      continue;
+    }
+    if (status === 'NAO_VERIFICAVEL') continue;
+
     const capag = CAPAG_RULES.has(r.ruleId) || r.impactsCapag;
     const g = grupos.get(r.ruleId);
     const pts = pontosDoResultado(status);
-    if (!g) {
+    if (!g || g.piorStatus === 'NAO_VERIFICAVEL') {
       grupos.set(r.ruleId, {
         ruleId: r.ruleId,
         dimension: r.dimension,
         descricao: r.description || rulesMap?.get(r.ruleId)?.description || r.message.slice(0, 80),
         somaPontos: pts,
         somaMax: 1,
+        okCount: status === 'OK' ? 1 : 0,
+        resultCount: 1,
         piorStatus: status,
         detalhes: [r.message],
         actionPlan: r.actionPlan,
@@ -188,6 +220,8 @@ export const buildScoreSummary = (
     } else {
       g.somaPontos += pts;
       g.somaMax += 1;
+      g.resultCount += 1;
+      if (status === 'OK') g.okCount += 1;
       if (rank[status] < rank[g.piorStatus]) {
         g.piorStatus = status;
         g.actionPlan = r.actionPlan ?? g.actionPlan;
@@ -196,18 +230,41 @@ export const buildScoreSummary = (
     }
   }
 
-  // 2. Converte grupos em ScoredCheck avaliáveis.
+  // 2. Converte grupos em ScoredCheck avaliáveis (aplica PROPORCAO oficial).
   const checks: ScoredCheck[] = [];
   for (const g of grupos.values()) {
+    const prop = PROPORCAO[g.ruleId];
+    let pontos = g.somaPontos;
+    let maxPontos = g.somaMax;
+    let status = g.piorStatus;
+
+    if (prop?.matrizes && status !== 'NAO_VERIFICAVEL' && status !== 'NAO_APLICAVEL') {
+      // Cada MSC correta vale 1/N; meses ausentes no upload não pontuam.
+      pontos = g.somaPontos / prop.matrizes;
+      maxPontos = 1;
+    }
+
+    if (prop?.pisoComOcorrencia != null && g.resultCount > 0 && status !== 'NAO_VERIFICAVEL') {
+      // Retificações: piso quando há ocorrência
+      if (prop.matrizes) {
+        pontos = Math.max(pontos, prop.pisoComOcorrencia);
+      } else {
+        const ratio = maxPontos > 0 ? pontos / maxPontos : 0;
+        const adjusted = Math.max(ratio, prop.pisoComOcorrencia);
+        pontos = adjusted;
+        maxPontos = 1;
+      }
+    }
+
     checks.push({
       ruleId: g.ruleId,
       dimension: g.dimension,
       dimensionLabel: DIMENSION_LABELS[g.dimension] ?? g.dimension,
       descricao: g.descricao,
-      status: g.piorStatus,
-      pontos: g.somaPontos,
-      maxPontos: g.somaMax,
-      avaliavel: isAvaliavel(g.piorStatus),
+      status,
+      pontos,
+      maxPontos,
+      avaliavel: isAvaliavel(status),
       detalhe: g.detalhes.join(' | '),
       actionPlan: g.actionPlan,
       impactsCapag: g.impactsCapag,

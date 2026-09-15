@@ -134,15 +134,18 @@ export interface SiconfiApiResponse {
  * Homologação de um tipo de demonstrativo POR PODER específico.
  * Usado por D1_00003 (RGF Executivo) e D1_00004 (RGF Legislativo): retorna se
  * TODOS os períodos exigíveis daquele tipo estão homologados para o poder dado.
+ * Se `poder` for omitido, considera todas as instituições.
  */
 export function homologacaoDoPoder(
   entregas: ExtratoEntrega[],
   sigla: string,
-  poder: Poder
+  poder?: Poder
 ): { total: number; homologados: number; pendentes: number[] } {
-  const doTipo = entregas.filter(
-    e => isEntregavelDoTipo(e.entregavel, sigla) && classificarPoder(e.instituicao) === poder
-  );
+  const doTipo = entregas.filter(e => {
+    if (!isEntregavelDoTipo(e.entregavel, sigla)) return false;
+    if (poder && classificarPoder(e.instituicao) !== poder) return false;
+    return true;
+  });
   const pendentes: number[] = [];
   for (const e of doTipo) {
     if (!isHomologado(e.status_relatorio)) pendentes.push(e.periodo);

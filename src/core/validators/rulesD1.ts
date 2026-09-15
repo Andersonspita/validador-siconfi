@@ -132,28 +132,26 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
           },
         });
       }
-
-      // TODO: Futuramente, podemos adicionar checagem exata de data_entrega x prazos legais.
     } else {
-       // Falha na API ou sem dados
-       if (ausentes.length > 0 && (temMSC || temRREO || temRGF || temDCA)) {
-         results.push({
-           ruleId: 'D1_00001',
-           dimension: 'D1',
-           description: 'Verificação de entrega dos demonstrativos',
-           severity: 'warning',
-           impactsCapag: false,
-           affectedAccounts: ausentes,
-           message:
-             `Demonstrativo(s) não incluído(s) no upload: ${ausentes.join(', ')}. ` +
-             `A API do Siconfi não retornou dados para confirmar homologação. Confirme manualmente no SICONFI.`,
-           actionPlan: `Acesse https://siconfi.tesouro.gov.br e confirme manualmente se ${ausentes.join(', ')} foram entregues e homologados para o ente ${data.enteId} em ${data.anoReferencia}. A checagem automática falhou (indisponibilidade da API ou bloqueio de rede/CORS).`,
-           debugInfo: {
-             label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
-             payload: { items: [], observacao: 'A API não retornou nenhum item (lista vazia) ou a chamada falhou. Veja o console do navegador para detalhes de erro de rede/CORS.' },
-           },
-         });
-       }
+      // Falha na API ou sem dados
+      if (ausentes.length > 0 && (temMSC || temRREO || temRGF || temDCA)) {
+        results.push({
+          ruleId: 'D1_00001',
+          dimension: 'D1',
+          description: 'Verificação de entrega dos demonstrativos',
+          severity: 'warning',
+          impactsCapag: false,
+          affectedAccounts: ausentes,
+          message:
+            `Demonstrativo(s) não incluído(s) no upload: ${ausentes.join(', ')}. ` +
+            `A API do Siconfi não retornou dados para confirmar homologação. Confirme manualmente no SICONFI.`,
+          actionPlan: `Acesse https://siconfi.tesouro.gov.br e confirme manualmente se ${ausentes.join(', ')} foram entregues e homologados para o ente ${data.enteId} em ${data.anoReferencia}. A checagem automática falhou (indisponibilidade da API ou bloqueio de rede/CORS).`,
+          debugInfo: {
+            label: `Resposta da API de Homologação (Siconfi) — ente ${data.enteId}, exercício ${data.anoReferencia}`,
+            payload: { items: [], observacao: 'A API não retornou nenhum item (lista vazia) ou a chamada falhou. Veja o console do navegador para detalhes de erro de rede/CORS.' },
+          },
+        });
+      }
     }
   } else {
     // Modo Offline (sem enteId)
@@ -240,23 +238,55 @@ export async function validateD1_Entrega(data: ParsedData, _rulesMap: Map<string
       ? { ruleId: 'D1_00014', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Legislativo', severity: 'info', impactsCapag: false, message: 'RGFs do Legislativo: nenhum retificado.' }
       : { ruleId: 'D1_00014', dimension: 'D1', description: 'Quantidade de retificações dos RGFs do Legislativo', severity: 'warning', impactsCapag: false,
           message: `RGFs do Legislativo: ${ret14} retificação(ões).`, actionPlan: 'Alinhe com a Câmara a revisão do RGF antes da homologação.' });
+
+    // D1_00002 — Homologação da DCA (anual)
+    const h02 = homologacaoDoPoder(entregasApi, 'DCA', 'Executivo');
+    // DCA costuma aparecer só no Executivo; se não houver, tenta sem filtro de poder
+    const h02All = h02.total > 0 ? h02 : homologacaoDoPoder(entregasApi, 'DCA');
+    results.push(h02All.pendentes.length === 0 && h02All.total > 0
+      ? { ruleId: 'D1_00002', dimension: 'D1', description: 'Homologação da DCA', severity: 'info', impactsCapag: false,
+          message: `DCA: ${h02All.homologados}/${h02All.total} registro(s) homologado(s) no exercício.` }
+      : { ruleId: 'D1_00002', dimension: 'D1', description: 'Homologação da DCA', severity: h02All.total === 0 ? 'info' : 'error', impactsCapag: false,
+          message: h02All.total === 0
+            ? 'Sem DCA no extrato da API para o exercício (pode ainda não ter sido enviada — prazo típico: 30/abr do ano seguinte).'
+            : `DCA NÃO homologada no Siconfi para o exercício ${ano}.`,
+          actionPlan: 'Elabore e homologue a Declaração de Contas Anuais (DCA) no portal Siconfi até o prazo legal.' });
+
+    // D1_00007 — Tempestividade da DCA
+    const dcaNoExtrato = homologacaoDoPoder(entregasApi, 'DCA').total;
+    const fora07 = homologacoesForaPrazo(entregasApi, 'DCA', ano);
+    results.push(fora07.length === 0
+      ? { ruleId: 'D1_00007', dimension: 'D1', description: 'Tempestividade na homologação da DCA', severity: 'info', impactsCapag: false,
+          message: dcaNoExtrato === 0
+            ? 'DCA ainda sem homologação no extrato — tempestividade será avaliada após o envio.'
+            : 'DCA homologada dentro do prazo legal (até 30 de abril do exercício seguinte).' }
+      : { ruleId: 'D1_00007', dimension: 'D1', description: 'Tempestividade na homologação da DCA', severity: 'error', impactsCapag: false,
+          message: `DCA homologada fora do prazo: ${fora07.map(f => `${f.instituicao}: ${f.data} > prazo ${f.prazo}`).join('; ')}`,
+          actionPlan: 'Atrasos passados não são reversíveis; planejar a DCA com folga antes de 30/abril do ano seguinte.' });
+
+    // D1_00012 — Retificações da DCA
+    const ret12 = contarRetificacoes(entregasApi, 'DCA');
+    results.push(ret12 === 0
+      ? { ruleId: 'D1_00012', dimension: 'D1', description: 'Quantidade de retificações da DCA', severity: 'info', impactsCapag: false, message: 'DCA: nenhuma retificação no exercício.' }
+      : { ruleId: 'D1_00012', dimension: 'D1', description: 'Quantidade de retificações da DCA', severity: 'warning', impactsCapag: false,
+          message: `DCA: ${ret12} retificação(ões) no exercício.`, actionPlan: 'Revise os anexos da DCA antes de homologar para evitar retificações.' });
   }
 
-  // Regras que ainda dependem de dados não disponíveis offline/nesta fase:
-  // D1_00002/07/12 (DCA anual) e D1_00005/10/15 (Judiciário/MP/Defensoria — só Estados/DF).
+  // Regras exclusivas de Estados/DF (Judiciário/MP/Defensoria) — stub informativo.
+  // Municípios: o scoring já as marca como NÃO APLICÁVEL via NAO_APLICAVEIS_MUNICIPIO.
   const serverRulesPendentes = temApi
-    ? ['D1_00002', 'D1_00005', 'D1_00007', 'D1_00010', 'D1_00012', 'D1_00015']
+    ? ['D1_00005', 'D1_00010', 'D1_00015']
     : ['D1_00002', 'D1_00003', 'D1_00004', 'D1_00005', 'D1_00006', 'D1_00007', 'D1_00008',
        'D1_00009', 'D1_00010', 'D1_00011', 'D1_00012', 'D1_00013', 'D1_00014', 'D1_00015'];
   serverRulesPendentes.forEach(ruleId => {
     results.push({
       ruleId,
       dimension: 'D1',
-      description: 'Regra validada pelo servidor Siconfi',
+      description: 'Regra do servidor Siconfi',
       severity: 'info',
       impactsCapag: false,
       message: temApi
-        ? `Esta verificação depende da DCA (anual) ou é exclusiva de Estados/DF; não avaliável nesta fase do exercício.`
+        ? `Não aplicável a municípios (apenas Estados/DF — Judiciário, MP ou Defensoria). Não foi possível validar offline.`
         : `Não foi possível consultar o extrato da API do Siconfi (ente sem código IBGE ou API indisponível). Consulte o painel oficial.`,
     });
   });

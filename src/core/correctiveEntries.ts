@@ -301,6 +301,105 @@ export function buildCorrectiveEntries(
       )];
     }
 
+    // ── D2_00069–73: divergência MSC Encerramento × DCA I-E por função ───────
+    case 'D2_00069':
+    case 'D2_00070':
+    case 'D2_00071':
+    case 'D2_00072':
+    case 'D2_00073': {
+      return [entry(
+        'Ajuste da classificação funcional da despesa orçamentária',
+        '622130100', 'Crédito Empenhado a Liquidar',
+        '622130100', 'Crédito Empenhado a Liquidar (reclassificação FS/ND)',
+        undefined,
+        `Divergência MSC Encerramento × DCA Anexo I-E. Reclassifique a função/subfunção (FS) ` +
+        `ou a modalidade (ND 91 = intra) nos empenhos afetados e regenere MSC/DCA. Ref.: MCASP / Portaria STN.`
+      )];
+    }
+
+    case 'D2_00074': {
+      return [entry(
+        'Ajuste de Restos a Pagar pagos no exercício',
+        '631410000', 'Restos a Pagar Processados — Pagos',
+        '111110000', 'Caixa e Equivalentes de Caixa',
+        undefined,
+        `Conferir baixa de RPP (6314) e RPNP (6322) pagos com o Anexo I-F da DCA. ` +
+        `Ref.: MCASP — execução de restos a pagar.`
+      )];
+    }
+
+    // ── D3: inconsistências entre anexos do RREO / RGF ───────────────────────
+    case 'D3_00001':
+    case 'D3_00002':
+    case 'D3_00003':
+    case 'D3_00005':
+    case 'D3_00007':
+    case 'D3_00017':
+    case 'D3_00027':
+    case 'D3_00028': {
+      return [entry(
+        'Reconciliação entre demonstrativos fiscais (RREO/RGF)',
+        '621200000', 'Receita Orçamentária Realizada',
+        '622130000', 'Crédito Empenhado',
+        undefined,
+        `Divergência entre anexos do RREO/RGF. Não há partida única genérica — ` +
+        `reconcilie as colunas citadas na mensagem (mesma base de cálculo e período) ` +
+        `e republicar os anexos no Siconfi. Ref.: MDF / Manual Siconfi.`
+      )];
+    }
+
+    case 'D3_00012':
+    case 'D3_00045': {
+      return [entry(
+        'Correção de valor negativo indevido no demonstrativo',
+        '621200000', 'Receita Orçamentária Realizada',
+        '622130000', 'Crédito Empenhado',
+        undefined,
+        `Valores negativos em linhas que não admitem sinal negativo. ` +
+        `Corrija o sinal/natureza no sistema de origem e regenere o demonstrativo.`
+      )];
+    }
+
+    // ── D4: cruzamentos MSC × RREO/RGF ───────────────────────────────────────
+    case 'D4_00001':
+    case 'D4_00021':
+    case 'D4_00025':
+    case 'D4_00026':
+    case 'D4_00027':
+    case 'D4_00029':
+    case 'D4_00030':
+    case 'D4_00031':
+    case 'D4_00032':
+    case 'D4_00033':
+    case 'D4_00035': {
+      return [entry(
+        'Alinhamento MSC × demonstrativo fiscal (RREO/RGF)',
+        '622130100', 'Crédito Empenhado a Liquidar',
+        '622130300', 'Crédito Empenhado Liquidado Pago',
+        undefined,
+        `Divergência entre MSC e RREO/RGF. Ajuste a execução orçamentária na MSC ` +
+        `(contas 621x/622x/631x/632x) ou republicar o anexo fiscal com a mesma base. ` +
+        `Ref.: Portaria STN — verificações D4.`
+      )];
+    }
+
+    case 'D4_00022':
+    case 'D4_00023':
+    case 'D4_00024':
+    case 'D4_00038':
+    case 'D4_00039':
+    case 'D4_00040':
+    case 'D4_00041': {
+      return [entry(
+        'Reclassificação de natureza da receita (tributos/transferências)',
+        '621200000', 'Receita Orçamentária Realizada',
+        '621200000', 'Receita Orçamentária Realizada (reclassificação CO/NR)',
+        undefined,
+        `Conferir o código de natureza da receita (CO) na MSC e a linha correspondente ` +
+        `no RREO Anexo 03/06. Ref.: MCASP — classificação da receita.`
+      )];
+    }
+
     default:
       return [];
   }

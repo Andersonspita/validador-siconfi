@@ -896,14 +896,84 @@ export const getDCA_ReceitaRealizadaTotal_IC = (dca: any): number | null =>
 export const getTotalReceitas_A01 = (rreo: any): number | null =>
   extractByColumnFromReport(rreo, ['RREO-Anexo 01', 'RREO Anexo 01'], 'TOTAL DAS RECEITAS', 'At[ée] o Bimestre|Bimestre');
 
-export const getDCA_DespesaFuncaoExcetoIntra_IE = (dca: any): number | null =>
-  extractByColumnFromReport(dca, ['DCA-Anexo I-E', 'Anexo I-E'], 'TOTAL.*EXCETO INTRA', 'Despesas Liquidadas');
+/** Despesa por função no Anexo I-E (exceto-intra). Tenta Empenhadas e Liquidadas. */
+export const getDCA_DespesaFuncao_IE = (dca: any, rowTerm: string): number | null => {
+  const sheets = ['DCA-Anexo I-E', 'Anexo I-E', 'DCA Anexo I-E', 'I-E'];
+  const cols = [
+    'Despesas Empenhadas|Empenhadas',
+    'Despesas Liquidadas|Liquidadas',
+    'Valor',
+  ];
+  for (const col of cols) {
+    const v = extractByColumnFromReport(dca, sheets, rowTerm, col);
+    if (v !== null) return v;
+  }
+  // Fallback: primeira coluna numérica da linha
+  return extractFromReport(dca, sheets, rowTerm, 1);
+};
 
-export const getDCA_RP_Pagos_IF = (dca: any): number | null =>
-  extractByColumnFromReport(dca, ['DCA-Anexo I-F', 'Anexo I-F'], 'TOTAL', 'Pagos');
+export const getDCA_DespesaIntra_IE = (dca: any): number | null => {
+  const sheets = ['DCA-Anexo I-E', 'Anexo I-E', 'DCA Anexo I-E', 'I-E'];
+  const rows = [
+    'DESPESAS.*INTRAOR[ÇC]AMENT[ÁA]RIAS',
+    'TOTAL.*INTRA(?!.*EXCETO)',
+    'INTRAOR[ÇC]AMENT[ÁA]RIAS.*\\(II\\)',
+  ];
+  const cols = ['Despesas Empenhadas|Empenhadas', 'Despesas Liquidadas|Liquidadas'];
+  for (const row of rows) {
+    for (const col of cols) {
+      const v = extractByColumnFromReport(dca, sheets, row, col);
+      if (v !== null) return v;
+    }
+  }
+  return null;
+};
+
+export const getDCA_DespesaFuncaoExcetoIntra_IE = (dca: any): number | null => {
+  const sheets = ['DCA-Anexo I-E', 'Anexo I-E', 'DCA Anexo I-E', 'I-E'];
+  const rows = ['TOTAL.*EXCETO INTRA', 'DESPESAS.*EXCETO INTRA', 'TOTAL GERAL.*EXCETO'];
+  const cols = [
+    'Despesas Empenhadas|Empenhadas',
+    'Despesas Liquidadas|Liquidadas',
+  ];
+  for (const row of rows) {
+    for (const col of cols) {
+      const v = extractByColumnFromReport(dca, sheets, row, col);
+      if (v !== null) return v;
+    }
+  }
+  return null;
+};
+
+export const getDCA_RP_Pagos_IF = (dca: any): number | null => {
+  const sheets = ['DCA-Anexo I-F', 'Anexo I-F', 'DCA Anexo I-F', 'I-F'];
+  return (
+    extractByColumnFromReport(dca, sheets, 'TOTAL', 'Pagos') ??
+    extractByColumnFromReport(dca, sheets, 'TOTAL', 'Pago') ??
+    extractFromReport(dca, sheets, 'TOTAL', 1)
+  );
+};
+
+/** RPP pagos no Anexo I-F da DCA. */
+export const getDCA_RPP_Pagos_IF = (dca: any): number | null => {
+  const sheets = ['DCA-Anexo I-F', 'Anexo I-F', 'DCA Anexo I-F', 'I-F'];
+  return (
+    extractByColumnFromReport(dca, sheets, 'RESTOS A PAGAR PROCESSADOS|RPP(?!.*N)', 'Pagos') ??
+    extractByColumnFromReport(dca, sheets, 'PROCESSADOS', 'Pagos')
+  );
+};
+
+/** RPNP pagos no Anexo I-F da DCA. */
+export const getDCA_RPNP_Pagos_IF = (dca: any): number | null => {
+  const sheets = ['DCA-Anexo I-F', 'Anexo I-F', 'DCA Anexo I-F', 'I-F'];
+  return (
+    extractByColumnFromReport(dca, sheets, 'RESTOS A PAGAR N[ÃA]O PROCESSADOS|RPNP', 'Pagos') ??
+    extractByColumnFromReport(dca, sheets, 'N[ÃA]O PROCESSADOS', 'Pagos')
+  );
+};
 
 export const getDCA_RPNP_Pagos_IG = (dca: any): number | null =>
-  extractByColumnFromReport(dca, ['DCA-Anexo I-G', 'Anexo I-G'], 'TOTAL', 'Pagos');
+  extractByColumnFromReport(dca, ['DCA-Anexo I-G', 'Anexo I-G', 'DCA Anexo I-G'], 'TOTAL', 'Pagos');
 
 export const getTotalRPPagos_A07_RPP = (rreo: any): number | null =>
   extractByColumnFromReport(rreo, ['RREO-Anexo 07', 'RREO Anexo 07'], 'RESTOS A PAGAR PROCESSADOS.*\(I\)', 'Pagos');
