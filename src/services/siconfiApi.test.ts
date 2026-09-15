@@ -38,6 +38,42 @@ describe('prazoLegal', () => {
     const p = prazoLegal('RGF', 1, 2026)!;
     expect(p.getMonth()).toBe(4); // maio (0-based) = 30 dias após abr
   });
+  it('DCA: 30 de abril do exercício seguinte', () => {
+    const p = prazoLegal('DCA', 1, 2025)!;
+    expect(p.getFullYear()).toBe(2026);
+    expect(p.getMonth()).toBe(3); // abril
+    expect(p.getDate()).toBe(30);
+  });
+});
+
+describe('homologacoesForaPrazo DCA', () => {
+  it('detecta DCA homologada após 30/abr do ano seguinte', () => {
+    const entregas = [
+      e({
+        entregavel: 'Declaração de Contas Anuais',
+        periodo: 1,
+        periodicidade: 'A',
+        status_relatorio: 'HO',
+        data_status: '2026-05-15T12:00:00Z',
+      }),
+    ];
+    const fora = homologacoesForaPrazo(entregas, 'DCA', 2025);
+    expect(fora.length).toBe(1);
+  });
+
+  it('não acusa DCA dentro do prazo', () => {
+    const entregas = [
+      e({
+        entregavel: 'Declaração de Contas Anuais',
+        periodo: 1,
+        periodicidade: 'A',
+        status_relatorio: 'HO',
+        data_status: '2026-04-10T12:00:00Z',
+      }),
+    ];
+    const fora = homologacoesForaPrazo(entregas, 'DCA', 2025);
+    expect(fora.length).toBe(0);
+  });
 });
 
 describe('homologacoesForaPrazo', () => {

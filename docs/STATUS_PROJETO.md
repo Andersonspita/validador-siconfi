@@ -39,9 +39,9 @@ O **Validador Siconfi** é uma SPA React/TypeScript que executa validações fis
 
 | Item | Prioridade | Notas |
 |------|------------|-------|
-| Tempestividade DCA anual (D1_00002/07/12) | Baixa | Stub `info` / API |
-| Firebase secrets no GitHub Actions | Baixa | Ops — app funciona sem auth |
-| Refinar extratores DCA I-E por layout STN | Baixa | Varia entre versões de planilha |
+| Refinar layouts DCA muito atípicos (planilhas customizadas) | Baixa | Extratores I-E/I-F já têm fallbacks múltiplos |
+
+Firebase secrets no GitHub Actions: já suportados no `deploy.yml` (opcionais). CI em `ci.yml` roda sem secrets.
 
 ---
 

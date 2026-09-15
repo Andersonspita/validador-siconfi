@@ -62,7 +62,7 @@ npm run deploy       # publicar no GitHub Pages (requer .env)
 
 ## Deploy via GitHub Actions (recomendado)
 
-Configurar em **Settings → Secrets and variables → Actions**:
+Configurar em **Settings → Secrets and variables → Actions** (opcional — sem isso o app sobe em modo local, sem login):
 
 ```
 VITE_FIREBASE_API_KEY
@@ -72,6 +72,10 @@ VITE_FIREBASE_STORAGE_BUCKET
 VITE_FIREBASE_MESSAGING_SENDER_ID
 VITE_FIREBASE_APP_ID
 ```
+
+Workflows:
+- `CI` — typecheck + testes + build em todo PR / push (`feat/**`, `fix/**`, `main`)
+- `Deploy para GitHub Pages` — build com secrets Firebase (se existirem) e publica em `main`
 
 A chave OpenAI **não** é configurada aqui — o usuário a insere em runtime no próprio chat (nunca entra no bundle).
 
