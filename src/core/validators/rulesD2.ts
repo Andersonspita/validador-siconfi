@@ -1,4 +1,4 @@
-import { getDCAValue, getDCA_ReceitaRealizadaTotal_IC, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais, getDCA_DespesasPessoal, getDCA_DespesasCusteio, hasDCA_DespesasFuncao, getDCA_ReceitasTransferencias, getDCA_ReceitasTributarias, checkDCA_ReceitasMenoresDeducoes, getDCA_BensMoveis, getDCA_DepreciacaoMoveis, getDCA_BensImoveis, getDCA_DepreciacaoImoveis, checkDCA_SaldosNegativosNivel, getDCA_DespesasTotais, getDCA_CreditosCurtoLongoPrazo, getDCA_AjustePerdasCreditos, getDCA_DemaisCreditos, getDCA_AjustePerdasDemaisCreditos, getDCA_VPD_Depreciacao, getDCA_PassivoCirculanteFinanceiro, getDCA_PassivoCirculante, getDCA_AjusteDividaAtiva, checkDCA_DeducoesNegativas, getDCA_CreditosPrevidenciarios, getDCA_AtivoIntangivel, getDCA_AmortizacaoIntangivel, getDCA_Estoques, getDCA_AjustePerdasEstoques } from '../xmlExtractors';
+import { getDCAValue, getDCA_ReceitaRealizadaTotal_IC, getDCA_VPA_Fundeb, getDCA_VPD_Fundeb, getDCA_DeducoesFundeb, getDCA_ReceitasFundeb, getDCA_EncargosPatronais, getDCA_DespesasPessoal, getDCA_DespesasCusteio, hasDCA_DespesasFuncao, getDCA_ReceitasTransferencias, getDCA_ReceitasTributarias, checkDCA_ReceitasMenoresDeducoes, getDCA_BensMoveis, getDCA_DepreciacaoMoveis, getDCA_BensImoveis, getDCA_DepreciacaoImoveis, checkDCA_SaldosNegativosNivel, getDCA_DespesasTotais, getDCA_CreditosCurtoLongoPrazo, getDCA_AjustePerdasCreditos, getDCA_DemaisCreditos, getDCA_AjustePerdasDemaisCreditos, getDCA_VPD_Depreciacao, getDCA_PassivoCirculanteFinanceiro, getDCA_PassivoCirculante, getDCA_AjusteDividaAtiva, checkDCA_DeducoesNegativas, getDCA_CreditosPrevidenciarios, getDCA_AtivoIntangivel, getDCA_AmortizacaoIntangivel, getDCA_Estoques, getDCA_AjustePerdasEstoques, getDCA_DespesaFuncao_IE, getDCA_DespesaIntra_IE, getDCA_DespesaFuncaoExcetoIntra_IE, getDCA_RPP_Pagos_IF, getDCA_RPNP_Pagos_IF, getDCA_RP_Pagos_IF } from '../xmlExtractors';
 import { ParsedData, ValidationResult, RuleDefinition } from '../types';
 import { sumAccounts, getNetBalance, validateEquilibrioGeral, getPassivoCirculanteNet, prefixMessage } from './utils';
 import {
@@ -599,6 +599,98 @@ export function validateD2_MSC_Encerramento_DCA(data: ParsedData, _rulesMap: Map
   if (Math.abs(mscDespesasEmpenhadas - dcaEmpenhadas) > 0.01) {
     results.push({ ruleId: 'D2_00050', dimension: 'D2', description: '', severity: 'error', impactsCapag: true,
       message: `Total de despesas empenhadas diverge entre MSC de Encerramento (R$ ${mscDespesasEmpenhadas.toFixed(2)}) e DCA Anexo I-D (R$ ${dcaEmpenhadas.toFixed(2)}).` });
+  }
+
+  // ── D2_00069–73: Despesas por função (MSC Encerramento × DCA Anexo I-E) ──
+  const isIntraNd = (nd?: string) => {
+    if (!nd || nd.length < 4) return false;
+    return nd.substring(2, 4) === '91';
+  };
+
+  let mscIntra = 0, mscPrev = 0, mscSaude = 0, mscEducacao = 0, mscDemais = 0;
+  mscEnc.forEach(a => {
+    if (!a.CONTA.startsWith('62213') || a.Tipo_valor !== 'beginning_balance') return;
+    const valor = a.Natureza_valor === 'C' ? a.Valor : -a.Valor;
+    if (isIntraNd(a.ND)) {
+      mscIntra += valor;
+    } else if (a.FS?.startsWith('09')) {
+      mscPrev += valor;
+    } else if (a.FS?.startsWith('10')) {
+      mscSaude += valor;
+    } else if (a.FS?.startsWith('12')) {
+      mscEducacao += valor;
+    } else {
+      mscDemais += valor;
+    }
+  });
+
+  const pushFuncaoEq = (
+    ruleId: string,
+    label: string,
+    mscVal: number,
+    dcaVal: number | null
+  ) => {
+    if (dcaVal === null) return;
+    if (Math.abs(mscVal - dcaVal) > 0.01) {
+      results.push({
+        ruleId,
+        dimension: 'D2',
+        description: '',
+        severity: 'error',
+        impactsCapag: false,
+        message: `${label}: MSC Encerramento R$ ${mscVal.toFixed(2)} ≠ DCA Anexo I-E R$ ${dcaVal.toFixed(2)}.`,
+        actionPlan: 'Conferir o detalhamento por função/subfunção na MSC de encerramento e no Anexo I-E da DCA (despesas exceto-intra).',
+      });
+    }
+  };
+
+  pushFuncaoEq('D2_00069', 'Despesas função 09 (Previdência Social) exceto-intra', mscPrev,
+    getDCA_DespesaFuncao_IE(data.dca, '09.*Previd[eê]ncia|Previd[eê]ncia Social'));
+  pushFuncaoEq('D2_00070', 'Despesas função 10 (Saúde) exceto-intra', mscSaude,
+    getDCA_DespesaFuncao_IE(data.dca, '10.*Sa[uú]de|^\\s*10\\s'));
+  pushFuncaoEq('D2_00071', 'Despesas função 12 (Educação) exceto-intra', mscEducacao,
+    getDCA_DespesaFuncao_IE(data.dca, '12.*Educa[cç][aã]o|^\\s*12\\s'));
+
+  const dcaExcetoIntra = getDCA_DespesaFuncaoExcetoIntra_IE(data.dca);
+  // Preferir Empenhadas no TOTAL exceto-intra quando disponível
+  const dcaExcetoIntraEmp = getDCA_DespesaFuncao_IE(data.dca, 'TOTAL.*EXCETO INTRA') ?? dcaExcetoIntra;
+  const dcaPrev = getDCA_DespesaFuncao_IE(data.dca, '09.*Previd[eê]ncia|Previd[eê]ncia Social') || 0;
+  const dcaSaude = getDCA_DespesaFuncao_IE(data.dca, '10.*Sa[uú]de|^\\s*10\\s') || 0;
+  const dcaEduc = getDCA_DespesaFuncao_IE(data.dca, '12.*Educa[cç][aã]o|^\\s*12\\s') || 0;
+  const dcaDemais = dcaExcetoIntraEmp !== null
+    ? dcaExcetoIntraEmp - dcaPrev - dcaSaude - dcaEduc
+    : null;
+  pushFuncaoEq('D2_00072', 'Despesas demais funções (≠ 09/10/12) exceto-intra', mscDemais, dcaDemais);
+
+  pushFuncaoEq('D2_00073', 'Despesas intraorçamentárias com detalhamento de função', mscIntra,
+    getDCA_DespesaIntra_IE(data.dca));
+
+  // ── D2_00074: RPP + RPNP pagos (MSC Encerramento × DCA Anexo I-F) ──
+  const mscRppPagos = mscEnc
+    .filter(a => a.CONTA.startsWith('6314') && a.Tipo_valor === 'ending_balance')
+    .reduce((acc, a) => acc + (a.Natureza_valor === 'D' ? a.Valor : -a.Valor), 0);
+  const mscRpnpPagos = mscEnc
+    .filter(a => a.CONTA.startsWith('6322') && a.Tipo_valor === 'ending_balance')
+    .reduce((acc, a) => acc + (a.Natureza_valor === 'D' ? a.Valor : -a.Valor), 0);
+  const mscRpPagos = mscRppPagos + mscRpnpPagos;
+
+  const dcaRpp = getDCA_RPP_Pagos_IF(data.dca);
+  const dcaRpnp = getDCA_RPNP_Pagos_IF(data.dca);
+  const dcaRpTotal = getDCA_RP_Pagos_IF(data.dca);
+  const dcaRpPagos = (dcaRpp !== null || dcaRpnp !== null)
+    ? (dcaRpp || 0) + (dcaRpnp || 0)
+    : dcaRpTotal;
+
+  if (dcaRpPagos !== null && Math.abs(mscRpPagos - dcaRpPagos) > 0.01) {
+    results.push({
+      ruleId: 'D2_00074',
+      dimension: 'D2',
+      description: '',
+      severity: 'error',
+      impactsCapag: false,
+      message: `RPP+RPNP pagos divergem: MSC Encerramento R$ ${mscRpPagos.toFixed(2)} ≠ DCA Anexo I-F R$ ${dcaRpPagos.toFixed(2)}.`,
+      actionPlan: 'Conferir contas 6314 (RPP pagos) e 6322 (RPNP pagos) na MSC de encerramento com as colunas de Pagos do Anexo I-F da DCA.',
+    });
   }
 
   return results;

@@ -7,7 +7,10 @@ import './CAPAGPanel.css';
 interface Props {
   msc: MSCAccount[];
   enteId?: string;
-  ano?: number;  // reservado para uso futuro
+  /** Ano de referência da MSC (exibido no cabeçalho). */
+  ano?: number;
+  /** Resultados de validação com impacto LRF/CAPAG para o resumo lateral. */
+  lrfResults?: { ruleId: string; message: string; severity: string }[];
 }
 
 const NOTA_COR: Record<NotaCapag, string> = { A: '#16a34a', B: '#d97706', C: '#dc2626', '–': '#6b7280' };
@@ -16,24 +19,29 @@ const NOTA_BG:  Record<NotaCapag, string> = { A: '#f0fdf4', B: '#fffbeb', C: '#f
 const brl = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (v: number | null) => v !== null ? `${(v * 100).toFixed(2)}%` : '–';
 
-export default function CAPAGPanel({ msc, enteId }: Props) {
+export default function CAPAGPanel({ msc, enteId, ano, lrfResults = [] }: Props) {
   const [capag, setCapag] = useState<ResultadoCapag | null>(null);
   const [tabCauc, setTabCauc] = useState(false);
+  const [tabLrf, setTabLrf] = useState(false);
 
   useEffect(() => {
     if (msc.length > 0) setCapag(calcularCapag(msc));
   }, [msc]);
 
-
-
   if (!capag) return null;
+
+  const lrfHits = lrfResults.filter(r =>
+    /LRF|pessoal|ARO|opera[cç][oõ]es de cr[eé]dito|RCL|DCL/i.test(`${r.ruleId} ${r.message}`)
+  );
 
   return (
     <div className="capag-panel">
       <div className="capag-header">
         <div>
-          <h3 className="capag-title">Estimativa CAPAG</h3>
-          <p className="capag-subtitle">Baseada na MSC — indicadores aproximados</p>
+          <h3 className="capag-title">Estimativa CAPAG{ano ? ` · ${ano}` : ''}</h3>
+          <p className="capag-subtitle">
+            Baseada na MSC{enteId ? ` · ente ${enteId}` : ''} — indicadores aproximados
+          </p>
         </div>
         <div className="capag-nota-geral" style={{ background: NOTA_BG[capag.notaGeral], borderColor: NOTA_COR[capag.notaGeral] }}>
           <span className="capag-nota-label">Nota estimada</span>
@@ -41,21 +49,51 @@ export default function CAPAGPanel({ msc, enteId }: Props) {
         </div>
       </div>
 
-      {/* Abas CAPAG / CAUC */}
+      {/* Abas CAPAG / LRF / CAUC */}
       <div className="capag-tabs">
-        <button className={`capag-tab ${!tabCauc ? 'capag-tab-active' : ''}`} onClick={() => setTabCauc(false)}>
+        <button
+          className={`capag-tab ${!tabCauc && !tabLrf ? 'capag-tab-active' : ''}`}
+          onClick={() => { setTabCauc(false); setTabLrf(false); }}
+        >
           Indicadores CAPAG
         </button>
         <button
-          className={`capag-tab ${tabCauc ? 'capag-tab-active' : ''}`}
-          onClick={() => setTabCauc(true)}
+          className={`capag-tab ${tabLrf ? 'capag-tab-active' : ''}`}
+          onClick={() => { setTabLrf(true); setTabCauc(false); }}
         >
-          CAUC 
+          Limites LRF {lrfHits.length > 0 ? `(${lrfHits.length})` : ''}
+        </button>
+        <button
+          className={`capag-tab ${tabCauc ? 'capag-tab-active' : ''}`}
+          onClick={() => { setTabCauc(true); setTabLrf(false); }}
+        >
+          CAUC
         </button>
       </div>
 
+      {tabLrf && (
+        <div className="cauc-section">
+          {lrfHits.length === 0 ? (
+            <p className="cauc-info-text">Nenhum apontamento de limites LRF nas validações desta carga.</p>
+          ) : (
+            <ul className="lrf-list">
+              {lrfHits.map((r, i) => (
+                <li key={`${r.ruleId}-${i}`} className={`lrf-item severity-${r.severity}`}>
+                  <strong>{r.ruleId}</strong>
+                  <span>{r.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="cauc-info-text" style={{ marginTop: 12 }}>
+            Os limites de Pessoal, ARO e Operações de Crédito também aparecem na aba
+            <strong> Regras D1 a D4</strong> com o detalhamento completo.
+          </p>
+        </div>
+      )}
+
       {/* ── Aba CAPAG ── */}
-      {!tabCauc && (
+      {!tabCauc && !tabLrf && (
         <>
           <div className="capag-grid">
             {capag.indicadores.map(ind => (

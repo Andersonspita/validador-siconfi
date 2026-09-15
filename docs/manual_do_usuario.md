@@ -125,7 +125,7 @@ O botão 🤖 no canto inferior direito abre o Assistente Fiscal IA, disponível
 
 ## Exportar o Relatório PDF
 
-Clique em **"Gerar Relatório Oficial (PDF)"** na aba Validações. O PDF contém:
+Clique em **"Relatório PDF"** na barra de ações da aba Validações. O PDF contém:
 
 1. Cabeçalho com ente, período, data e versão do MDF
 2. Resumo colorido (impeditivos / avisos / orientações)

@@ -1,0 +1,465 @@
+﻿co_dimensao;no_verificacao;no_dimensao;no_aplicavel;no_desc;no_declaracao;no_anexo;no_finalidade;capag
+DI;D1_00001;Gestão da Informação;E/DF/M;Homologação de todos os RREOs;RREO;Verificação de entrega;Verifica se o ente homologou todos os RREOs para o exercício analisado.;
+DI;D1_00002;Gestão da Informação;E/DF/M;Homologação da DCA;DCA;Verificação de entrega;Verifica se o ente homologou a DCA do exercício analisado. ;
+DI;D1_00003;Gestão da Informação;E/DF/M;Homologação de todos os RGFs do poder Executivo;RGF;Verificação de entrega;Verifica se o poder executivo do ente homologou todos os RGFs para o exercício analisado.;
+DI;D1_00004;Gestão da Informação;E/DF/M;Homologação de todos os RGFs do poder Legislativo;RGF;Verificação de entrega;Verifica se todos os órgãos do poder legislativo do ente homologaram todos os RGFs para o exercício analisado.;
+DI;D1_00005;Gestão da Informação;E/DF;Homologação de todos os RGFs do Judiciário, Ministério Público e Defensoria Pública;RGF;Verificação de entrega;Verifica se foram homlogados todos os RGFs de todos os órgãos dos poderes Judiciário, Ministério Público e Defensoria Pública para o exercício analisado. ;
+DI;D1_00006;Gestão da Informação;E/DF/M;Tempestividade na homologação dos RREOs;RREO;Verificação de entrega no prazo;Verifica se todos os RREOs do exercício analisado foram homologados no Siconfi dentro do prazo estabelecido pela legislação.;
+DI;D1_00007;Gestão da Informação;E/DF/M;Tempestividade na homologação da DCA;DCA;Verificação de entrega no prazo;Verifica se a DCA do exercício analisado foi homologada no Siconfi dentro do prazo estabelecido pela legislação.;
+DI;D1_00008;Gestão da Informação;E/DF/M;Tempestividade na homologação dos RGFs do poder Executivo;RGF;Verificação de entrega no prazo;Verifica se todos os RGFs do poder executivo do exercício analisado foram homologados no Siconfi dentro do prazo estabelecido pela legislação.;
+DI;D1_00009;Gestão da Informação;E/DF/M;Tempestividade na homologação dos RGFs do poder Legislativo;RGF;Verificação de entrega no prazo;Verifica se todos os RGFs do poder legislativo do exercício analisado foram homologados no Siconfi dentro do prazo estabelecido pela legislação.;
+DI;D1_00010;Gestão da Informação;E/DF;Tempestividade na homologação dos RGFs do Judiciário, Ministério Público e Defensoria Pública;RGF;Verificação de entrega no prazo;Verifica se todos os RGFs dos poderes Judiciário, Ministério Público e Defensoria Pública, do exercício analisado, foram homologados no Siconfi dentro do prazo estabelecido pela legislação.;
+DI;D1_00011;Gestão da Informação;E/DF/M;Quantidade de retificações dos RREOs do exercício;RREO;Verificação de retificação;Verifica a quantidade de retificações efetuadas em todos os RREOs do exercício analisado. A pontuação é proporcional à quantidade de retificações, de 0,5 a 1,0 ponto.;
+DI;D1_00012;Gestão da Informação;E/DF/M;Quantidade de retificações da DCA;DCA;Verificação de retificação;Verifica a quantidade de retificações efetuadas na DCA do exercício analisado. A pontuação é proporcional à quantidade de retificações, de 0,5 a 1,0 ponto.;
+DI;D1_00013;Gestão da Informação;E/DF/M;Quantidade de retificações dos RGFs do poder executivo no exercício;RGF;Verificação de retificação;Verifica a quantidade de retificações efetuadas em todos os RGFs do poder executivo no exercício analisado. A pontuação é proporcional à quantidade de retificações, de 0,5 a 1,0 ponto.;
+DI;D1_00014;Gestão da Informação;E/DF/M;Quantidade de retificações dos RGFs do poder Legislativo no exercício;RGF;Verificação de retificação;Verifica a quantidade de retificações efetuadas em todos os RGFs do poder legislativo no exercício analisado. A pontuação é proporcional à quantidade de retificações, de 0,5 a 1,0 ponto.;
+DI;D1_00015;Gestão da Informação;E/DF;Quantidade de retificações dos RGFs do Judiciário, Ministério Público e Defensoria Pública, no exercício;RGF;Verificação de retificação;Verifica a quantidade de retificações efetuadas em todos os RGFs dos poderes Judiciário, Ministério Público e Defensoria Pública, do exercício analisado. A pontuação é proporcional à quantidade de retificações, de 0,5 a 1,0 ponto.;
+DI;D1_00016;Gestão da Informação;E/DF/M;Envio de todas as MSCs do período;MSC;Verificação de entrega;Verifica se o ente enviou todas as Matrizes de Saldos Contábeis no exercício analisado, inclusive a MSC de encerramento. Cada MSC entregue vale 1/13 da pontuação.;
+DI;D1_00017;Gestão da Informação;E/DF/M;Envio de MSCs com valores negativos;MSC;MSC com valores inferior a zero;Verifica a quantidade de matrizes com valores negativos. Cada MSC sem valores negativos vale 1/13 da pontuação.;
+DI;D1_00018;Gestão da Informação;E/DF/M;Envio de MSCs com contas com movimentação inconsistente: SI + MOV <> SF;MSC;MSCs com contas com movimentação inconsistente;Verifica a quantidade de matrizes com contas com movimentação inconsistente: saldo inicial + movimentação <> saldo final. Cada MSC sem movimentação incorreta vale 1/13 da pontuação.;
+DI;D1_00019;Gestão da Informação;E/DF/M;Envio de MSCs com códigos de poder/órgão incorretos;MSC;MSCs com poder/órgãos incorretos;Verifica a quantidade de matrizes com códigos de poderes incorretos. Cada MSC sem PO incorreto vale 1/13 da pontuação.;
+DI;D1_00020;Gestão da Informação;E/DF/M;Envio de MSCs com diferenças nos saldos entre meses diferentes;MSC;MSCs com contas com saldos divergentes;Verifica a quantidade de matrizes com contas cujo saldo inicial é diferente do saldo final da MSC do mês anterior. Cada MSC sem divergência vale 1/12 da pontuação.;
+DI;D1_00021;Gestão da Informação;E/DF/M;Envio de MSCs com contas do ativo com saldo invertido incorretamente;MSC;MSCs com contas de ativo com saldos invertidos;Verifica a quantidade de matrizes com contas dos grupos 1111, 1121, 1125, 1231 e 1232 cujo saldo final está com natureza diferente da padrão do PCASP Estendido. Cada MSC vale 1/13 da pontuação.;
+DI;D1_00022;Gestão da Informação;E/DF/M;Envio de de MSCs com todos os códigos de poder/órgão;MSC;MSCs com informação de todos os poderes/órgãos;Verifica a quantidade de matrizes com todos os códigos de poder/órgão informados. Cada MSC completa vale 1/13 da pontuação.;
+DI;D1_00023;Gestão da Informação;E/DF/M;Envio de MSCs com dados do poder executivo iguais entre meses diferentes;MSC;MSCs do executivo repetida;Verifica a quantidade matrizes com dados do poder executivo repetida em mais de um mês. Cada MSC única vale 1/13 da pontuação.;
+DI;D1_00024;Gestão da Informação;E/DF/M;Envio de MSCs com dados do legislativo iguais entre meses diferentes;MSC;MSCs do legislativo repetida;Verifica a quantidade matrizes com dados do poder legislativo repetida em mais de um mês. Cada MSC única vale 1/13 da pontuação.;
+DI;D1_00025;Gestão da Informação;E/DF/M;Envio de MSCs com contas do passivo com saldo invertido incorretamente;MSC;MSCs com contas de passivo com saldos invertidos;Verifica a quantidade de matrizes com contas dos grupos 2111, 2112, 2113,2114, 2121, 2122, 2123, 2124, 2125,2126, 213, 214, 215, 221, 222, 223 cujo saldo final está com natureza diferente da padrão do PCASP Estendido.  Cada MSC vale 1/13 da pontuação.;
+DI;D1_00026;Gestão da Informação;E/DF/M;Envio de MSCs com contas de patrimônio líquido com saldo invertido incorretamente;MSC;MSCs com contas de patrimonio líquido com saldos invertidos;Verifica a quantidade de matrizes com contas dos grupos 2311, 2312, 232, 233, 234, 235, 236 cujo saldo final está com natureza diferente da padrão do PCASP Estendido. Cada MSC vale 1/13 da pontuação.;
+DI;D1_00027;Gestão da Informação;E/DF/M;Envio de MSCs com contas com atributo F (financeiro) sem detalhamento de fonte ou destinação de recursos;MSC;MSCs com informações complementares - fonte de recurso - incompletas;Verifica a quantidade matrizes com contas contábeis com informação complementar de  atributo do superávit financeiro igual a F que não tenham informação complementar de FR - fonte ou destinação de recurso - associada.  Cada MSC vale 1/13 da pontuação.;
+DI;D1_00028;Gestão da Informação;E/DF/M;Envio de MSCs com todas as classes de contas (Patrimonial, orçamentária e controle);MSC;MSCs com informção de contas incompletas;Verifica se foram enviados valores nas Matrizes de Saldos Contábeis, diferentes de zero, em todas as classes de contas da MSC: patrimonial (1, 2, 3 e 4), orçamentária (5 e 6) e controle (7 e 8). Cada MSC vale 1/13 da pontuação.;
+DI;D1_00029;Gestão da Informação;E/DF/M;Envio de MSCs com contas de receita orçamentária e deduções sem detalhamento de fonte  ou destinação de recurso;MSC;MSCs com informações complementares de contas de receita - fonte ou destinação de recurso - incompletas;Verifica a quantidade de MSC com contas dos grupos 6211, 6212, 6213 cujos registros não apresentam detalhamento de fonte ou destinação de recurso. Cada MSC vale 1/13 da pontuação.;
+DI;D1_00030;Gestão da Informação;E/DF/M;Envio de MSCs com contas de receita orçamentária e deduções sem o detalhamento de natureza de receita;MSC;MSCs com informações complementares de contas de receita - natureza da receita - incompletas;Verifica a quantidade de MSC com contas dos grupos 6211, 6212, 6213 cujos registros não apresentam detalhamento de natureza da receita. Cada MSC vale 1/13 da pontuação.;
+DI;D1_00031;Gestão da Informação;E/DF/M;Envio de MSCs com contas de despesa orçamentária sem o detalhamento de natureza de despesa;MSC;MSCs com informações complementares de contas de despesa - natureza de despesa - incompletas;Verifica a quantidade de MSC com contas dos grupos 62213 cujos registros não apresentam detalhamento de natureza da despesa. Cada MSC vale 1/13 da pontuação.;
+DI;D1_00032;Gestão da Informação;E/DF/M;Envio de MSCs com contas de despesa orçamentária sem o detalhamento de função/subfunção;MSC;MSCs com informações complementares de contas de despesa - função/subfunção - incompletas;Verifica a quantidade de MSC com contas dos grupos 62213 cujos registros não apresentam detalhamento de função/subfunção. Cada MSC vale 1/13 da pontuação.;
+DI;D1_00033;Gestão da Informação;E/DF/M;Envio de MSCs com contas de despesa orçamentária sem o detalhamento de fonte ou destinação de recursos;MSC;MSCs com informações complementares de contas de despesa - fonte de recursos - incompletas;Verifica a quantidade de MSC com contas dos grupos 62213 cujos registros não apresentam detalhamento de fonte ou destinação de recursos. Cada MSC vale 1/13 da pontuação.;
+DI;D1_00034;Gestão da Informação;E/DF/M;Envio de MSC com contas de VPD com saldo invertido incorretamente;MSC;MSCs com contas de VPD com saldos invertidos;Verifica a quantidade de matrizes com contas dos grupos 311, 312, 313, 321, 322, 323, 331, 332, 333 , 351, 352, 353, 361, 362 e 363 cujo saldo final está com natureza diferente da padrão do PCASP Estendido. Exceto MSC de encerrament;
+DI;D1_00035;Gestão da Informação;E/DF/M;Envio de MSC com contas de VPA com saldo invertido incorretamente;MSC;MSCs com contas de VPA com saldos invertidos;Verifica a quantidade de matrizes com contas de VPA cujo saldo final está com natureza diferente da padrão do PCASP Estendido.  Exceto MSC de encerramento. Cada MSC vale 1/12 da pontuação.;
+DI;D1_00036;Gestão da Informação;E/DF/M;Envio de MSC encerramento com saldo final nas contas VPA e VPD;MSC;MSC Encerramento com saldo final nas contas de VPA e VPD;Verifica se a MSC de encerramento foi encaminhada com o correto encerramento das contas de VPA e VPD. Ou seja, essas contas não podem apresentar saldo final na MSC de encerramento.;
+DI;D1_00037;Gestão da Informação;E/DF/M;Quantidade de MSC de estados e municípios com fontes de recursos da União;MSC;MSCs com fontes de recursos da União;Verifica se estados e municípios enviaram informações em fontes de recursos da União (de 000 a 499). Cada MSC vale 1/13 da pontuação.;
+DI;D1_00038;Gestão da Informação;E/DF/M;Quantidade de MSC com contas de previsão e execução orçamentária com saldos invertidos.;MSC;MSCs com saldo final de natureza diferente do padrão PCASP;Verifica a quantidade de matrizes com contas de classe 5 e 6 cujo saldo final está com natureza diferente da padrão do PCASP Estendido. Cada MSC vale 1/13 da pontuação.;
+DII;D2_00001;Contábil;E/DF/M;Informação da variação patrimonial aumentativa do FUNDEB no Anexo I-HI da DCA;DCA;ANEXO I - HI;Verifica se foi informado, no Anexo I-HI da DCA, valor da variação patrimonial aumentativa com o FUNDEB.;
+DII;D2_00002;Contábil;E/DF/M;Informação da variação patrimonial diminutiva do FUNDEB no Anexo I-HI da DCA;DCA;ANEXO I - HI;Verifica se foi informado, no Anexo I-HI da DCA, valor da variação patrimonial diminutiva com o FUNDEB.;
+DII;D2_00003;Contábil;E/DF/M;Informação de deduções de receitas para formação do FUNDEB no Anexo I-C da DCA;DCA;ANEXO I - C;Verifica se foram informadas, no Anexo I-C da DCA, valores referentes ao registro orçamentário de destinação ao FUNDEB.;CAPAG
+DII;D2_00004;Contábil;E/DF/M;Informação das receitas orçamentárias do FUNDEB no Anexo I-C da DCA;DCA;ANEXO I - C;Verifica se foram informadas, no Anexo I-C da DCA, as receitas orçamentárias com a entrada de recursos para o FUNDEB.;CAPAG
+DII;D2_00005;Contábil;E/DF/M;Informação das despesas orçamentárias com encargos patronais no Anexo I-D da DCA;DCA;ANEXO I - D;Verifica se foram informadas, no Anexo I-D da DCA, as despesas orçamentárias com encargos patronais relativos aos servidores e funcionários do ente.;
+DII;D2_00006;Contábil;E/DF/M;Informação das despesas orçamentárias com pessoal no Anexo I-D da DCA;DCA;ANEXO I - D;Verifica se foram informadas, no Anexo I-D da DCA, as despesas orçamentárias os servidores e funcionários do ente.;
+DII;D2_00007;Contábil;E/DF/M;Informação de despesas orçamentárias de custeio no Anexo I-D da DCA;DCA;ANEXO I - D;"Verifica se foram informadas, no Anexo I-D da DCA, as despesas orçamentárias de outros grupos de natureza da despesa relacionados a custeio diferente de ""Pessoal e Encargos Sociais"" e ""Juros e Encargos da Dívida"".";
+DII;D2_00008;Contábil;E/DF/M;Informação das despesa orçamentárias por função no Anexo I-E da DCA;DCA;ANEXO I - E;Verifica se foram informadas, no Anexo I-E da DCA, as despesas orçamentárias classificadas por função do gasto púbblico.;
+DII;D2_00010;Contábil;E/DF/M;Informação das receitas de transferências intergovernamentais no Anexo I-C da DCA;DCA;ANEXO I - C;Verifica se foram informadas, no Anexo I-C da DCA, as receitas orçamentárias de transferências de outros entes/entidades.;CAPAG
+DII;D2_00011;Contábil;E/DF/M;Informação de receitas orçamentárias tributárias no Anexo I-C da DCA;DCA;ANEXO I - C;Verifica se foram informadas, no Anexo I-C da DCA, as receitas orçamentárias tributárias.;CAPAG
+DII;D2_00012;Contábil;E/DF/M;Avalia a existência de receitas orçamentárias menores que suas deduções no Anexo I-C da DCA;DCA;ANEXO I - C;Verifica, no Anexo I-C da DCA, se o valor de deduções de receitas é superior às receitas brutas para cada uma das linhas. As naturezas de receitas começadas por 132 não são analisadas.;CAPAG
+DII;D2_00013;Contábil;E/DF/M;"Avalia a existência de ajustes para perdas maiores que os ativos originais no Anexo I-AB da DCA para ""Créditos a curto e longo prazos""";DCA;ANEXO I - AB;"Verifica a relação entre o ajuste para perdas dos ""Créditos a curto e longo prazo"" e suas contas principais no Anexo I-AB da DCA. O valor dos ajustes não pode ser superior aos valores das contas originais.";
+DII;D2_00014;Contábil;E/DF/M;"Avalia a existência de ajustes para perdas maiores que os ativos originais no Anexo I-AB da DCA para ""Demais créditos e valores a curto e longo prazo""";DCA;ANEXO I - AB;"Verifica a relação entre o ajuste para perdas dos ""Demais créditos e valores a curto e longo prazo"" e suas contas principais no Anexo I-AB da DCA. O valor dos ajustes não pode ser superior aos valores das contas originais.";
+DII;D2_00015;Contábil;E/DF/M;Informação de valor patrimonial de bens móveis no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se foi informado saldo patrimonial de bens móveis no Anexo I-AB da DCA.;
+DII;D2_00016;Contábil;E/DF/M;Informação de Depreciação acumulada de bens móveis no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se foi informado saldo patrimonial de depreciação acumulada de bens móveis no Anexo I-AB da DCA.;
+DII;D2_00017;Contábil;E/DF/M;Informação de variação patrimonial diminutiva de depreciação de bens móveis e imóveis no Anexo I-HI da DCA;DCA;ANEXO I - HI;Verifica se foi informada Variação patrimonial diminutiva de depreciação de bens móveis e imóveis no Anexo I-HI da DCA.;
+DII;D2_00018;Contábil;E/DF/M;Avalia se o valor dos bens móveis é maior que sua depreciação acumulada no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se os valores de depreciação de bens móveis é inferior ao valor  total de bens móveis no Anexo I-AB da DCA.;
+DII;D2_00019;Contábil;E/DF/M;Informação do valor patrimonial de bens imóveis no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se foi informado saldo patrimonial de bens imóveis no Anexo I-AB da DCA.;
+DII;D2_00020;Contábil;E/DF/M;Informação de depreciação acumulada de bens imóveis no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se foi informado saldo patrimonial de depreciação acumulada de bens imóveis no Anexo I-AB da DCA.;
+DII;D2_00021;Contábil;E/DF/M;Avalia se o valor dos bens imóveis é maior que sua depreciação acumulada no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se os valores de depreciação acumulada de bens imóveis é inferior ao valor total de bens imóveis no Anexo I-AB da DCA.;
+DII;D2_00022;Contábil;E/DF/M;Relação entre a VPA de Contribuições para o RPPS e a Provisão Atuarial do RPPS;DCA;"ANEXO I - AB
+ANEXO I - HI";Verificação da existência de saldo na conta de provisão atuarial no balanço patrimonial (Anexo I-AB) sempre que existirem valores de VPA de contribuições para o RPPS no Anexo I-HI da DCA.;
+DII;D2_00023;Contábil;E/DF/M;Avalia se o valor de inscrição de restos a pagar não processados no Anexo I-D da DCA é menor ou igual à diferença entre despesas empenhadas e liquidadas;DCA;ANEXO I - D;Verifica se o valor inscrito em RPNP no exercício é menor ou igual à diferença entre os valores registrados de despesa empenhada e liquidada no Anexo I-D da DCA.;
+DII;D2_00024;Contábil;E/DF/M;Avalia se o valor de inscrição de restos a pagar processados no Anexo I-D da DCA é menor ou igual à diferença entre despesas liquidadas e pagas;DCA;ANEXO I - D;Verifica se o valor inscrito em RPP no exercício é menor ou igual à diferença entre os valores registrados de despesa liquidada e paga no Anexo I-D da DCA.;
+DII;D2_00028;Contábil;E/DF/M;Avalia se o valor de Passivo Circulante Financeiro é menor ou igual ao Passivo Circulante no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se o valor do Passivo Circulante Financeiro é menor ou igual ao valor de Passivo Circulante no Anexo I-AB da DCA.;CAPAG
+DII;D2_00029;Contábil;E/DF/M;Relação entre empréstimos e financiamentos no Anexo I-AB e a VPD  de Juros e Encargos no Anexo I-HI - PIPCP item 10;DCA;"ANEXO I - AB 
+ANEXO I - HI";Verifica a existência de VPD de Juros e Encargos de Empréstimos e Financiamentos no Anexo I-HI quando foram informados valores de Obrigações decorrentes de empréstimos e financiamentos no Anexo I-AB da DCA.;CAPAG
+DII;D2_00030;Contábil;E/DF/M;Existência de contas de terceiro nível do PCASP com saldos negativos no Anexo - I-AB da DCA;DCA;ANEXO I - AB;Verifica se foram informados valores negativos nas contas de balanço, no terceiro nível do PCASP, no Anexo I-AB da DCA. Não são avaliadas contas que começam com 23.;
+DII;D2_00031;Contábil;E/DF/M;Existência de contas de terceiro nível do PCASP com saldos negativos no Anexo - I-HI da DCA;DCA;ANEXO I - HI;Verifica se foram informados valores negativos nas contas de VPA e VPD, no terceiro nível do PCASP, no Anexo I-HI da DCA. São avaliados todos os grupos de contas.;
+DII;D2_00032;Contábil;E/DF/M;Informação de Ajuste de Dívida Ativa (Tributária + Não Tributária) no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se o ente aplica o PIPCP de ajuste para perdas da Dívida ativa. Se existe saldo de Dívida ativa, é verificada a existência de ajuste para perdas no mesmo grupo. Curto prazo e longo prazo são analisados separadamente.;
+DII;D2_00033;Contábil;E/DF/M;Informação de receitas que não são de competência do ente no Anexo I-C da DCA;DCA;ANEXO I - C;Verifica se foi informada alguma receita ou dedução de receita no Anexo I-C da DCA que não é de competência do ente.;CAPAG
+DII;D2_00034;Contábil;E/DF/M;Existência de contas de quinto nível do PCASP com saldos negativos no Anexo - I-HI da DCA;DCA;ANEXO I - HI;Verifica se foram informados valores negativos nas contas de VPA e VPD, no quinto nível do PCASP, no Anexo I-HI da DCA. São avaliados todos os grupos de contas.;
+DII;D2_00035;Contábil;E/DF/M;Informação de deduções de Receitas com sinal negativo no Anexo I-C da DCA;DCA;ANEXO I - C;Verifica se foram informados valores negativos nas colunas das deduções da receita do Anexo I-C da DCA.;CAPAG
+DII;D2_00036;Contábil;E/DF;Verifica a evidenciação de créditos tributários na DCA, relacionando a existência de VPD no Anexo I-HI com créditos tributários no Anexo I-AB - PIPCP item 1;DCA;"ANEXO I - AB
+ANEXO I - HI";Verifica se houve evidenciação de créditos tributários: se existe VPA de tributos no Anexo I-HI, deve haver o registro do crédito no ativo curto/longo prazo no Anexo I-AB  - PIPCP item 1;
+DII;D2_00037;Contábil;E/DF/M;Verifica a informação de registro de créditos tributários do período no Anexo I-HI da DCA - PIPCP item 1;DCA;ANEXO I - HI;Verifica se houve registro de créditos tributários no período no Anexo I-HI da DCA.;
+DII;D2_00038;Contábil;E/DF;Verifica a informação de créditos previdenciários no Anexo I-AB da DCA - PIPCP item 2;DCA;ANEXO I - AB;Verifica se existem créditos previdenciários registrados no Anexo I-AB da DCA.;
+DII;D2_00039;Contábil;E/DF/M;Verifica a evidenciação de provisões por competência, relacionando a existência de VPD no Anexo I-HI e passivos no Anexo I-AB da DCA;DCA;"ANEXO I - AB
+ANEXO I - HI";Verifica as provisões por competência: se há valor de VPD de provisão no Anexo I-HI, deve haver o registro no passivo de curto ou de longo prazo no Anexo I-AB.;
+DII;D2_00040;Contábil;E/DF/M;Existência de contas de quinto nível do PCASP com saldos negativos no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se foram informados valores negativos nas contas de balanço, no quinto nível do PCASP, no Anexo I-AB da DCA. Não são avaliadas contas que começam com 23.;
+DII;D2_00043;Contábil;E/DF/M;Relação entre ativo intangível e a respectiva amortização no Anexo I-AB da DCA;DCA;ANEXO I - AB;Verifica se o valor de amortização acumulada é inferior ao valor do ativo intangível no Anexo I-AB da DCA.;
+DII;D2_00044;Contábil;E/DF/M;Avalia a igualdade das receitas arrecadadas na MSC de encerramento e no Anexo I-C da DCA;"MSC
+DCA";"MSCE
+ANEXO I - C";Verifica se o valor acumulado das receitas arrecadadas da MSC de encerramento é igual às receitas arrecadadas do Anexo I-C da DCA. Na MSC de encerramento, considera-se o saldo inicial das contas começadas por 6212, 6213101, 6213102, 62132 e 62139 que tenham detalhamento de natureza de receita.;CAPAG
+DII;D2_00045;Contábil;E/DF;Avalia a igualdade das receitas com tributos estaduais na MSC de encerramento e no Anexo I-C da DCA;"MSC
+DCA";"MSCE
+ANEXO I - C";Verifica se o valor acumulado das receitas com tributos estaduais (ICMS, IPVA, ITCD, IRRF) da MSC de encerramento é igual ao informado no Anexo I-C da DCA.  Na MSC de encerramento, considera-se o saldo inicial das contas começadas por 6212, 6213101, 6213102, 62132 e 62139 que tenham detalhamento de natureza de receita.;CAPAG
+DII;D2_00046;Contábil;M;Avalia a igualdade das receitas com tributos municipais na MSC de encerramento e no Anexo I-C da DCA;"MSC
+DCA";"MSCE
+ANEXO I - C";Verifica se o valor acumulado das receitas com tributos municipais ( IPTU, ISS, ITBI, IRRF ) da MSC de encerramento é igual ao informado no Anexo I-C da DCA.  Na MSC de encerramento, considera-se o saldo inicial das contas começadas por 6212, 6213101, 6213102, 62132 e 62139 que tenham detalhamento de natureza de receita.;CAPAG
+DII;D2_00047;Contábil;E/DF;Avalia a igualdade das receitas estaduais com transferências constitucionais na MSC de encerramento e no Anexo I-C da DCA;"MSC
+DCA";"MSCE
+ANEXO I - C";Verifica se o valor acumulado das receitas estaduais com transferências ( Cota-Parte do FPE e Transferências do FUNDEB) da MSC de encerramento é igual ao informado no Anexo I-C da DCA.  Na MSC de encerramento, considera-se o saldo inicial das contas começadas por 6212, 6213101, 6213102, 62132 e 62139 que tenham detalhamento de natureza de receita.;CAPAG
+DII;D2_00048;Contábil;M;Verifica a igualdade das receitas municipais com transferências constitucionais na MSC de dezembro e no Anexo I-C da DCA;"MSC
+DCA";"MSCE
+ANEXO I - C";Verifica se o valor acumulado das receitas municipais com transferências (Cotas-Partes do FPM, do ICMS, do IPVA, do ITR e Transferências do FUNDEB) da MSC de encerramento é igual ao informado no Anexo I-C da DCA.  Na MSC de encerramento, considera-se o saldo inicial das contas começadas por 6212, 6213101, 6213102, 62132 e 62139 que tenham detalhamento de natureza de receita.;CAPAG
+DII;D2_00049;Contábil;E/DF/M;Verifica a igualdade das Despesas Orçamentárias empenhadas, liquidadas e pagas na MSC de encerramento e no Anexo I-D da DCA;"MSC
+DCA";"MSCE
+ANEXO I - D";Verifica se o valor das despesas orçamentárias no Anexo I-D da DCA está igual ao saldo inicial da MSC de encerramento. Avaliam-se valores empenhados, liquidados e pagos separadamente. Na MSC de encerramento, considera-se o saldo inicial das contas do grupo 62213 que tenham detalhamento de natureza de despesa.;CAPAG
+DII;D2_00050;Contábil;E/DF/M;Verifica a igualdade dos Restos a Pagar processados e não processados na MSC de encerramento e no Anexo I-D da DCA;"MSC
+DCA";"MSCE
+ANEXO I - D";Verifica se o valor dos RPP e RPNP no Anexo I-D da DCA está igual ao saldo inicial da MSC de encerramento. Avaliam-se valores de RPP e RPNP separadamente. Na MSC de encerramento, considera-se o saldo inicial das contas começadas por 6221304 e 6221307 que tenham detalhamento de natureza de despesa.;
+DII;D2_00051;Contábil;E/DF/M;Verifica se o total de ajustes para perdas de estoques é maior que o saldo de estoques no Anexo I-AB da DCA;DCA;Anexo I-AB;Verifica se o do total do Ajuste para perdas em Estoques é inferior ao total do saldo dos Estoques no Anexo I-AB da DCA.;
+DII;D2_00052;Contábil;E/DF/M;Avalia a relação entre VPA ou VPD com resultado de equivalência patrimonial no Anexo I-H e participações permanentes no Anexo I-AB da DCA;DCA;Anexo I-AB e Anexo I-H;Verifica se o ente está registrando os investimentos permanentes, em conformidade com o PIPCP. Caso haja VPA ou VPD com equivalência patrimonial no Anexo I-HI, verifica-se a existência de investimentos permanentes no Anexo I-AB.;
+DII;D2_00053;Contábil;E/DF/M;Verifica se o total de ajustes para perdas de estoques é maior que o saldo de estoques na MSC de Encerramento;MSC;MSC Encerramento;Verifica se o total do Ajuste para perdas em Estoques é inferior ao total do saldo dos Estoques na MSC de Encerramento.Na MSC de encerramento, utliza-se o saldo final (ending_balance) para contas de classe 1 e 2.;
+DII;D2_00054;Contábil;E/DF/M;Avalia, na MSC de encerramento, a relação entre VPA ou VPD com resultado de equivalência patrimonial e participações permanentes;MSC;MSC Encerramento;Verifica se ente está registrando os investimentos permanentes, em conformidade com o PIPCP.  Caso haja VPA ou VPD com equivalência patrimonial, verifica-se a existência de investimentos permanentes. Na MSC de encerramento, utliza-se o saldo final (ending_balance) para contas de classe 1 e 2 e saldo inicial (beginning_balance) para contas de classe 3 e 4.;
+DII;D2_00055;Contábil;E/DF/M;Avalia se o valor dos ativos intangíveis é maior que sua amortização acumulada na MSC de Encerramento;MSC;MSC Encerramento;Verifica se a amortização acumulada de ativos intangíveis é maior que o do ativo intangível. A avaliação é feita por grupo de ativos específico. Na MSC de encerramento, utliza-se o saldo final (ending_balance) para contas de classe 1 e 2.;
+DII;D2_00058;Contábil;E/DF/M;Avalia se os valores de VPA e VPD com Fundeb estão iguais entre a MSC de encerramento e o Anexo I-HI da DCA;"MSC
+DCA";DCA - Anexo I- HI e MSC de Encerramento;Verifica a igualdade entre os valores informados de Variação Patrimonial Aumentativa com FUNDEB na DCA e MSC. Na MSC de encerramento, utliza-se o saldo inicial (beginning_balance) para contas de classe 3 e 4.;
+DII;D2_00059;Contábil;E/DF/M;"Avalia a existência de ajustes para perdas maiores que os ativos originais na MSC de encerramento para ""Créditos a curto e longo prazos""";MSC;MSC Encerramento;"Verifica a relação entre o valor de ajuste para perdas dos ""Créditos a curto e longo prazo"" e suas contas principais. Os valores de ajustes não podem ser superiores aos valores das contas originais. A verificação é feita por grupo de crédito. Na MSC de encerramento, utliza-se o saldo final (ending_balance) para contas de classe 1 e 2.";
+DII;D2_00060;Contábil;E/DF/M;"Avalia a existência de ajustes para perdas maiores que os ativos originais na MSC de encerramento para ""Demais créditos e valores a curto e longo prazo""";MSC;MSC Encerramento;"Verifica a relação entre o valor de ajuste para perdas dos ""Demais créditos e valores a curto e longo prazo"" e suas contas principais. Os valores de ajustes não podem ser superiores aos valores das contas originais. A verificação é feita por grupo de crédito. Na MSC de encerramento, utliza-se o saldo final (ending_balance) para contas de classe 1 e 2.";
+DII;D2_00061;Contábil;E/DF/M;Informação da variação patrimonial aumentativa do FUNDEB no Anexo I-HI da DCA;DCA;DCA - ANEXO I - H;Verifica se foi informada Variação Patrimonial Aumentativa com o FUNDEB no Anexo I-HI da DCA.;
+DII;D2_00066;Contábil;E/DF/M;Avalia se o valor dos ativos intangíveis é maior que sua amortização acumulada no Anexo I-AB da DCA;DCA;DCA - Anexo I-AB;Verifica, na DCA, se o valor de amortização acumulada é inferior ao valor do ativo intangível. A avaliação é feita por tipo de ativo intangível.;
+DII;D2_00067;Contábil;E/DF/M;Avalia se o valor dos bens móveis é maior que sua depreciação acumulada na MSC de encerramento;MSC;MSC Encerramento;Verifica, na MSC de encerramento, se os valores de depreciação de bens móveis são inferiores ao valor  total de bens móveis. Na MSC de encerramento, utliza-se o saldo final (ending_balance) para contas de classe 1 e 2.;
+DII;D2_00068;Contábil;E/DF/M;Avalia se o valor dos bens imóveis é maior que sua depreciação acumulada na MSC de encerramento;MSC;MSC Encerramento;Verifica, na MSC de encerramento, se os valores  depreciação de bens imóveis são inferiores ao valor  total de bens imóveis. Na MSC de encerramento, utliza-se o saldo final (ending_balance) para contas de classe 1 e 2.;
+DII;D2_00069;Contábil;E/DF/M;Avalia se o valor de despesas exceto-intra na função 09 (Prev. Social) é igual entre a MSC de encerramento e o Anexo I-E da DCA;"MSC
+DCA";DCA - Anexo I-E/ MSC de encerramento;Compara, entre DCA X  MSC de Encerramento, as Despesas Exceto Intraorçamentárias na função 09 (Previdência Social). Na MSC de encerramento, utliza-se o saldo inicial (beginning_balance) para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação diferente de 91 e classificação funcional igual a 09.;
+DII;D2_00070;Contábil;E/DF/M;Avalia se o valor de despesas exceto-intra na função 10 (Saúde) é igual entre a MSC de encerramento e o Anexo I-E da DCA;"MSC
+DCA";DCA - Anexo I-E/ MSC de encerramento;Compara, entre DCA X  MSC de Encerramento, as Despesas Exceto Intraorçamentárias na função 10 (Saúde). Na MSC de encerramento, utliza-se o saldo inicial (beginning_balance) para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação diferente de 91 e classificação funcional igual a 10.;
+DII;D2_00071;Contábil;E/DF/M;Avalia se o valor de despesas exceto-intra na função 12 (Educação) é igual entre a MSC de encerramento e o Anexo I-E da DCA;"MSC
+DCA";DCA - Anexo I-E/ MSC de encerramento;Compara, entre DCA X  MSC de Encerramento, as Despesas Exceto Intraorçamentárias na função 12 (Educação). Na MSC de encerramento, utliza-se o saldo inicial (beginning_balance) para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação diferente de 91 e classificação funcional igual a 12.;
+DII;D2_00072;Contábil;E/DF/M;Avalia se o valor de despesas exceto-intra nas funções diferentes de 09, 10 e 12 é igual entre a MSC de encerramento e o Anexo I-E da DCA;"MSC
+DCA";DCA - Anexo I-E/ MSC de encerramento;Compara, entre DCA X  MSC de Encerramento, as Despesas Exceto Intraorçamentárias nas demais funções (Excetuando-se as funções de Saúde, Educação e Previdência Social). Na MSC de encerramento, utliza-se o saldo inicial (beginning_balance) para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação diferente de 91 e classificação funcional diferente de 09, 10 e 12.;
+DII;D2_00073;Contábil;E/DF/M;Avalia se o valor de despesas intraorçamentárias com detalhamento de função/subfunção é igual entre a MSC de encerramento e o Anexo I-E da DCA;"MSC
+DCA";DCA - Anexo I-E/ MSC de encerramento;Compara as despesas por função entre DCA X  MSC de Encerramento - Intraorçamentárias. Na MSC de encerramento, utliza-se o saldo inicial (beginning_balance) para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação igual a 91.;
+DII;D2_00074;Contábil;E/DF/M;Avalia a igualdade entre os saldos finais de RPP pagos e RPNP pagos na MSC de Encerramento e no Anexo I-F da DCA;"MSC
+DCA";DCA - Anexo I-F/ MSC de encerramento;Compara o saldo final de RPPP e RPNPP executados no exercício entre DCA X MSC de Encerramento. A verificação avalia separadamente os valores de RPP e de RPNP. Na MSC de encerramento, utliza-se o saldo inicial (beginning_balance) para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 6314 (RPNPP) e 6322 (RPPP).;
+DII;D2_00076;Contábil;E/DF/M;Verifica se houve evidenciação de créditos previdenciários parcelados, ou seja, se existir VPA de juros desse parcelamento, deverá haver o registro do crédito no ativo (curto/longo prazo).;MSC;Saldo Inicial da MSC de Janeiro e Saldo Final da MSC de Dezembro;Verifica se o saldo inicial da conta 4.4.2.5.2.02.XX na MSC de encerramento é maior 0, o saldo das contas (1.1.2.1.2.71.XX +  1.2.1.1.2.06.XX + 1.1.3.6.2.02.XX ) deve ser maior que 0;
+DII;D2_00077;Contábil;E/DF/M;Verificação de execução de passivos por competência, a partir da análise das contas que começam 227 e 228.;MSC;Saldo Inicial da MSC de Janeiro e Saldo Final da MSC de Dezembro;Compara o somatório dos Saldos iniciais na msc de janeiro das contas que começam com 227 e 228, serão diferentes do somatório dos saldos finais dessas contas na msc de dezembro;
+DII;D2_00079;Contábil;E/DF/M;Verifica se os valores pagos antecipadamente estão sendo baixados por competência.;MSC;Saldo Inicial da MSC de Janeiro e Saldo Final da MSC de Dezembro;Verifica o somatório dos saldos das contas começam com 119, na msc de janeiro serão diferentes do somatório do saldo final  na msc de dezembro.;
+DII;D2_00080;Contábil;E/DF/M;Verifica se foi reconhecido, mensurado e evidenciado saldo patrimonial na conta de estoques;MSC;MSC Mensal/MSC de encerramento;O saldo final das contas começadas por 11561XXXX > 0, se igual ou menor que zero perde ponto, durante o ano se tiver saldo em algum momento do ano;
+DII;D2_00081;Contábil;E/DF/M;Verifica se houve evidenciação de obrigações por competência decorrentes de benefícios a empregados;MSC;MSC Mensal ;Verifica a existência mensal de lançamentos a crédito, se houver férias e  13º salario (2.1.1.1.1.01.02 + 2.1.1.1.1.01.03).;
+DII;D2_00082;Contábil;E/DF/M;Verifica se houve movimentação mensal nas contas patrimoniais de depreciação, exaustão ou amortização acumulada de bens móveis.;MSC;MSC Mensal ;Verifica se cada conta de depreciação (1.2.3.8.1.01.00), de amortização (1.2.3.8.1.03.00 ) e de exaustão (1.2.3.8.1.05.00 ), há registros mensais de lançamentos a crédito.;
+DII;D2_00083;Contábil;E/DF/M;Verifica o cumprimento das regras de integridade de DDR;MSC;MSC Mensal/MSC de encerramento;Verifica se os saldos finais das contas contábeis acima de 721 serão iguais aos saldos finais da 821;
+DII;D2_00084;Contábil;E/DF/M;Avalia se a soma total de passivo financeiro e permanente da DCA é maior ou igual ao total da soma do passivo circulante e não circulante na MSC de dezembro.;"MSC
+DCA";DCA / MSC de encerramento;Verifica se a soma do passivo financeiro e passivo permanente da DCA  é igual ou maior a soma do passivo circulante e não circulante do saldo final da MSC de dezembro.;CAPAG
+DII;D2_00085;Contábil;E/DF/M;Avalia se o total da soma do passivo financeiro e permanente na DCA é maior ou igual ao total de ativo circulante e  passivo circulante na DCA.;DCA;DCA;Verifica se a soma do passivo financeiro e passivo permanente da DCA  é igual ou maior a soma do passivo circulante e não circulante da DCA.;CAPAG
+DII;D2_00086;Contábil;E/DF/M;Verifica se houve reconhecimento de VPD com material de consumo em todos os meses.;MSC;MSCs mensais;Verifica se houve reconhecimento de VPD com material de consumo em todos os meses.;
+DII;D2_00087;Contábil;E/DF/M;Verifica se houve reconhecimento de VPD com serviços em todos os meses.;MSC;MSCs mensais;Verifica se houve reconhecimento de VPD com serviços em todos os meses.;
+DII;D2_00088;Contábil;E/DF/M;Verifica se houve reconhecimento de variação patrimonial aumentativa com Transferências Intergovernamentais em todos os meses.;MSC;MSCs mensais;Verifica se houve reconhecimento de variação patrimonial aumentativa com Transferências Intergovernamentais em todos os meses.;
+DII;D2_00089;Contábil;E/DF/M;Verifica a existência de VPD de Variações Monetárias e Cambiais quando foram informados valores de Obrigações decorrentes de empréstimos e financiamentos externos.;DCA;"ANEXO I - AB
+ANEXO I - HI";Verifica a existência de VPD de Variações Monetárias e Cambiais quando foram informados valores de Obrigações decorrentes de empréstimos e financiamentos externos.;
+DII;D2_00093;Contábil;E/DF/M;Verifica se foi reconhecido, mensurado e evidenciado a movimentação patrimonial de consumo nas contas de almoxarifado (grupo 11561).;MSC;MSCs mensais;Verifica se foi reconhecido, mensurado e evidenciado a movimentação patrimonial de consumo nas contas de almoxarifado (grupo 11561).;
+DII;D2_00094;Contábil;E/DF/M;Verificar se existem despesas previdenciárias devidamente registradas no período para servidores do RPPS.;MSC;MSCs mensais;É avaliada a relação entre a movimentação das contas 3.1.1.1.1.01.01 e 3.1.2.1.2.01.00.;
+DII;D2_00095;Contábil;E/DF/M;Verificar se existem despesas previdenciárias devidamente registradas no período para funcionários contratados sob RGPS.;MSC;MSCs mensais;É avaliada a relação entre a movimentação das contas 3.1.1.2.1.01.01 e 3.1.2.2.1.01.00 e 3.1.2.2.3.01.00.;
+DII;D2_00097;Contábil;E/DF/M;Verificar se o valor total transferido pela União por meio de transferências especiais de emendas individuais é menor ou igual ao valor total de receitas decorrentes dessas transferências registrados pelo ente.;MSC;"Relatório de Transferências da União 
+MSC de Dezembro";Verificar se o valor total transferido pela União por meio de transferências especiais de emendas individuais é menor ou igual ao valor total de receitas decorrentes dessas transferências registrados pelo ente.;CAPAG
+DII;D2_00099;Contábil;MUN;Avalia a informação de deduções com transferências constitucionais por municípios.;DCA;Anexo I-C;Avaliar a informação de deduções com transferências constitucionais por municípios.;CAPAG
+DIII;D3_00001;Fiscal;E/DF/M;Avalia a correta informação do déficit ou superávit orçamentário no Anexo 01 do RREO;RREO;ANEXO-1;Verifica se o resultado orçamentário foi calculado corretamente no Balanço Orçamentário e se esse valor foi informado na coluna correta do Anexo 01 do RREO 6ºB.;
+DIII;D3_00002;Fiscal;E/DF/M;Igualdade da Informação de despesas orçamentárias entre os anexos 1 e 2 do RREO;RREO;"ANEXO-1
+ANEXO-2  ";Verifica a igualdade dos valores de despesa entre o Balanço Orçamentário (Anexo 01) e o Demonstrativo da Execução da Despesa por Função/Subfunção (Anexo 02) do RREO.;
+DIII;D3_00003;Fiscal;E/DF/M;Igualdade da Informação de despesas orçamentárias entre os anexos 1 e 6 do RREO;RREO;"ANEXO-1 
+ANEXO-6";Verifica a igualdade dos valores de despesa entre o Balanço Orçamentário (Anexo 01) e o Demonstrativo dos Resultados Primário e Nominal (Anexo 06) do RREO.;
+DIII;D3_00005;Fiscal;E/DF/M;Igualdade da Receita Corrente Líquida (RCL) entre o Anexo 03 do RREO e os Anexos 01, 02, 03 e 04 do RGF do poder executivo;"RREO
+RGF";"RREO-ANEXO-3 
+RGF-ANEXO-1
+RGF-ANEXO-2
+RGF-ANEXO-3
+RGF-ANEXO-4";Verifica a igualdade da Receita Corrente Líquida entre o Anexo 03 do RREO e os Anexos 01, 02, 03 e 04 do RGF do poder executivo.;CAPAG
+DIII;D3_00006;Fiscal;E/DF/M;Igualdade da Dívida Consolidada Líquida (DCL) entre o Anexo 06 do RREO e o Anexo 02 do RGF do poder executivo;"RREO
+RGF";"RREO-ANEXO-6
+RGF-ANEXO-2";Verifica a igualdade da DCL entre os Demonstrativos dos Resultados Primário e Nominal (Anexo 06) no RREO e o Demonstrativo da Dívida Consolidada Líquida (Anexo 02) no RGF do poder executivo.;
+DIII;D3_00007;Fiscal;E/DF/M;Igualdade da previsão atualizada de receitas e receitas realizadas entre anexos 01 e 06 do RREO;RREO;"ANEXO-1
+ANEXO-6
+ ";Verifica a igualdade da previsão atualizada de receitas e das receitas realizadas até o bimestre entre o Anexo 01 e o Anexo 06 do RREO.;
+DIII;D3_00008;Fiscal;E/DF/M;Igualdade dos restos a pagar não processados entre o Anexo 01 do RREO e o Anexo 05 do RGF de todos os poderes/órgãos;"RREO
+RGF";"RREO - ANEXO-1
+RGF - ANEXO-5";Verifica a igualdade dos valores dos restos a pagar não processados entre o Anexo 01 do RREO e a soma dos valores do Anexo 05 do RGF de todos os poderes/órgãos.;CAPAG
+DIII;D3_00009;Fiscal;E/DF/M;Igualdade dos restos a pagar processados e não processados entre o Anexo 07 do RREO e o Anexo 05 do RGF de todos os poderes/órgãos;"RREO
+RGF";"RREO - ANEXO-7
+RGF - ANEXO-5";Verifica a igualdade dos valores dos restos a pagar processados e não processados entre Anexo 07 do RREO e a soma dos valores dos Anexos 05 do RGF de todos os poderes/órgãos.;CAPAG
+DIII;D3_00010;Fiscal;E/DF/M;Igualdade da Receita Corrente Líquida (RCL) no Anexo 01 do RGF de todos os poderes/órgãos;RGF;ANEXO-1;Verifica a igualdade dos valores da RCL e da RCL ajustada entre o Demonstrativo da Despesa com Pessoal do RGF (Anexo 1) do Poder Executivo e dos demais poderes/órgãos.;CAPAG
+DIII;D3_00011;Fiscal;E/DF/M;Dedução de inativos e pensionistas com recursos vinculados menor ou igual ao valor com inativos e pensionistas no Anexo 01 do RGF de todos os poderes/órgãos;RGF;ANEXO-1;Verifica se o valor da dedução de inativos e pensionistas com recursos vinculados é menor ou igual ao valor da despesa com inativos e pensionistas no Anexo 01 do RGF de final de período de todos os poderes/órgãos.;
+DIII;D3_00012;Fiscal;E/DF/M;Informação de valores negativos no RREO;RREO;"ANEXO-1
+ANEXO-2
+ANEXO-3
+ANEXO-6
+ANEXO-7";Verifica se foram informados valores com sinal negativo no Relatório Resumido de Execução Orçamentária (RREO) em campos que não deveriam apresentar valores negativos.;
+DIII;D3_00013;Fiscal;E/DF/M;Informação de valores negativos no RGF de todos os poderes/órgãos;RGF;"ANEXO-1
+ANEXO-2
+ANEXO-4
+ANEXO-5";Verifica se foram informados valores com sinal negativo no Relatório de Gestão Fiscal (RGF) de todos os poderes/órgãos em campos que não deveriam apresentar valores negativos.;CAPAG
+DIII;D3_00014;Fiscal;E/DF/M;Igualdade das Transferências Obrigatórias da União Relativas às Emendas Individuais nos Anexos 01, 02 e 04 do RGF do poder executivo;RGF;"ANEXO-1
+ANEXO-2
+ANEXO-3
+ANEXO-4";Verifica a igualdade do valor da Transferências Obrigatórias da União Relativas às Emendas Individuais entre os anexos 1, 2, 3 e 4 do RGF do poder executivo de final de período.;CAPAG
+DIII;D3_00015;Fiscal;E/DF/M;Igualdade das Transferências Relativas às Emendas Individuais entre o Anexo 03 do RREO e o Anexo 01 do RGF do poder executivo;"RGF
+RREO";"RGF ANEXO-1
+RREO ANEXO-3";Verifica a igualdade do valor da Transferências Obrigatórias da União Relativas às Emendas Individuais entre o Anexo 01 do RGF do poder executivo e o Anexo 03 do RREO.;CAPAG
+DIII;D3_00016;Fiscal;E/DF/M;Igualdade das Transferências Relativas às Emendas de bancada entre o Anexo 03 do RREO e o Anexo 01 do RGF do poder executivo;"RGF
+RREO";"RGF ANEXO-1
+RREO ANEXO-3";Verifica a igualdade do valor da Transferências Obrigatórias da União Relativas às Emendas de Bancada entre o Anexo 01 do RGF do poder executivo e o Anexo 03 do RREO.;CAPAG
+DIII;D3_00017;Fiscal;E/DF/M;Igualdade entre os Restos a Pagar (Processados e Não-Processados) Pagos no Exercício do Anexo 6 do RREO com os Restos a Pagar (Processados e Não-Processados) Pagos do Anexo 7 do RREO ;RREO;"RREO - ANEXO-6 
+RREO - ANEXO-7";Verifica a igualdade entre os Restos a Pagar (Processados e Não-Processados) Pagos no Exercício do Anexo 6 do RREO com os Restos a Pagar (Processados e Não-Processados) Pagos do Anexo 7 do RREO ;
+DIII;D3_00021;Fiscal;E/DF/M;Verifica se o somatório do passivo circulante e passivo não circulante (apenas financeiros) é maior ou igual aos Restos a Pagar (liquidados ou em liquidação) da MSC dezembro - PO - Poder Executivo mais PO RPPS;MSC de Dezembro;"MSC de Dezembro
+";Verifica se o somatório do passivo circulante e passivo não circulante (apenas financeiros) é maior ou igual aos Restos a Pagar (liquidados ou em liquidação) da MSC dezembro - PO - Poder Executivo mais PO RPPS;CAPAG
+DIII;D3_00022;Fiscal;E/DF/M;"Igualdade das ""Receitas  Correntes Orçamentárias"" e ""Receitas Correntes Intraorçamentárias"" no Anexo 1 do RREO e dos valores da MSC de dezembro. ";"MSC de Dezembro
+RREO";"RREO - ANEXO 1 
+MSC de Dezembro";"Verifica a igualdade das ""Receitas  Correntes Orçamentárias"" e ""Receitas Correntes Intraorçamentárias"" no Anexo 1 do RREO e dos valores da MSC de dezembro. ";CAPAG
+DIII;D3_00023;Fiscal;E/DF/M;"Igualdade das ""Receitas de Capital Orçamentárias"" e ""Receitas de Capital Intraorçamentárias"" no Anexo 1 do RREO e da MSC de dezembro. ";"MSC de Dezembro
+RREO";"RREO - ANEXO 1
+MSC de Dezembro";"Verifica a igualdade das ""Receitas de Capital Orçamentárias"" e ""Receitas de Capital Intraorçamentárias"" no Anexo 1 do RREO e da MSC de dezembro. ";CAPAG
+DIII;D3_00024;Fiscal;E/DF/M;"Igualdade das ""Despesas  Correntes Orçamentárias"" e ""Despesas Correntes Intraorçamentárias"" no Anexo 1 do RREO e dos valores da MSC de dezembro.";"MSC de Dezembro
+RREO";"RREO - ANEXO 1
+MSC de Dezembro";"Verifica a igualdade  das ""Despesas  Correntes Orçamentárias"" e ""Despesas Correntes Intraorçamentárias"" no Anexo 1 do RREO e dos valores da MSC de dezembro.";CAPAG
+DIII;D3_00025;Fiscal;E/DF/M;"Igualdade das ""Despesas de Capital Orçamentárias"" e ""Despesas de Capital Intraorçamentárias"" no Anexo 1 do RREO e da MSC de dezembro. ";"MSC de Dezembro
+RREO";"RREO - ANEXO 1
+MSC de Dezembro";"Verifica a igualdade das ""Despesas de Capital Orçamentárias"" e ""Despesas de Capital Intraorçamentárias"" no Anexo 1 do RREO e da MSC de dezembro. ";
+DIII;D3_00026;Fiscal;E/DF/M;Verifica os valores de Caixa e Equivalentes de Caixa por grupos de Fontes de Recursos do Anexo 5 do RGF;"MSC de Dezembro
+RREO";"RREO - ANEXO 1
+MSC de Dezembro";Verifica os valores de Caixa e Equivalentes de Caixa por grupos de Fontes de Recursos do Anexo 5 do RGF;CAPAG
+DIII;D3_00027;Fiscal;E/DF/M;Verifica a igualdade entre Dotação atualizada, Despesas empenhadas até o bimestre, Despesas Liquidadas até o bimestre nos Anexos 1 e 6;RREO;"RREO - ANEXO-1 
+ RREO - ANEXO-6";Verifica a igualdade entre Dotação atualizada, Despesas empenhadas até o bimestre, Despesas Liquidadas até o bimestre nos Anexos 1 e 6;
+DIII;D3_00028;Fiscal;E/DF/M;"Igualdade no total das ""Receitas Realizadas Até o Bimestre"" - Anexo 1 e Anexo 6. ";RREO;"RREO - ANEXO-1 
+ RREO - ANEXO-6";"Verifica a igualdade no total das ""Receitas Realizadas Até o Bimestre"" - Anexo 1 e Anexo 6. ";CAPAG
+DIII;D3_00029;Fiscal;E/DF/M;"O valor da linha de dedução ""Parcela dedutível referente ao piso salarial do Enfermeiro, Técnico de Enfermagem, Auxiliar de Enfermagem e Parteira (ADCT, art. 38, §2º)"" deve ser menor ou igual a 90% do somatório dos valores informados na MSC Agregada mensal";"RGF
+MSC Dezembro";"RGF - ANEXO-1
+MSC de Dezembro";"Na MSC, são analisados os saldos finais das contas 6221303, 6221304, 6221305, 6221306, 6221307 com as ICs:
+* PO: executivo, RPPS e defensoria pública
+* ND: 3.1.XX.XX.XX , 3.3.XX.34.XX , ND: 3.3.90.91.34 , ND: 3.3.90.92.34
+* FR: 605";
+DIII;D3_00030;Fiscal;E/DF/M;Verificação de igualdade entre o total de receitas previdenciárias, Anexo 4 com o Anexo 6 do RREO;RREO;"RREO - ANEXO - 4
+RREO - ANEXO - 6 ";Verificação de igualdade entre o total de receitas previdenciárias, Anexo 4 com o Anexo 6 do RREO;CAPAG
+DIII;D3_00032;Fiscal;E/DF/M;Verificação de igualdade de Recursos Arrecadados em Exercícios Anteriores (RPPS) entre os anexos 1, 4 e 6 do RREO.;RREO;"RREO - ANEXO - 1
+RREO - ANEXO - 4
+RREO - ANEXO - 6 ";Verificação de igualdade de Recursos Arrecadados em Exercícios Anteriores (RPPS) entre os anexos 1, 4 e 6 do RREO.;
+DIII;D3_00033;Fiscal;E/DF/M;Verificação de igualdade de Superávit Financeiro Utilizado para Créditos Adicionais entre os anexos 1 e 6 do RREO.;RREO;"RREO - ANEXO - 1
+RREO - ANEXO - 6 ";Verificação de igualdade de Superávit Financeiro Utilizado para Créditos Adicionais entre os anexos 1 e 6 do RREO.;
+DIII;D3_00034;Fiscal;E/DF/M;Verificação de igualdade de Reserva do RPPS entre os anexos 1, 4 e 6 do RREO.;RREO;"RREO - ANEXO - 1
+RREO - ANEXO - 4
+RREO - ANEXO - 6 ";Verificação de igualdade de Reserva do RPPS entre os anexos 1, 4 e 6 do RREO.;
+DIII;D3_00035;Fiscal;E/DF/M;Verificação de igualdade de Reserva de Contingência entre os anexos 1 e 6 do RREO.;RREO;"RREO - ANEXO - 1
+RREO - ANEXO - 6 ";Verificação de igualdade de Reserva de Contingência entre os anexos 1 e 6 do RREO.;
+DIII;D3_00037;Fiscal;E/DF/M;Verificação da igualdade de Investimentos (intra + exceto intra) do Anexo 1 e do Anexo 9 do RREO.;RREO;"RREO - ANEXO - 1
+RREO - ANEXO - 9 ";Verificação da igualdade de Investimentos (intra + exceto intra) do Anexo 1 e do Anexo 9 do RREO.;
+DIII;D3_00038;Fiscal;E/DF/M;Verificação da igualdade de Inversões Financeiras (intra + exceto intra) do Anexo 1 e do Anexo 9 do RREO.;RREO;"RREO - ANEXO - 1
+RREO - ANEXO - 9 ";Verificação da igualdade de Inversões Financeiras (intra + exceto intra) do Anexo 1 e do Anexo 9 do RREO.;
+DIII;D3_00039;Fiscal;E/DF/M;Verificação da igualdade de Amortização da Dívida (intra + exceto intra) do Anexo 1 e do Anexo 9 do RREO.;RREO;"RREO - ANEXO - 1
+RREO - ANEXO - 9 ";Verificação da igualdade de Amortização da Dívida (intra + exceto intra) do Anexo 1 e do Anexo 9 do RREO.;
+DIII;D3_00040;Fiscal;E/DF/M;Verificação da igualdade de Receitas de Operações de crédito do Anexo 1 e do Anexo 9 do RREO.;RREO;"RREO - ANEXO - 1
+RREO - ANEXO - 9 ";Verificação da igualdade de Receitas de Operações de crédito do Anexo 1 e do Anexo 9 do RREO.;
+DIII;D3_00044;Fiscal;E/DF/M;Igualdade de Transferências da União relativas a remuneração dos agentes  comunitários de saúde e de combate às endemias.;RREO;"RREO - ANEXO - 3
+RGF - ANEXO-1";Igualdade de Transferências da União relativas a remuneração dos agentes  comunitários de saúde e de combate às endemias (CF, art. 198, §11) (VII) do anexo 3 RREO e o valor correspondente no Anexo 1 RGF;CAPAG
+DIII;D3_00045;Fiscal;E/DF/M;Verifica se foram informados valores negativos em todas a linhas que não sejam totais ou subtotais das colunas referentes aos Restos a Pagar.;RREO;DECLARAÇÕES;Verifica se foram informados valores negativos em todas a linhas que não sejam totais ou subtotais das colunas Restos a Pagar Liquidados e Não Pagos de Exercícios Anteriores (b) e do Exercício (c), Restos a Pagar Empenhados e Não Liquidados de Exercícios Anteriores (d) e Demais Obrigações Financeiras (e);CAPAG
+DIV;D4_00001;"Contábil
+x
+Fiscal";E/DF/M;Igualdade da receita realizada entre o Anexo I-C da DCA e o Anexo 01 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I-C
+RREO-ANEXO 1";Verifica se os valores de receita realizada do Anexo I-C da DCA estão iguais ao Anexo 01 do RREO 6ºB.;CAPAG
+DIV;D4_00002;"Contábil
+x
+Fiscal";E/DF/M;Igualdade da execução da despesa entre o Anexo I-D da DCA e o Anexo 01 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - D
+RREO-ANEXO 1";Verifica se os valores da execução da despesa do Anexo I-D da DCA estão iguais ao Anexo 01 do RREO 6ºB para as colunas: Empenhado/Liquidado/Pago/RPNP.;CAPAG
+DIV;D4_00003;"Contábil
+x
+Fiscal";E/DF/M;Igualdade da execução da despesa por função entre o Anexo I-E da DCA e o Anexo 02 do RREO 6ºB (exceto intraorçamentária).;"DCA
+RREO";"DCA - ANEXO - I - E
+RREO-ANEXO-2";Verifica se os valores da execução da despesa por função, exceto intraorçamentária, no Anexo I-E da DCA estão iguais ao Anexo 02 do RREO 6ºB. ;CAPAG
+DIV;D4_00004;"Contábil
+x
+Fiscal";E/DF/M;Igualdade da execução da despesa por função entre o Anexo I-E da DCA e o Anexo 02 do RREO 6ºB (intraorçamentária).;"DCA
+RREO";"DCA - ANEXO - I - E
+RREO-ANEXO-2";Verifica se os valores da execução da despesa por função intraorçamentária no Anexo I-E da DCA estão iguais ao Anexo 02 do RREO 6ºB.;CAPAG
+DIV;D4_00005;"Contábil
+x
+Fiscal";E/DF/M;Igualdade dos restos a pagar não processados e processados entre o Anexo I-F da DCA e o Anexo 07 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO - IF
+RREO-ANEXO-7";Verifica se os valores dos restos a pagar processados e não processados do Anexo I-F da DCA (Execução dos Restos a Pagar) estão iguais ao Anexo 07 do RREO 6ºB.;
+DIV;D4_00006;"Contábil
+x
+Fiscal";E/DF/M;Igualdade dos restos a pagar não processados entre o Anexo I-G da DCA e o Anexo 07 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO - IG
+RREO-ANEXO-7";Verifica se os valores dos restos a pagar não processados na Execução dos Restos a Pagar do Anexo I-G da DCA estão iguais ao Anexo 07 do RREO 6ºB.;
+DIV;D4_00007;"Contábil
+x
+Fiscal";E/DF/M;Igualdade dos restos a pagar processados entre o Anexo I-G da DCA e o Anexo 07 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO - IG
+RREO-ANEXO-7";Verifica se os valores dos restos a pagar processados na Execução dos Restos a Pagar do Anexo I-G da DCA estão iguais ao Anexo 07 do RREO 6ºB.;
+DIV;D4_00008;"Contábil
+x
+Fiscal";E/DF/M;Igualdade das receitas com alienação de ativos entre a o Anexo I-C da DCA e o Anexo 11 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 11";Verifica se os valores das receitas com alienação de ativos do Anexo I-C da DCA estão iguais ao Anexo 11 do RREO 6ºB.;
+DIV;D4_00009;"Contábil
+x
+Fiscal";E/DF;Igualdade das receitas com tributos estaduais entre o Anexo I-C da DCA e o Anexo 03 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 3";Verifica se os valores das receitas com tributos estaduais (ICMS, IPVA, ITCD, IRRF) do Anexo I-C da DCA estão iguais ao Anexo 03 do RREO 6ºB.;
+DIV;D4_00010;"Contábil
+x
+Fiscal";M;Igualdade das receitas com tributos municipais entre o Anexo I-C da DCA e o Anexo 03 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 3";Verifica se os valores das  receitas com tributos municipais (IPTU, ISS, ITBI, IRRF) do Anexo I-C da DCA estão iguais ao Anexo 03 do RREO 6ºB.;CAPAG
+DIV;D4_00011;"Contábil
+x
+Fiscal";E/DF;Igualdade das transferências estaduais entre o Anexo I-C da DCA e o Anexo 03 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 3";Verifica se os valores das  receitas com transferências estaduais ( Cota-Parte do FPE e Transferências do FUNDEB) do Anexo I-C da DCA estão iguais ao Anexo 03 do RREO 6ºB.;
+DIV;D4_00012;"Contábil
+x
+Fiscal";M;Igualdade das transferências municipais entre o Anexo I-C da DCA e o Anexo 03 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 3";Verifica se os valores das  receitas com transferências municipais (Cotas-Partes do FPM, do ICMS, do IPVA, do ITR e Transferências do FUNDEB)  do Anexo I-C da DCA estão iguais ao Anexo 03 do RREO 6ºB.;CAPAG
+DIV;D4_00013;"Contábil
+x
+Fiscal";E/DF;Igualdade das receitas com tributos estaduais entre o Anexo I-C da DCA e o Anexo 06 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 6";Verifica se os valores das  receitas com tributos estaduais (ICMS, IPVA, ITCD, IRRF) do Anexo I-C da DCA estão iguais ao Anexo 06 do RREO 6ºB.;
+DIV;D4_00014;"Contábil
+x
+Fiscal";M;Igualdade das receitas com tributos municipais entre o Anexo I-C da DCA e o Anexo 06 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 6";Verifica se os valores das receitas com tributos municipais (IPTU, ISS, ITBI, IRRF) do Anexo I-C da DCA estão iguais ao Anexo 06 do RREO 6ºB.;
+DIV;D4_00015;"Contábil
+x
+Fiscal";E/DF;Igualdade das transferências constitucionais estaduais entre o Anexo I-C da DCA e o Anexo 06 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 6";Verifica se os valores das transferências constitucionais estaduais (Cota-Parte do FPE e Transferências do FUNDEB) do Anexo I-C da DCA estão iguais ao Anexo 06 do RREO 6ºB.;
+DIV;D4_00016;"Contábil
+x
+Fiscal";M;Igualdade das transferências constitucionais municipais entre o Anexo I-C da DCA e o Anexo 06 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 6";Verifica se os valores das transferências constitucionais municipais (Cotas-Partes do FPM, do ICMS, do IPVA, do ITR e Transferências do FUNDEB) no Anexo I-C da DCA estão iguais ao Anexo 06 do RREO 6ºB.;
+DIV;D4_00017;"Contábil
+x
+Fiscal";E/DF/M;Igualdade das contrib. dos servidores e compensações financeiras entre o Anexo I-C da DCA e o Anexo 03 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - C
+RREO - ANEXO 3";Verifica a igualdade nas contribuições dos servidores entre o RREO - Anexo 03 e a DCA – Anexo I-C.;CAPAG
+DIV;D4_00019;"Contábil
+x
+Fiscal";E/DF/M;Igualdade do valor das despesas de capital entre o Anexo I-D da DCA e o Anexo 09 do RREO 6ºB.;"DCA
+RREO";"DCA - ANEXO I - D
+RREO - ANEXO 9";Verifica se o valor bruto das despesas de capital no Anexo I-D da DCA está igual ao Anexo 09 do RREO 6ºB.;
+DIV;D4_00020;"Contábil
+x
+Fiscal";E/DF/M;Igualdade nas receitas arrecadadas na MSC de dezembro e no Anexo 01 do RREO 6ºB.;"MSC
+RREO";"MSCC - Dezembro
+RREO - ANEXO 1";Verifica se o valor acumulado das receitas arrecadadas da MSC de dezembro é igual às receitas arrecadadas do Anexo 01 do RREO 6ºB. Na MSC de dezembro, é considerado o saldo final das contas começadas por 6212 e 6213 com detalhamento de natureza de receita.;CAPAG
+DIV;D4_00021;"Contábil
+x
+Fiscal";E/DF;Igualdade nas receitas com tributos estaduais na MSC de dezembro e no Anexo 03 do RREO 6ºB.;"MSC
+RREO";"MSCC - Dezembro
+RREO - ANEXO 3";Verifica se o valor acumulado das receitas com tributos estaduais (ICMS, IPVA, ITCD, IRRF) da MSC de dezembro é igual ao informado no Anexo 03 do RREO 6ºB. Na MSC de dezembro, é considerado o saldo final das contas começadas por 6212 e 62132 e 62139 com detalhamento da naturezas de receitas.;CAPAG
+DIV;D4_00022;"Contábil
+x
+Fiscal";M;Igualdade nas receitas com tributos municipais na MSC de dezembro e no Anexo 03 do RREO 6ºB.;"MSC
+RREO";"MSCC - Dezembro
+RREO - ANEXO 3";Verifica se o valor acumulado das receitas com tributos municipais ( IPTU, ISS, ITBI, IRRF ) da MSC de dezembro é igual ao informado no Anexo 03 do RREO 6ºB. Na MSC de dezembro, é considerado o saldo final das contas começadas por 6212 e 62132 e 62139 com detalhamento da naturezas de receitas.;
+DIV;D4_00023;"Contábil
+x
+Fiscal";E/DF;Igualdade nas receitas estaduais com transferências constitucionais na MSC de dezembro e no Anexo 03 do RREO 6ºB.;"MSC
+RREO";"MSCC - Dezembro
+RREO - ANEXO 3";Verifica se o valor acumulado das receitas estaduais com transferências ( Cota-Parte do FPE e Transferências do FUNDEB) da MSC de dezembro é igual ao informado no Anexo 03 do RREO 6ºB. Na MSC de dezembro, é considerado o saldo final das contas começadas por 6212 e 62132 e 62139 com detalhamento da naturezas de receitas.;CAPAG
+DIV;D4_00024;"Contábil
+x
+Fiscal";M;Igualdade nas receitas municipais com transferências constitucionais na MSC de dezembro e no Anexo 03 do RREO 6ºB.;"MSC
+RREO";"MSCC - Dezembro
+RREO - ANEXO 3";Verifica se o valor acumulado das receitas municipais com transferências (Cotas-Partes do FPM, do ICMS, do IPVA, do ITR e Transferências do FUNDEB) da MSC de dezembro é igual ao informado no Anexo 03 do RREO 6ºB. Na MSC de dezembro, é considerado o saldo final das contas começadas por 6212 e 62132 e 62139 com detalhamento da naturezas de receitas.;
+DIV;D4_00025;"Contábil
+x
+Fiscal";E/DF/M;Igualdade das Despesas Orçamentárias empenhadas, liquidadas e pagas na MSC de dezembro e no RREO 6ºB.;"MSC
+RREO";"MSCC - Dezembro
+RREO - ANEXO 1";Verifica se o valor das despesas orçamentárias no Anexo 01 do RREO 6ºB está igual ao saldo final da MSC de dezembro das contas do grupo 62213 que tenham detalhamento de natureza de despesa. Avaliam-se valores empenhados, liquidados e pagos.;CAPAG
+DIV;D4_00026;"Contábil
+x
+Fiscal";E/DF/M;Igualdade dos Restos a Pagar não processados no Anexo 01 do RREO 6ºB e na MSC de dezembro.;"MSC
+RREO";"MSCC - Dezembro
+RREO - ANEXO 1";Verifica se o valor dos RPNP no Anexo 01 do RREO 6ºB está igual ao saldo final das contas contábeis começadas por 6221305 e 6221306, com detalhamento de natureza de despesa, na MSC de dezembro.;
+DIV;D4_00027;"Contábil
+x
+Fiscal";E/DF/M;Avalia se o valor de caixa e equivalente de caixas do Anexo 02 do RGF é menor ou igual ao saldo de caixa e equivalentes do Anexo 01 da DCA.;"DCA
+RGF";"DCA
+RGF - ANEXO 2 ";Compara o saldo da conta CEC da DCA com a disponibilidade de caixa bruta total do Anexo 2 do RGF. Disponibilidade de Caixa Bruta do Anexo 2 do RGF deve ser menor ou igual a 1.1.1.0.0.00.00 - Caixa e Equivalentes, do Anexo I-AB, da DCA.;
+DIV;D4_00028;"Contábil
+x
+Fiscal";E/DF/M;Avalia se o valor de caixa e equivalente de caixas do Anexo 05 do RGF é menor ou igual ao saldo de caixa e equivalentes do Anexo 01 da DCA.;"DCA
+RGF";"DCA
+RGF - ANEXO 5";Compara o saldo da conta CEC da DCA com a disponibilidade de caixa bruta total do Anexo 5 do RGF. Disponibilidade de Caixa Bruta do Anexo 5 do RGF deve ser menor ou igual a 1.1.1.0.0.00.00 - Caixa e Equivalentes do Anexo I-AB, da DCA.;CAPAG
+DIV;D4_00029;"Contábil
+x
+Fiscal";E/DF/M;Avalia se o valor de despesas exceto-intra na função 09 (Prev. Social) é igual entre a MSC de Dezembro e o Anexo 02 do RREO.;"MSC
+RREO";"RREO - ANEXO 2
+MSCC - Dezembro";Compara, entre RREO X  MSC de Dezembro, as Despesas Exceto Intraorçamentárias na função 09 (Previdência Social). Na MSC de Dezembro, utliza-se o saldo final para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação diferente de 91 e classificação funcional igual a 09.;
+DIV;D4_00030;"Contábil
+x
+Fiscal";E/DF/M;Avalia se o valor de despesas exceto-intra na função 10 (Saúde) é igual entre a MSC de Dezembro e o Anexo 02 do RREO.;"MSC
+RREO";"RREO - ANEXO 2
+MSCC - Dezembro ";Compara, entre RREO X  MSC de Dezembro, as Despesas Exceto Intraorçamentárias na função 10 (Saúde). Na MSC de Dezembro, utliza-se o saldo final para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação diferente de 91 e classificação funcional igual a 10.;
+DIV;D4_00031;"Contábil
+x
+Fiscal";E/DF/M;Avalia se o valor de despesas exceto-intra na função 12 (Educação) é igual entre a MSC de Dezembro e o Anexo 02 do RREO.;"MSC
+RREO";"RREO - ANEXO 2
+MSCC - Dezembro";Compara, entre RREO X  MSC de Dezembro, as Despesas Exceto Intraorçamentárias na função 12 (Educação). Na MSC de Dezembro, utliza-se o saldo final para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação diferente de 91 e classificação funcional igual a 12.;
+DIV;D4_00032;"Contábil
+x
+Fiscal";E/DF/M;Avalia se o valor de despesas exceto-intra nas funções diferentes de 09, 10 e 12 é igual entre a MSC de Dezembro e o Anexo 02 do RREO.;"MSC
+RREO";"RREO - ANEXO 2
+MSCC - Dezembro ";Compara, entre RREO X  MSC de Dezembro, as Despesas Exceto Intraorçamentárias nas demais funções (Excetuando-se as funções de Saúde, Educação e Previdência Social). Na MSC de Dezembro, utliza-se o saldo final para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação diferente de 91 e classificação funcional diferente de 09, 10 e 12.;
+DIV;D4_00033;"Contábil
+x
+Fiscal";E/DF/M;Avalia se o valor de despesas intraorçamentárias com detalhamento de função/subfunção é igual entre a MSC de Dezembro e o Anexo 02 do RREO.;"MSC
+RREO";"RREO - ANEXO 2
+MSCC - Dezembro ";Compara as despesas por função entre RREO X  MSC de Dezembro - Intraorçamentárias. Na MSC de Dezembro, utliza-se o saldo final para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 62213 com modalidade de aplicação igual a 91.;
+DIV;D4_00034;"Contábil
+x
+Fiscal";E/DF/M;Avalia a igualdade entre os saldos finais de RPP pagos e RPNP pagos na MSC de Dezembro e no Anexo 07 do RREO.;"MSC
+RREO";"RREO - ANEXO 7 
+MSCC - Dezembro  ";Compara o saldo final de RPPP e RPNPP executados no exercício entre o RREO - Anexo 07  x MSC de dezembro. Na MSC de encerramento, utliza-se o saldo final (ending_balance) para contas de classe 5 e 6. São avaliados os saldos das contas contábeis começadas por 6314 (RPNPP) e 6322 (RPPP).;
+DIV;D4_00035;"Contábil
+x
+Fiscal";E/DF/M;Avalia se o valor de caixa e equivalente de caixas do Anexo 05 do RGF é menor ou igual ao saldo de caixa e equivalentes da MSC de encerramento.;"MSC
+RREO";"RGF - ANEXO 5
+MSCC - Dezembro";Compara o saldo da conta CEC da MSC de dezembro com a disponibilidade de caixa bruta total do Anexo 5 do RGF. Na MSC de dezembro, utliza-se o saldo final (ending_balance) para contas de classe 1 e 2. São avaliados os saldos das contas começadas por 111.;CAPAG
+DIV;D4_00036;"Contábil
+x
+Fiscal";E/DF/M;Avalia se o valor de caixa e equivalente de caixas do Anexo 02 do RGF é menor ou igual ao saldo de caixa e equivalentes do Anexo 01 da MSC de encerramento.;"MSC
+RREO";"RGF - ANEXO 2
+MSCC - Dezembro ";Compara o saldo da conta CEC da MSC de dezembro com a disponibilidade de caixa bruta total do Anexo 2 do RGF. Na MSC de dezembro, utliza-se o saldo final (ending_balance) para contas de classe 1 e 2. São avaliados os saldos das contas começadas por 111.;
+DIV;D4_00037;"Contábil
+x
+Fiscal";E/DF;Igualdade nas receitas de Tributos (ICMS, IPVA, ITCD, IRRF) entre os Anexos 6 RREO X MSC de dezembro.;"MSC 
+RREO";RREO - Anexo 6 /  MSC de dezembro;Igualdade nas receitas de Tributos (ICMS, IPVA, ITCD, IRRF) entre os Anexos 6 RREO X MSC de dezembro;CAPAG
+DIV;D4_00038;"Contábil
+x
+Fiscal";M;Igualdade nas receitas de Tributos ( IPTU, ISS, ITBI, IRRF ) entre os Anexos VI RREO X MSC de dezembro.;"MSC 
+RREO";RREO - Anexo 6 /  MSC de dezembro;Igualdade nas receitas de Tributos ( IPTU, ISS, ITBI, IRRF ) entre os Anexos VI RREO X MSC de dezembro;CAPAG
+DIV;D4_00039;"Contábil
+x
+Fiscal";E/DF;Igualdade no valor das transferências constitucionais   ( Cota-Parte do FPE e Transferências do FUNDEB)  entre os anexos 6 RREO X MSC de dezembro.;"MSC 
+RREO";RREO - Anexo 6 /  MSC de dezembro;Igualdade no valor das transferências constitucionais   ( Cota-Parte do FPE e Transferências do FUNDEB)  entre os anexos 6 RREO X MSC de dezembro;CAPAG
+DIV;D4_00040;"Contábil
+x
+Fiscal";M;Igualdade no valor das transferências constitucionais (  Cota-Parte do FPM, Cota-Parte do ICMS, Cota-Parte do IPVA, Cota-Parte do ITR e Transferências do FUNDEB )  entre os anexos VI RREO X MSC de dezembro.;"MSC 
+RREO";RREO - Anexo 6 /  MSC de dezembro;Igualdade no valor das transferências constitucionais (  Cota-Parte do FPM, Cota-Parte do ICMS, Cota-Parte do IPVA, Cota-Parte do ITR e Transferências do FUNDEB )  entre os anexos VI RREO X MSC de dezembro;CAPAG
+DIV;D4_00041;"Contábil
+x
+Fiscal";E/DF/M;Avalia o impacto nas contas de natureza patrimonial, Passivo Financeiro da DCA, se é maior ou igual a soma de restos a pagar do exercício, bem como dos restos a pagar pendentes de pagamento.;"DCA 
+MSC de dezembro  ";"DCA 
+MSC de dezembro  ";Avalia o impacto nas contas de natureza patrimonial, Passivo Financeiro da DCA, se é maior ou igual a soma da inscrição de restos a pagar no exercício, bem como dos restos a pagar pendentes de pagamento.;CAPAG
+DIV;D4_00042;"Contábil
+x
+Fiscal";E/DF/M;"Relação entre valores restituíveis na MSC e Obrigações Financeiras Extraorçamentárias no Anexo 05 do RGF.
+O valor do RGF deve ser maior ou igual ao valor apurado na MSC.";"MSC 
+RGF";"MSC - Dezembro
+RGF - Anexo 05";São avaliados na MSC de dezembro o saldo final das contas contábeis começadas com 2188 + começadas por 2288 + 218910105 + 218910108, sendo todas essas contas vinculadas ao Poder Executivo e associadas às fontes de recurso 860, 861, 862 e 869.;CAPAG
+DIV;D4_00043;"Contábil
+x
+Fiscal";E/DF/M;Igualdade entre os valores de Recursos Não Vinculados às Disponibilidades de Caixa e aos Restos a Pagar Processados e Não Processados de exercícios anteriores com os saldos finais da MSC de dezembro.;"MSC 
+RGF";"MSC - Dezembro
+RGF - Anexo 06";"São avaliados na MSC de dezembro o saldo final das contas contábeis específicas de cada uma da colunas combinadas às fontes de recurso de cada uma das linhas (500 ou 501, 502 e 503).
+Contas por coluna:
+* Disponibilidade de caixa bruta: começadas por 11111,11121,11131,11133,11134,11135
+* RP Liquidados e não pagos de exercicios anteriores: começadas por 6321,6313
+* RP Liquidados e não pagos do exercício: começadas por 6327
+* Restos a Pagar empenhados e não pagos de exercícios anteriores: começadas por 6311,6312";CAPAG
+DIV;D4_00045;"Contábil
+x
+Fiscal";E/DF/M;"Relação entre valores restituíveis na MSC e em Recursos Extraorçamentários no RGF.
+O valor do RGF deve ser maior ou igual ao valor apurado na MSC.";"MSC 
+RGF";"MSC - Dezembro
+RGF - Anexo 07";São avaliados na MSC de dezembro o saldo final das contas contábeis começadas por 1113, associadas às FRs 860, 861, 862 e 869, do poder executivo.;CAPAG
+ -;DI;Dimensão da Gestão da Informação;-; -; -; -;Dimensão de análise das entregas, prazo, retificações e estrutuda da MSC;
+ -;DII;Dimensão contábil; -; -; -; -;Dimensão de análise dos elementos contábeis;
+ -;DIII;Dimensão fiscal; -; -; -; -;Dimensão das análises fiscais dos relatórios;
+ -;DIV;Dimensão contábil x fiscal; -; -; -; -;Dimensão contábil x fiscal;

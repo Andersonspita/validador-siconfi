@@ -269,7 +269,7 @@ function App() {
           >
             <span className="nav-left">
               <Gauge size={18} />
-              CAPAG &amp; Limites LRF
+              CAPAG &amp; CAUC
             </span>
             {stats.capag > 0 && (
               <span className="inst-nav-count warn">{stats.capag}</span>
@@ -295,7 +295,7 @@ function App() {
           >
             <span className="nav-left">
               <Table2 size={18} />
-              Matriz de Saldos (MSC)
+              Relatórios de Execução
             </span>
           </button>
           <a

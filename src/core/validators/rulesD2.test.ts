@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateD2_MSC } from './rulesD2';
+import { validateD2_MSC, validateD2_MSC_Encerramento_DCA } from './rulesD2';
 import { MSCAccount, ParsedData } from '../types';
 
 const acc = (partial: Partial<MSCAccount> & Pick<MSCAccount, 'CONTA' | 'Valor'>): MSCAccount => ({
@@ -174,5 +174,48 @@ describe('D2_00086/087/088 — VPD/VPA por competência', () => {
     ];
     const results = validateD2_MSC(data(msc), new Map());
     expect(results.find(r => r.ruleId === 'D2_00088')).toBeDefined();
+  });
+});
+
+// ─── D2_00069–74: MSC Encerramento × DCA ─────────────────────────────────────
+
+describe('D2_00069–74 — MSC Encerramento × DCA Anexo I-E/I-F', () => {
+  it('D2_00070 aponta divergência de função Saúde entre MSC encerramento e DCA I-E', () => {
+    const mscEnc: MSCAccount[] = [
+      acc({
+        CONTA: '622130100', Valor: 1000, Tipo_valor: 'beginning_balance',
+        Natureza_valor: 'C', FS: '10000', ND: '339030',
+      }),
+    ];
+    const dca = {
+      'DCA-Anexo I-E': [
+        ['Função', 'Despesas Empenhadas'],
+        ['10 - Saúde', 500],
+        ['TOTAL DAS DESPESAS EXCETO INTRA', 500],
+      ],
+      'DCA-Anexo I-D': [
+        ['Despesas Empenhadas', 'Liquidadas', 'Pagas'],
+        ['Total Geral da Despesa', 1000, 0, 0],
+      ],
+      'DCA-Anexo I-C': [
+        ['Conta', 'Receitas Brutas Realizadas'],
+        ['TOTAL DAS RECEITAS', 0],
+      ],
+    };
+    const parsed: ParsedData = {
+      mscByPeriod: { '2025-13': mscEnc },
+      dca,
+    };
+    const results = validateD2_MSC_Encerramento_DCA(parsed, new Map());
+    expect(results.find(r => r.ruleId === 'D2_00070')).toBeDefined();
+  });
+
+  it('não executa D2_00069–74 sem MSC de encerramento', () => {
+    const parsed: ParsedData = {
+      mscByPeriod: { '2025-12': [acc({ CONTA: '622130100', Valor: 100 })] },
+      dca: { 'DCA-Anexo I-E': [['x']] },
+    };
+    const results = validateD2_MSC_Encerramento_DCA(parsed, new Map());
+    expect(results.find(r => r.ruleId?.startsWith('D2_0007'))).toBeUndefined();
   });
 });

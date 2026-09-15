@@ -22,6 +22,7 @@ yarn-error.log*
 
 # User Data (sem lixo / dados financeiros no repo)
 *.csv
+!public/data/*.csv
 *.zip
 temp_zip/
 

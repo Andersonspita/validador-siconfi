@@ -9,10 +9,11 @@ import { calcularCapag } from '../core/capagEngine';
 import Papa from 'papaparse';
 import {
   CheckCircle, AlertTriangle, XCircle, ArrowLeft, Loader2, ShieldAlert,
-  Download, Lightbulb, BarChart3, Search, Bot, Copy
+  Download, Lightbulb, BarChart3, Search, Bot, Copy, FileText
 } from 'lucide-react';
 import ReportView from './ReportView';
 import CAPAGPanel from './CAPAGPanel';
+import { generatePDF } from '../core/pdfGenerator';
 import type { AppNav } from '../navigation';
 import './ReportDashboard.css';
 
@@ -216,6 +217,10 @@ export default function ReportDashboard({
     openHtmlReport(buildPlanoAcaoHtml(buildScoreSummary(results, { rulesMap }), rankingMeta()));
   };
 
+  const exportPDF = () => {
+    generatePDF(results, { enteId: reportMeta.enteId, periodo: reportMeta.periodo });
+  };
+
   const copyEntry = async (text: string) => {
     try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
   };
@@ -232,6 +237,7 @@ export default function ReportDashboard({
             msc={parsedMsc}
             enteId={reportMeta.enteId}
             ano={reportMeta.periodo ? parseInt(reportMeta.periodo.split('-')[0]) : undefined}
+            lrfResults={results.map(r => ({ ruleId: r.ruleId, message: r.message, severity: r.severity }))}
           />
         ) : (
           <div className="panel panel-pad"><p>MSC necessária para estimar CAPAG.</p></div>
@@ -327,6 +333,7 @@ export default function ReportDashboard({
         </button>
         <div className="export-actions">
           <button onClick={exportToCSV} className="inst-btn"><Download size={16} /> Exportar CSV</button>
+          <button onClick={exportPDF} className="inst-btn"><FileText size={16} /> Relatório PDF</button>
           <button onClick={openRanking} className="inst-btn"><BarChart3 size={16} /> Ranking STN</button>
           <button onClick={openPlanoAcao} className="inst-btn inst-btn-primary"><Lightbulb size={16} /> Plano de Ação</button>
         </div>

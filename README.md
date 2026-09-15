@@ -52,7 +52,7 @@ cp .env.example .env
 # editar .env com VITE_FIREBASE_* 
 
 npm run dev          # http://localhost:5173
-npm test             # 33 testes Vitest
+npm test             # Vitest (~70 testes)
 npx tsc --noEmit     # verificar tipos
 npm run build        # build produção → /dist
 npm run deploy       # publicar no GitHub Pages (requer .env)

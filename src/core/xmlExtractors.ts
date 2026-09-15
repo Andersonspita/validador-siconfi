@@ -899,8 +899,43 @@ export const getTotalReceitas_A01 = (rreo: any): number | null =>
 export const getDCA_DespesaFuncaoExcetoIntra_IE = (dca: any): number | null =>
   extractByColumnFromReport(dca, ['DCA-Anexo I-E', 'Anexo I-E'], 'TOTAL.*EXCETO INTRA', 'Despesas Liquidadas');
 
+/** Despesa por função no Anexo I-E (exceto-intra), coluna Empenhadas. */
+export const getDCA_DespesaFuncao_IE = (dca: any, rowTerm: string): number | null =>
+  extractByColumnFromReport(
+    dca,
+    ['DCA-Anexo I-E', 'Anexo I-E'],
+    rowTerm,
+    'Despesas Empenhadas|Empenhadas'
+  );
+
+export const getDCA_DespesaIntra_IE = (dca: any): number | null =>
+  extractByColumnFromReport(
+    dca,
+    ['DCA-Anexo I-E', 'Anexo I-E'],
+    'DESPESAS.*INTRAOR[ÇC]AMENT[ÁA]RIAS|TOTAL.*INTRA(?!.*EXCETO)',
+    'Despesas Empenhadas|Empenhadas'
+  );
+
 export const getDCA_RP_Pagos_IF = (dca: any): number | null =>
   extractByColumnFromReport(dca, ['DCA-Anexo I-F', 'Anexo I-F'], 'TOTAL', 'Pagos');
+
+/** RPP pagos no Anexo I-F da DCA. */
+export const getDCA_RPP_Pagos_IF = (dca: any): number | null =>
+  extractByColumnFromReport(
+    dca,
+    ['DCA-Anexo I-F', 'Anexo I-F'],
+    'RESTOS A PAGAR PROCESSADOS|RPP',
+    'Pagos'
+  );
+
+/** RPNP pagos no Anexo I-F da DCA. */
+export const getDCA_RPNP_Pagos_IF = (dca: any): number | null =>
+  extractByColumnFromReport(
+    dca,
+    ['DCA-Anexo I-F', 'Anexo I-F'],
+    'RESTOS A PAGAR N[ÃA]O PROCESSADOS|RPNP',
+    'Pagos'
+  );
 
 export const getDCA_RPNP_Pagos_IG = (dca: any): number | null =>
   extractByColumnFromReport(dca, ['DCA-Anexo I-G', 'Anexo I-G'], 'TOTAL', 'Pagos');
